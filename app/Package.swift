@@ -8,7 +8,7 @@ let package = Package(
         .package(url: "https://github.com/supabase/supabase-swift", from: "2.5.0"),
     ],
     targets: [
-        .target(name: "FriendCalCore", dependencies: [.product(name: "Supabase", package: "supabase-swift")], path: "FriendCal", sources: ["Models", "Services", "Privacy"]),
+        .target(name: "FriendCalCore", dependencies: [.product(name: "Supabase", package: "supabase-swift")], path: "FriendCal", exclude: ["FriendCalApp.swift", "Views", "Secrets.plist", "Secrets.plist.template"], sources: ["Models", "Services", "Privacy"]),
         .testTarget(name: "FriendCalTests", dependencies: ["FriendCalCore"], path: "FriendCalTests"),
     ]
 )

@@ -9,7 +9,7 @@ protocol SupabaseServiceProtocol {
     func fetchProposals(for userID: UUID) async throws -> [Proposal]
     func createProposal(_ p: Proposal) async throws
     func lockProposal(_ id: UUID, to date: Date) async throws
-    func fetchBusyBlocks(for viewerID: UUID, in range: ClosedRange<Date>) async throws -> [BusyBlock]
+    func fetchBusyBlocks(for viewerID: UUID, in range: DateRange) async throws -> [BusyBlock]
     func subscribeRealtime(onProposal id: UUID, handler: @escaping ([AvailabilitySlot]) -> Void) -> Any
 }
 
@@ -46,7 +46,7 @@ final class SupabaseService: SupabaseServiceProtocol {
         try await client.from("proposals").update(["locked_date": ISO8601DateFormatter().string(from: date), "status": "locked"]).eq("id", value: id.uuidString).execute()
     }
 
-    func fetchBusyBlocks(for viewerID: UUID, in range: ClosedRange<Date>) async throws -> [BusyBlock] {
+    func fetchBusyBlocks(for viewerID: UUID, in range: DateRange) async throws -> [BusyBlock] {
         // Server-side RLS + sanitized view ensures excluded viewers (e.g. Jalen) never get event payload
         // We query sanitized_busy_blocks for safety; PostgREST will apply RLS hidden_from check
         let iso = ISO8601DateFormatter()
@@ -57,18 +57,10 @@ final class SupabaseService: SupabaseServiceProtocol {
     }
 
     func subscribeRealtime(onProposal id: UUID, handler: @escaping ([AvailabilitySlot]) -> Void) -> Any {
-        // Supabase Realtime channel for heatmap live convergence
+        // TODO: Wire Supabase Realtime (schema in supabase/schema.sql, see TODOS P0). Stubbed to keep Phase 1 building.
+        // Real impl: channel.onPostgresChange + subscribeWithError once supabase-swift API stabilized.
         let channel = client.channel("proposal-\(id.uuidString)")
-        Task {
-            let stream = channel.postgresChange(event: .all, schema: "public", table: "availability_slots", filter: "source_proposal_id=eq.\(id.uuidString)")
-            for await _ in stream {
-                // Refetch slots and call handler — debounce in ViewModel
-                if let slots: [AvailabilitySlot] = try? await client.from("availability_slots").select().eq("source_proposal_id", value: id.uuidString).execute().value {
-                    handler(slots)
-                }
-            }
-        }
-        Task { await channel.subscribe() }
+        Task { _ = try? await channel.subscribeWithError() }
         return channel
     }
 }
@@ -80,7 +72,7 @@ final class MockSupabaseService: SupabaseServiceProtocol {
     func fetchProposals(for userID: UUID) async throws -> [Proposal] { proposals }
     func createProposal(_ p: Proposal) async throws { proposals.append(p) }
     func lockProposal(_ id: UUID, to date: Date) async throws { }
-    func fetchBusyBlocks(for viewerID: UUID, in range: ClosedRange<Date>) async throws -> [BusyBlock] {
+    func fetchBusyBlocks(for viewerID: UUID, in range: DateRange) async throws -> [BusyBlock] {
         busyBlocks.filter { $0.range.overlaps(range) }.map { block in
             if block.hiddenFrom.contains(viewerID) {
                 return BusyBlock(id: block.id, userID: block.userID, range: block.range, visibility: .public, hiddenFrom: [], createdAt: block.createdAt)
