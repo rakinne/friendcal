@@ -33,3 +33,8 @@ npm-debug.log*
 
 # gstack / tmp
 .tmp/
+
+# Secrets - do not commit anon key
+app/FriendCal/Secrets.plist
+SupabaseConfig.xcconfig
+.build/
