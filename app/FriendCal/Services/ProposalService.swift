@@ -2,7 +2,7 @@ import Foundation
 
 /// Proposal lifecycle: create → distribute (Send Separately / New Group) → collect availability → heatmap → lock
 final class ProposalService {
-    func createProposal(title: String, window: ClosedRange<Date>, distribution: Distribution, createdBy: UUID) -> Proposal {
+    func createProposal(title: String, window: DateRange, distribution: Distribution, createdBy: UUID) -> Proposal {
         Proposal(id: UUID(), title: title, window: window, createdBy: createdBy, distribution: distribution)
     }
 

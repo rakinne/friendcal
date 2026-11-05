@@ -5,7 +5,7 @@ final class StealthTests: XCTestCase {
     func testExcludedSeesGenericBusy() {
         let jalenID = UUID()
         let micaID = UUID()
-        let block = BusyBlock(userID: micaID, range: Date.now...Date.now.addingTimeInterval(3600), visibility: .stealth, hiddenFrom: [jalenID])
+        let block = BusyBlock(userID: micaID, range: DateRange(Date.now...Date.now.addingTimeInterval(3600)), visibility: .stealth, hiddenFrom: [jalenID])
         let svc = StealthService()
         let sanitized = svc.sanitize(block, for: jalenID)
         XCTAssertEqual(sanitized.userID, micaID)

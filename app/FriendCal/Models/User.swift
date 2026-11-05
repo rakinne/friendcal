@@ -1,6 +1,6 @@
 import Foundation
 
-struct User: Identifiable, Codable, Equatable, Hashable {
+struct User: Identifiable, Codable, Equatable {
     var id: UUID
     var displayName: String
     var avatarURL: URL?
