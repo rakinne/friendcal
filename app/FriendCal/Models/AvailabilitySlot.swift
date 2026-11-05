@@ -9,7 +9,7 @@ enum AvailabilityState: String, Codable {
 struct AvailabilitySlot: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
     var userID: UUID
-    var range: ClosedRange<Date>
+    var range: DateRange
     var sourceProposalID: UUID? // nil = manual / global profile entry
     var state: AvailabilityState
     var createdAt: Date = Date()

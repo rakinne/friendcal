@@ -20,7 +20,7 @@ enum ProposalStatus: String, Codable {
 struct Proposal: Identifiable, Codable {
     var id: UUID
     var title: String // e.g. "Friendsgivemas"
-    var window: ClosedRange<Date> // e.g. Nov 20 - Dec 19 from screenshots
+    var window: DateRange // e.g. Nov 20 - Dec 19 from screenshots
     var createdBy: UUID
     var distribution: Distribution
     var status: ProposalStatus = .requesting
@@ -34,7 +34,7 @@ extension Proposal {
         Proposal(
             id: UUID(),
             title: "Friendsgivemas",
-            window: Date.now...Calendar.current.date(byAdding: .day, value: 45, to: .now)!,
+            window: DateRange(Date.now...Calendar.current.date(byAdding: .day, value: 45, to: .now)!),
             createdBy: UUID(),
             distribution: Distribution(mode: .newGroup, recipientIDs: []),
             status: .requesting

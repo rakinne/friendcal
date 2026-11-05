@@ -12,7 +12,7 @@ final class AvailabilityService {
     }
 
     /// Tap a free slot for a proposal. Creates SoftHold visible as "leaning" to others.
-    func tapFreeSlot(userID: UUID, range: ClosedRange<Date>, proposalID: UUID, expiresAt: Date?) -> TapResult {
+    func tapFreeSlot(userID: UUID, range: DateRange, proposalID: UUID, expiresAt: Date?) -> TapResult {
         // Check existing Hard Busy collision first
         // Then check SoftHold collision from other proposals
         // If none → create SoftHold + AvailabilitySlot

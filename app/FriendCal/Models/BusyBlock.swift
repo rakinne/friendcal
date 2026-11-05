@@ -8,7 +8,7 @@ enum BusyVisibility: String, Codable {
 struct BusyBlock: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
     var userID: UUID
-    var range: ClosedRange<Date>
+    var range: DateRange
     var visibility: BusyVisibility = .public
     var hiddenFrom: [UUID] = [] // empty = public; non-empty = stealth — must be enforced server-side (RLS)
     var createdAt: Date = Date()

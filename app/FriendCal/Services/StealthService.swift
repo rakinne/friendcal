@@ -8,7 +8,7 @@ final class StealthService {
     struct SanitizedBusy: Codable, Equatable {
         var id: UUID
         var userID: UUID
-        var range: ClosedRange<Date>
+        var range: DateRange
         // No title, no location, no host avatar, no attendee list
         // Render as identical grey "Busy" — same component as manual Busy
     }
