@@ -10,12 +10,18 @@ struct FriendCalApp: App {
 }
 
 struct ContentView: View {
-    // Preview data mirroring Friendsgivemas screenshots
+    @State private var mockSupabase = MockSupabaseService()
     var body: some View {
         NavigationStack {
-            MyFavesWheelView(friends: [])
-            Text("FriendCal — Phase 1 scaffold")
-                .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(spacing: DesignTokens.Spacing.lg) {
+                    MyFavesWheelView(friends: [])
+                    ProposalFlowView()
+                    BusyBlockView(sanitized: StealthService.SanitizedBusy(id: UUID(), userID: UUID(), range: DateRange(lower: Date.now, upper: Date.now.addingTimeInterval(3600))))
+                }
+            }
+            .background(DesignTokens.Colors.background)
+            .navigationTitle("FriendCal").navigationBarTitleDisplayMode(.inline)
         }
     }
 }

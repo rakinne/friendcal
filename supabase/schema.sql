@@ -58,3 +58,24 @@ alter table busy_blocks enable row level security;
 alter table events enable row level security;
 alter table availability_slots enable row level security;
 alter table proposals enable row level security;
+
+-- Performance + safety: GiST indexes for range queries + exclusion to prevent double-book on hard Busy
+create extension if not exists "btree_gist";
+create index if not exists idx_busy_blocks_user_range on busy_blocks using gist (user_id, range);
+create index if not exists idx_availability_user_range on availability_slots using gist (user_id, range);
+-- Prevent overlapping hard Busy for same user (softHold allowed to overlap, busy not)
+-- Note: requires btree_gist; softHold rows can overlap because state != 'busy'
+alter table busy_blocks drop constraint if exists no_overlapping_busy;
+alter table busy_blocks add constraint no_overlapping_busy
+  exclude using gist (user_id with =, range with &&) where (visibility = 'public'::text or visibility = 'stealth'::text);
+-- Circles for membership-scoped availability reads (used by RLS above when ready)
+create table if not exists circles (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz default now()
+);
+create table if not exists circle_members (
+  circle_id uuid references circles(id) on delete cascade,
+  user_id uuid references users(id) on delete cascade,
+  primary key (circle_id, user_id)
+);

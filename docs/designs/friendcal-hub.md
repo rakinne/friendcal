@@ -91,3 +91,12 @@ Review artifacts:
 - /Users/rakinnefoote/.gstack/projects/friendcal/rakinnefoote-main-eng-review-20261104-122227.md
 - /Users/rakinnefoote/.gstack/projects/friendcal/rakinnefoote-main-eng-review-test-plan-20261104-122227.md
 Recommended Phase 1: Proposal + Request-for-Times + Availability + Heatmap + Stealth Busy (manual Busy for cover) + backend with RLS
+
+---
+
+## Eng Review 2026-11-05 — TestFlight slice (branch codex/ship-phase1-fixes)
+
+Detailed report: docs/designs/friendcal-eng-review-20261105.md
+
+Outcome: Scope ACCEPTED with phased lanes. P0 stealth RLS fix chosen (R1=A) — server-enforced sanitized view + Edge Function push stripping.
+

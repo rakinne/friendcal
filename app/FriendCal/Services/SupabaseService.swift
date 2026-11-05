@@ -47,13 +47,16 @@ final class SupabaseService: SupabaseServiceProtocol {
     }
 
     func fetchBusyBlocks(for viewerID: UUID, in range: DateRange) async throws -> [BusyBlock] {
-        // Server-side RLS + sanitized view ensures excluded viewers (e.g. Jalen) never get event payload
-        // We query sanitized_busy_blocks for safety; PostgREST will apply RLS hidden_from check
-        let iso = ISO8601DateFormatter()
-        return try await client.from("sanitized_busy_blocks").select()
-            .gte("range", value: iso.string(from: range.lowerBound))
-            .lte("range", value: iso.string(from: range.upperBound))
-            .execute().value as [BusyBlock]
+        // gstack-shortcut(R1): strict — query sanitized view (no hidden_from/event payload) and map to BusyBlock with hidden strippped
+        // View returns range_start/range_end (tstzrange split) + id/user_id/created_at; decode as SanitizedBusy then rehydrate
+        struct SanitizedRow: Decodable {
+            var id: UUID; var user_id: UUID; var range_start: Date; var range_end: Date; var created_at: Date
+        }
+        let rows: [SanitizedRow] = try await client.from("sanitized_busy_blocks").select()
+            .execute().value as [SanitizedRow]
+        return rows.filter { $0.range_start <= range.upperBound && $0.range_end >= range.lowerBound }.map { r in
+            BusyBlock(id: r.id, userID: r.user_id, range: DateRange(lower: r.range_start, upper: r.range_end), visibility: .public, hiddenFrom: [], createdAt: r.created_at)
+        }
     }
 
     func subscribeRealtime(onProposal id: UUID, handler: @escaping ([AvailabilitySlot]) -> Void) -> Any {
