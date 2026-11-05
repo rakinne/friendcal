@@ -1,0 +1,130 @@
+name: FriendCal
+options:
+  bundleIdPrefix: com.friendcal
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+  createIntermediateGroups: true
+  defaultConfig: Debug
+
+configs:
+  Debug: debug
+  Release: release
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: "2.5.0"
+
+targets:
+  FriendCalCore:
+    type: framework
+    platform: iOS
+    deploymentTarget: "17.0"
+    supportedDestinations: [iOS]
+    sources:
+      - FriendCal/Models
+      - FriendCal/Services
+      - FriendCal/Privacy
+      - FriendCal/Shared
+    dependencies:
+      - package: Supabase
+        product: Supabase
+    settings:
+      base:
+        PRODUCT_NAME: FriendCalCore
+        EXECUTABLE_NAME: FriendCalCore
+        ENABLE_TESTABILITY: YES
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+  FriendCal:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    supportedDestinations: [iOS]
+    bundleId: com.friendcal.app
+    info:
+      path: FriendCal/Info.plist
+      properties:
+        CFBundleDisplayName: FriendCal
+        CFBundleName: FriendCal
+        UILaunchStoryboardName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        LSRequiresIPhoneOS: true
+    settings:
+      base:
+        INFOPLIST_FILE: FriendCal/Info.plist
+        PRODUCT_NAME: FriendCal
+        EXECUTABLE_NAME: FriendCal
+        PRODUCT_BUNDLE_IDENTIFIER: com.friendcal.app
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        SWIFT_VERSION: "5.9"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+    sources:
+      - FriendCal/FriendCalApp.swift
+      - FriendCal/Models
+      - FriendCal/Services
+      - FriendCal/Privacy
+      - FriendCal/Shared
+      - FriendCal/Views
+      - path: FriendCal/Assets.xcassets
+        optional: true
+      - path: FriendCal/Secrets.plist
+        optional: true
+        buildPhase: resources
+    dependencies:
+      - target: FriendCalCore
+      - package: Supabase
+        product: Supabase
+  FriendCalTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    supportedDestinations: [iOS]
+    sources:
+      - FriendCalTests
+    dependencies:
+      - target: FriendCalCore
+      - target: FriendCal
+    settings:
+      base:
+        PRODUCT_NAME: FriendCalTests
+        EXECUTABLE_NAME: FriendCalTests
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+
+schemes:
+  FriendCal:
+    build:
+      targets:
+        FriendCal: all
+    test:
+      config: Debug
+      targets:
+        - FriendCalTests
+      gatherCoverageData: true
+    run:
+      config: Debug
+    archive:
+      config: Release
+

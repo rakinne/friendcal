@@ -13,7 +13,7 @@ struct MyFavesWheelView: View {
             let radius: CGFloat = min(geo.size.width, geo.size.height) * 0.35
             ZStack {
                 // Orbit guide — hairline dashed, warm border
-                Circle()
+                SwiftUI.Circle()
                     .stroke(DesignTokens.Colors.border, style: StrokeStyle(lineWidth: 1, dash: [6,6]))
                     .frame(width: radius*2, height: radius*2)
                     .position(x: geo.size.width/2, y: geo.size.height/2)
@@ -43,12 +43,12 @@ struct FriendFaceView: View {
     @State private var pulsing = false
     var body: some View {
         AsyncImage(url: user.avatarURL) { phase in
-            if let img = phase.image { img.resizable().scaledToFill() } else { Circle().fill(DesignTokens.Colors.border.opacity(0.35)) }
+            if let img = phase.image { img.resizable().scaledToFill() } else { SwiftUI.Circle().fill(DesignTokens.Colors.border.opacity(0.35)) }
         }
         .frame(width: 56, height: 56)
-        .clipShape(Circle())
-        .overlay(Circle().stroke(DesignTokens.Colors.accent, lineWidth: 2))
-        .overlay(Circle().stroke(DesignTokens.Colors.primary.opacity(pulsing ? 0.5 : 0), lineWidth: 4).scaleEffect(pulsing ? 1.12 : 0.95))
+        .clipShape(SwiftUI.Circle())
+        .overlay(SwiftUI.Circle().stroke(DesignTokens.Colors.accent, lineWidth: 2))
+        .overlay(SwiftUI.Circle().stroke(DesignTokens.Colors.primary.opacity(pulsing ? 0.5 : 0), lineWidth: 4).scaleEffect(pulsing ? 1.12 : 0.95))
         .animation(reduceMotion ? nil : .easeInOut(duration: 1.6).repeatForever(autoreverses: true), value: pulsing)
         .onAppear { if !reduceMotion { pulsing = true } }
         .accessibilityAddTraits(.isButton)

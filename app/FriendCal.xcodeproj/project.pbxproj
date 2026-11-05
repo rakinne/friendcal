@@ -1,0 +1,716 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01750CC4FB8527879168ABF6 /* ProposalService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30090859881EBF4CB862B3A /* ProposalService.swift */; };
+		048B9DDBC98B53BC17D38C41 /* PokeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C956DEF60E9B069D56B7CF8 /* PokeService.swift */; };
+		0E6E4865813B8DCFABFA20CF /* FriendCalCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		11F112A11705260E319E7FD6 /* Proposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5261F4E2562AAB0BC19A5 /* Proposal.swift */; };
+		12A4ABCC5AF7C8E0486C2A8C /* MyFavesWheelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ACD515F4A643655A19E1CCF /* MyFavesWheelView.swift */; };
+		175F20ADF987C05ED6FA0C2E /* TicketTap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37FA32C19C5A52CE5C2D8744 /* TicketTap.swift */; };
+		188B63E03CD503EC9109B923 /* DateRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57799F8A2115B96A2AB2A5D /* DateRange.swift */; };
+		199F5FFE6527BFDFBE6060DD /* AvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DCA69AD3A06B42825D4E23 /* AvailabilityTests.swift */; };
+		1AD0211CD30BD8F7F9515BF2 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B23FD039C44660FD7E81006 /* SupabaseService.swift */; };
+		1AE4D913604178B5C7D9E3C4 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C463503758CB21CEE0C9A3B /* User.swift */; };
+		24FFAA6E5BA5D993C238E442 /* TicketTap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37FA32C19C5A52CE5C2D8744 /* TicketTap.swift */; };
+		2532AFB3614A4A56918D9434 /* StealthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813D547380BAA92B5093B0AF /* StealthService.swift */; };
+		28C9E584BE77456841D02A2F /* ProposalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3ECA81E4D7508EF76A61E9E /* ProposalTests.swift */; };
+		3E7DDA9707160ACFD955ADAB /* BusyBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75E25CC0C30F98E22405F7DB /* BusyBlock.swift */; };
+		43EA0BA9F50EB1CE2BA46A80 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C463503758CB21CEE0C9A3B /* User.swift */; };
+		4612B6F6919CFDDC3E4C01C5 /* PokeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C956DEF60E9B069D56B7CF8 /* PokeService.swift */; };
+		4AF3711E20702BE0F0ADC21D /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B7362117FF0D47C0157A90DC /* Supabase */; };
+		4BDCA3ED53D271629B2CDD09 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEFB7D7881A26617F09C477 /* DesignTokens.swift */; };
+		4C051FBE05C9587703D358C3 /* Poke.swift in Sources */ = {isa = PBXBuildFile; fileRef = C655B941E7F436FF81DEDDE7 /* Poke.swift */; };
+		568B90A8B369192D81F654C3 /* PrivacyManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078E091DFF9809EA8E5F20F2 /* PrivacyManifest.swift */; };
+		57E4A620AE09672DD1565CF0 /* Secrets.plist in Resources */ = {isa = PBXBuildFile; fileRef = 45C5E66C5F1BD7B5BEC73BB6 /* Secrets.plist */; };
+		5FA2B1A8DA7F06B1AA07B5F6 /* AvailabilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60658B91E1F1634C70D9DB96 /* AvailabilityService.swift */; };
+		5FF117C16E9E370E6F541A05 /* PrivacyManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078E091DFF9809EA8E5F20F2 /* PrivacyManifest.swift */; };
+		631FAD599C4612FC363ECC9A /* FriendCalCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */; };
+		666E7128531D0282300CC32B /* AvailabilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60658B91E1F1634C70D9DB96 /* AvailabilityService.swift */; };
+		68A8C70A1523CE870E513637 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEFB7D7881A26617F09C477 /* DesignTokens.swift */; };
+		6B687BDA72A1C0EA139CD0AC /* DateRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57799F8A2115B96A2AB2A5D /* DateRange.swift */; };
+		7A46F21718B42AD1ECD7D229 /* StealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE8AF7ACE8394A95382F1BD6 /* StealthTests.swift */; };
+		7BBFC966AB5E63EB170E303D /* Poke.swift in Sources */ = {isa = PBXBuildFile; fileRef = C655B941E7F436FF81DEDDE7 /* Poke.swift */; };
+		8AC0ADBB2D7586D331F344B7 /* ProposalService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30090859881EBF4CB862B3A /* ProposalService.swift */; };
+		A47A87EA61A4EC1B7DCF9E61 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 2E51940AC4B3B7167C09CA47 /* Supabase */; };
+		A4C8B3776385D8A83F116C9E /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B23FD039C44660FD7E81006 /* SupabaseService.swift */; };
+		B5289405857D6B1D99E9F440 /* HeatmapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCAFD4BAD6693F93CB38CD81 /* HeatmapView.swift */; };
+		B610F2F2B16D21C58BE162AA /* BusyBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75E25CC0C30F98E22405F7DB /* BusyBlock.swift */; };
+		B8744C035CE6A552F2BE1CDB /* Proposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5261F4E2562AAB0BC19A5 /* Proposal.swift */; };
+		BB731E9D4B2D40F5797FB257 /* FriendCalCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */; };
+		BB7F3BD6FAB66260C77FBDE0 /* ProposalFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B126AF82BC1D3F32CFA37F /* ProposalFlowView.swift */; };
+		BEECE8D24F29D4D1043D6653 /* StealthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813D547380BAA92B5093B0AF /* StealthService.swift */; };
+		C21E0D5C2320A80A49359F4C /* FriendCalCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C58790849824E82A1A6B742E /* AvailabilitySlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE37C5FDBC29D81B997E3B62 /* AvailabilitySlot.swift */; };
+		D216AE3876F4A62C5903A62A /* AvailabilitySlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE37C5FDBC29D81B997E3B62 /* AvailabilitySlot.swift */; };
+		EA9C3A387C0C6F3DA419B5E3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B4531A2350CDA183921F747E /* Assets.xcassets */; };
+		F00E85E3C8DB43A30E944C63 /* BusyBlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 713BB8CC406C59AE3E2B193F /* BusyBlockView.swift */; };
+		FAA8CB0BE952DCDF5CDD43DE /* FriendCalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131835A9213461F546F3F7F5 /* FriendCalApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2503E158328441E5C90FE1C8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 234C905748B713D357773366 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 92B8F5A2E5B6F0658463BF51;
+			remoteInfo = FriendCalCore;
+		};
+		5AE7FDCAFE522901A9576419 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 234C905748B713D357773366 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 92B8F5A2E5B6F0658463BF51;
+			remoteInfo = FriendCalCore;
+		};
+		7C74B324BD471ED555992E99 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 234C905748B713D357773366 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 297B36CE7CE6EBA4D7F02DAE;
+			remoteInfo = FriendCal;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		630730BC0718F3195011EF9F /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				C21E0D5C2320A80A49359F4C /* FriendCalCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A8B0208312BDB7F2522C2FE6 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				0E6E4865813B8DCFABFA20CF /* FriendCalCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		078E091DFF9809EA8E5F20F2 /* PrivacyManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyManifest.swift; sourceTree = "<group>"; };
+		0B23FD039C44660FD7E81006 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
+		131835A9213461F546F3F7F5 /* FriendCalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendCalApp.swift; sourceTree = "<group>"; };
+		1ACD515F4A643655A19E1CCF /* MyFavesWheelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyFavesWheelView.swift; sourceTree = "<group>"; };
+		31E71A3733EE3E9DED3F22D1 /* FriendCal.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FriendCal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3727D684C7521C3352DBD0E6 /* FriendCalTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FriendCalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		37FA32C19C5A52CE5C2D8744 /* TicketTap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketTap.swift; sourceTree = "<group>"; };
+		45C5E66C5F1BD7B5BEC73BB6 /* Secrets.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Secrets.plist; sourceTree = "<group>"; };
+		49B126AF82BC1D3F32CFA37F /* ProposalFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalFlowView.swift; sourceTree = "<group>"; };
+		5C956DEF60E9B069D56B7CF8 /* PokeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PokeService.swift; sourceTree = "<group>"; };
+		60658B91E1F1634C70D9DB96 /* AvailabilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilityService.swift; sourceTree = "<group>"; };
+		6C463503758CB21CEE0C9A3B /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		713BB8CC406C59AE3E2B193F /* BusyBlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusyBlockView.swift; sourceTree = "<group>"; };
+		75E25CC0C30F98E22405F7DB /* BusyBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusyBlock.swift; sourceTree = "<group>"; };
+		813D547380BAA92B5093B0AF /* StealthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StealthService.swift; sourceTree = "<group>"; };
+		B4531A2350CDA183921F747E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = FriendCalCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2DCA69AD3A06B42825D4E23 /* AvailabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilityTests.swift; sourceTree = "<group>"; };
+		C30090859881EBF4CB862B3A /* ProposalService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalService.swift; sourceTree = "<group>"; };
+		C655B941E7F436FF81DEDDE7 /* Poke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Poke.swift; sourceTree = "<group>"; };
+		CCEFB7D7881A26617F09C477 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		D3ECA81E4D7508EF76A61E9E /* ProposalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalTests.swift; sourceTree = "<group>"; };
+		D4E5261F4E2562AAB0BC19A5 /* Proposal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Proposal.swift; sourceTree = "<group>"; };
+		DCAFD4BAD6693F93CB38CD81 /* HeatmapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapView.swift; sourceTree = "<group>"; };
+		DE37C5FDBC29D81B997E3B62 /* AvailabilitySlot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilitySlot.swift; sourceTree = "<group>"; };
+		DE8AF7ACE8394A95382F1BD6 /* StealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StealthTests.swift; sourceTree = "<group>"; };
+		F57799F8A2115B96A2AB2A5D /* DateRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateRange.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4C59CF282651BFE1D6C495F0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4AF3711E20702BE0F0ADC21D /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D0C66DB2EB1D412EC5F61CEF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				631FAD599C4612FC363ECC9A /* FriendCalCore.framework in Frameworks */,
+				A47A87EA61A4EC1B7DCF9E61 /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F6AB1689125CD409055ECB5F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB731E9D4B2D40F5797FB257 /* FriendCalCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0EA2BEAEBBB4F50ED2F9624E /* Wheel */ = {
+			isa = PBXGroup;
+			children = (
+				1ACD515F4A643655A19E1CCF /* MyFavesWheelView.swift */,
+			);
+			path = Wheel;
+			sourceTree = "<group>";
+		};
+		25837D54340989D2E28E5E82 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				31E71A3733EE3E9DED3F22D1 /* FriendCal.app */,
+				C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */,
+				3727D684C7521C3352DBD0E6 /* FriendCalTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3AD75F3C42411261DCC39012 /* FriendCalTests */ = {
+			isa = PBXGroup;
+			children = (
+				C2DCA69AD3A06B42825D4E23 /* AvailabilityTests.swift */,
+				D3ECA81E4D7508EF76A61E9E /* ProposalTests.swift */,
+				DE8AF7ACE8394A95382F1BD6 /* StealthTests.swift */,
+			);
+			path = FriendCalTests;
+			sourceTree = "<group>";
+		};
+		5190D6086DEC0E382C7A91A5 /* Proposal */ = {
+			isa = PBXGroup;
+			children = (
+				DCAFD4BAD6693F93CB38CD81 /* HeatmapView.swift */,
+				49B126AF82BC1D3F32CFA37F /* ProposalFlowView.swift */,
+			);
+			path = Proposal;
+			sourceTree = "<group>";
+		};
+		8B84ED94662E81A8D4DE427F /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				CCEFB7D7881A26617F09C477 /* DesignTokens.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		A6CC96095CC0597556DD01B7 /* Privacy */ = {
+			isa = PBXGroup;
+			children = (
+				078E091DFF9809EA8E5F20F2 /* PrivacyManifest.swift */,
+			);
+			path = Privacy;
+			sourceTree = "<group>";
+		};
+		AFD437FB42CD853731B8C6BD /* FriendCal */ = {
+			isa = PBXGroup;
+			children = (
+				B4531A2350CDA183921F747E /* Assets.xcassets */,
+				131835A9213461F546F3F7F5 /* FriendCalApp.swift */,
+				45C5E66C5F1BD7B5BEC73BB6 /* Secrets.plist */,
+				D2A5132D1A8809E92855DCBE /* Models */,
+				A6CC96095CC0597556DD01B7 /* Privacy */,
+				BA69823FE21CC10452344A53 /* Services */,
+				8B84ED94662E81A8D4DE427F /* Shared */,
+				FEF6A9982C89CE82D406866E /* Views */,
+			);
+			path = FriendCal;
+			sourceTree = "<group>";
+		};
+		BA69823FE21CC10452344A53 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				60658B91E1F1634C70D9DB96 /* AvailabilityService.swift */,
+				5C956DEF60E9B069D56B7CF8 /* PokeService.swift */,
+				C30090859881EBF4CB862B3A /* ProposalService.swift */,
+				813D547380BAA92B5093B0AF /* StealthService.swift */,
+				0B23FD039C44660FD7E81006 /* SupabaseService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		CD851B4EA44ECDBF0046BCB1 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				713BB8CC406C59AE3E2B193F /* BusyBlockView.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		D2A5132D1A8809E92855DCBE /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				DE37C5FDBC29D81B997E3B62 /* AvailabilitySlot.swift */,
+				75E25CC0C30F98E22405F7DB /* BusyBlock.swift */,
+				F57799F8A2115B96A2AB2A5D /* DateRange.swift */,
+				C655B941E7F436FF81DEDDE7 /* Poke.swift */,
+				D4E5261F4E2562AAB0BC19A5 /* Proposal.swift */,
+				37FA32C19C5A52CE5C2D8744 /* TicketTap.swift */,
+				6C463503758CB21CEE0C9A3B /* User.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		DA86FEAE4F716E383F0993FD = {
+			isa = PBXGroup;
+			children = (
+				AFD437FB42CD853731B8C6BD /* FriendCal */,
+				3AD75F3C42411261DCC39012 /* FriendCalTests */,
+				25837D54340989D2E28E5E82 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		FEF6A9982C89CE82D406866E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				5190D6086DEC0E382C7A91A5 /* Proposal */,
+				CD851B4EA44ECDBF0046BCB1 /* Shared */,
+				0EA2BEAEBBB4F50ED2F9624E /* Wheel */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		297B36CE7CE6EBA4D7F02DAE /* FriendCal */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 622D80A414CDB90AC725B59B /* Build configuration list for PBXNativeTarget "FriendCal" */;
+			buildPhases = (
+				9B681D73F8B138B678BC0485 /* Sources */,
+				9C8BD3CB347B7C4E0F781336 /* Resources */,
+				D0C66DB2EB1D412EC5F61CEF /* Frameworks */,
+				A8B0208312BDB7F2522C2FE6 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				89887BF55B1BB6D7A6320190 /* PBXTargetDependency */,
+			);
+			name = FriendCal;
+			packageProductDependencies = (
+				2E51940AC4B3B7167C09CA47 /* Supabase */,
+			);
+			productName = FriendCal;
+			productReference = 31E71A3733EE3E9DED3F22D1 /* FriendCal.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4B6570469B743BBF4C56C9C5 /* FriendCalTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FE3710F307A2EAA4A9A7A201 /* Build configuration list for PBXNativeTarget "FriendCalTests" */;
+			buildPhases = (
+				C4D953219C2147FDFCDDFAEF /* Sources */,
+				F6AB1689125CD409055ECB5F /* Frameworks */,
+				630730BC0718F3195011EF9F /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7A996F13953C51CB25E3F5E0 /* PBXTargetDependency */,
+				6B402E24A8795781460AD8FF /* PBXTargetDependency */,
+			);
+			name = FriendCalTests;
+			packageProductDependencies = (
+			);
+			productName = FriendCalTests;
+			productReference = 3727D684C7521C3352DBD0E6 /* FriendCalTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		92B8F5A2E5B6F0658463BF51 /* FriendCalCore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 24B8D44673E858BB154D259E /* Build configuration list for PBXNativeTarget "FriendCalCore" */;
+			buildPhases = (
+				F47986F15C63394EE0DB1AD9 /* Sources */,
+				4C59CF282651BFE1D6C495F0 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FriendCalCore;
+			packageProductDependencies = (
+				B7362117FF0D47C0157A90DC /* Supabase */,
+			);
+			productName = FriendCalCore;
+			productReference = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		234C905748B713D357773366 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					297B36CE7CE6EBA4D7F02DAE = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = CA88EF0C5F9121773CB02E2C /* Build configuration list for PBXProject "FriendCal" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = DA86FEAE4F716E383F0993FD;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				299F86FC56B14A95A6157EDD /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				297B36CE7CE6EBA4D7F02DAE /* FriendCal */,
+				92B8F5A2E5B6F0658463BF51 /* FriendCalCore */,
+				4B6570469B743BBF4C56C9C5 /* FriendCalTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9C8BD3CB347B7C4E0F781336 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EA9C3A387C0C6F3DA419B5E3 /* Assets.xcassets in Resources */,
+				57E4A620AE09672DD1565CF0 /* Secrets.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9B681D73F8B138B678BC0485 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5FA2B1A8DA7F06B1AA07B5F6 /* AvailabilityService.swift in Sources */,
+				D216AE3876F4A62C5903A62A /* AvailabilitySlot.swift in Sources */,
+				B610F2F2B16D21C58BE162AA /* BusyBlock.swift in Sources */,
+				F00E85E3C8DB43A30E944C63 /* BusyBlockView.swift in Sources */,
+				188B63E03CD503EC9109B923 /* DateRange.swift in Sources */,
+				4BDCA3ED53D271629B2CDD09 /* DesignTokens.swift in Sources */,
+				FAA8CB0BE952DCDF5CDD43DE /* FriendCalApp.swift in Sources */,
+				B5289405857D6B1D99E9F440 /* HeatmapView.swift in Sources */,
+				12A4ABCC5AF7C8E0486C2A8C /* MyFavesWheelView.swift in Sources */,
+				4C051FBE05C9587703D358C3 /* Poke.swift in Sources */,
+				4612B6F6919CFDDC3E4C01C5 /* PokeService.swift in Sources */,
+				568B90A8B369192D81F654C3 /* PrivacyManifest.swift in Sources */,
+				B8744C035CE6A552F2BE1CDB /* Proposal.swift in Sources */,
+				BB7F3BD6FAB66260C77FBDE0 /* ProposalFlowView.swift in Sources */,
+				8AC0ADBB2D7586D331F344B7 /* ProposalService.swift in Sources */,
+				2532AFB3614A4A56918D9434 /* StealthService.swift in Sources */,
+				1AD0211CD30BD8F7F9515BF2 /* SupabaseService.swift in Sources */,
+				175F20ADF987C05ED6FA0C2E /* TicketTap.swift in Sources */,
+				1AE4D913604178B5C7D9E3C4 /* User.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C4D953219C2147FDFCDDFAEF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				199F5FFE6527BFDFBE6060DD /* AvailabilityTests.swift in Sources */,
+				28C9E584BE77456841D02A2F /* ProposalTests.swift in Sources */,
+				7A46F21718B42AD1ECD7D229 /* StealthTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F47986F15C63394EE0DB1AD9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				666E7128531D0282300CC32B /* AvailabilityService.swift in Sources */,
+				C58790849824E82A1A6B742E /* AvailabilitySlot.swift in Sources */,
+				3E7DDA9707160ACFD955ADAB /* BusyBlock.swift in Sources */,
+				6B687BDA72A1C0EA139CD0AC /* DateRange.swift in Sources */,
+				68A8C70A1523CE870E513637 /* DesignTokens.swift in Sources */,
+				7BBFC966AB5E63EB170E303D /* Poke.swift in Sources */,
+				048B9DDBC98B53BC17D38C41 /* PokeService.swift in Sources */,
+				5FF117C16E9E370E6F541A05 /* PrivacyManifest.swift in Sources */,
+				11F112A11705260E319E7FD6 /* Proposal.swift in Sources */,
+				01750CC4FB8527879168ABF6 /* ProposalService.swift in Sources */,
+				BEECE8D24F29D4D1043D6653 /* StealthService.swift in Sources */,
+				A4C8B3776385D8A83F116C9E /* SupabaseService.swift in Sources */,
+				24FFAA6E5BA5D993C238E442 /* TicketTap.swift in Sources */,
+				43EA0BA9F50EB1CE2BA46A80 /* User.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6B402E24A8795781460AD8FF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 297B36CE7CE6EBA4D7F02DAE /* FriendCal */;
+			targetProxy = 7C74B324BD471ED555992E99 /* PBXContainerItemProxy */;
+		};
+		7A996F13953C51CB25E3F5E0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 92B8F5A2E5B6F0658463BF51 /* FriendCalCore */;
+			targetProxy = 2503E158328441E5C90FE1C8 /* PBXContainerItemProxy */;
+		};
+		89887BF55B1BB6D7A6320190 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 92B8F5A2E5B6F0658463BF51 /* FriendCalCore */;
+			targetProxy = 5AE7FDCAFE522901A9576419 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1FFF21FD2FD37DBE5381E287 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				EXECUTABLE_NAME = FriendCal;
+				INFOPLIST_FILE = FriendCal/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.friendcal.app;
+				PRODUCT_NAME = FriendCal;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		23681B0862FFB21387DC6F33 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_TESTABILITY = YES;
+				EXECUTABLE_NAME = FriendCalCore;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.friendcal.FriendCalCore;
+				PRODUCT_NAME = FriendCalCore;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		5936FDA9CB264BC2BAEC23E6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				EXECUTABLE_NAME = FriendCalTests;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.friendcal.FriendCalTests;
+				PRODUCT_NAME = FriendCalTests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FriendCal.app/FriendCal";
+			};
+			name = Debug;
+		};
+		5B1D214FEE5D0EC3A0426659 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		6262A8F7E9CAF9EBB694273D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_TESTABILITY = YES;
+				EXECUTABLE_NAME = FriendCalCore;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.friendcal.FriendCalCore;
+				PRODUCT_NAME = FriendCalCore;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		94F75148D5E5A86CE553899D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		F2932F2BE216013EA24A35C8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				EXECUTABLE_NAME = FriendCal;
+				INFOPLIST_FILE = FriendCal/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.friendcal.app;
+				PRODUCT_NAME = FriendCal;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F5F8036EF3ADB28F9AEE5EF8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				EXECUTABLE_NAME = FriendCalTests;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.friendcal.FriendCalTests;
+				PRODUCT_NAME = FriendCalTests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FriendCal.app/FriendCal";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		24B8D44673E858BB154D259E /* Build configuration list for PBXNativeTarget "FriendCalCore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				23681B0862FFB21387DC6F33 /* Debug */,
+				6262A8F7E9CAF9EBB694273D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		622D80A414CDB90AC725B59B /* Build configuration list for PBXNativeTarget "FriendCal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F2932F2BE216013EA24A35C8 /* Debug */,
+				1FFF21FD2FD37DBE5381E287 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CA88EF0C5F9121773CB02E2C /* Build configuration list for PBXProject "FriendCal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5B1D214FEE5D0EC3A0426659 /* Debug */,
+				94F75148D5E5A86CE553899D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FE3710F307A2EAA4A9A7A201 /* Build configuration list for PBXNativeTarget "FriendCalTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5936FDA9CB264BC2BAEC23E6 /* Debug */,
+				F5F8036EF3ADB28F9AEE5EF8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		299F86FC56B14A95A6157EDD /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2E51940AC4B3B7167C09CA47 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 299F86FC56B14A95A6157EDD /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+		B7362117FF0D47C0157A90DC /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 299F86FC56B14A95A6157EDD /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 234C905748B713D357773366 /* Project object */;
+}

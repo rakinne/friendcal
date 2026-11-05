@@ -14,7 +14,7 @@ struct HeatmapView: View {
                     Text(row.date, style: .date).font(.caption).monospacedDigit()
                     Spacer()
                     Text("\(row.freeCount)/\(row.totalRecipients) free").font(.caption)
-                    Circle().fill(color(for: row.level)).frame(width: 12, height: 12)
+                    SwiftUI.Circle().fill(color(for: row.level)).frame(width: 12, height: 12)
                         .scaleEffect(row.level == .green && !reduceMotion ? 1.08 : 1)
                         .animation(reduceMotion ? nil : .easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: row.level)
                 }
