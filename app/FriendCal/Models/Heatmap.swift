@@ -31,6 +31,20 @@ public enum HeatmapRamp: Equatable, Sendable {
     }
 }
 
+/// A recipient's status in one cell (X2). Derived only from this proposal's eligible softHolds (D9):
+/// BusyBlocks are never read, so busy, a hidden plan and no reply all look identical (X1).
+public enum CellStatus: Equatable, Sendable {
+    /// An eligible slot covers the cell's commonWindow. The number of `.free` equals commonCount.
+    case free
+    /// Not free; their earliest eligible time in the cell starts at this date, after the common
+    /// window's start (or after the cell's start when there is no common window).
+    case after(Date)
+    /// Not free and not after: has an eligible slot in the cell that misses the common window.
+    case maybe
+    /// No eligible slot intersecting the cell (X1).
+    case busy
+}
+
 /// One day x daypart cell of the heatmap grid.
 public struct HeatmapCell: Identifiable, Equatable {
     public struct ID: Hashable {
@@ -53,8 +67,10 @@ public struct HeatmapCell: Identifiable, Equatable {
     /// Proposal recipient count (D5).
     public let total: Int
     public internal(set) var isBest: Bool
+    /// Every recipient's status in this cell (X2). Empty for disabled cells.
+    public let roster: [UUID: CellStatus]
 
-    public init(day: Date, daypart: Daypart, interval: DateRange?, freeCount: Int, commonCount: Int, commonWindow: DateRange?, total: Int, isBest: Bool = false) {
+    public init(day: Date, daypart: Daypart, interval: DateRange?, freeCount: Int, commonCount: Int, commonWindow: DateRange?, total: Int, isBest: Bool = false, roster: [UUID: CellStatus] = [:]) {
         self.day = day
         self.daypart = daypart
         self.interval = interval
@@ -63,6 +79,7 @@ public struct HeatmapCell: Identifiable, Equatable {
         self.commonWindow = commonWindow
         self.total = total
         self.isBest = isBest
+        self.roster = roster
     }
 
     public var isEnabled: Bool { interval != nil }
@@ -104,13 +121,16 @@ public enum HeatmapBuilder {
     /// and `expiresAt` nil or after `now`. A slot counts in a cell when it `intersects` the cell's
     /// `interval` (D10). Each recipient counts at most once per cell. total = distinct recipients (D5).
     /// Best per week (D13) = highest commonCount among enabled cells, ties to the earliest day then
-    /// daypart; no best when every count is 0.
+    /// daypart; no best when every count is 0. Each enabled cell's roster gives every recipient a
+    /// CellStatus (see CellStatus for the rules).
     public static func weeks(slots: [AvailabilitySlot], window: DateRange, recipientIDs: [UUID], proposalID: UUID, now: Date, calendar: Calendar) -> [HeatmapWeek] {
         guard window.lowerBound < window.upperBound else { return [] }
         var cal = calendar
         cal.firstWeekday = 2 // weeks start Monday regardless of locale
 
-        let recipients = Set(recipientIDs)
+        var seen = Set<UUID>()
+        let ordered = recipientIDs.filter { seen.insert($0).inserted }
+        let recipients = Set(ordered)
         let eligible = slots.filter { s in
             s.state == .softHold
                 && s.sourceProposalID == proposalID
@@ -121,27 +141,28 @@ public enum HeatmapBuilder {
         guard var weekStart = cal.dateInterval(of: .weekOfYear, for: window.lowerBound)?.start else { return [] }
         var weeks: [HeatmapWeek] = []
         while weekStart < window.upperBound {
-            weeks.append(week(starting: weekStart, window: window, slots: eligible, total: recipients.count, calendar: cal))
+            weeks.append(week(starting: weekStart, window: window, slots: eligible, recipients: ordered, calendar: cal))
             guard let next = cal.date(byAdding: .weekOfYear, value: 1, to: weekStart) else { break }
             weekStart = next
         }
         return weeks
     }
 
-    private static func week(starting weekStart: Date, window: DateRange, slots: [AvailabilitySlot], total: Int, calendar: Calendar) -> HeatmapWeek {
+    private static func week(starting weekStart: Date, window: DateRange, slots: [AvailabilitySlot], recipients: [UUID], calendar: Calendar) -> HeatmapWeek {
         var cells: [HeatmapCell] = []
         cells.reserveCapacity(21)
         for dayIndex in 0..<7 {
             let day = calendar.date(byAdding: .day, value: dayIndex, to: weekStart)!
             for daypart in Daypart.allCases {
-                cells.append(cell(day: day, daypart: daypart, window: window, slots: slots, total: total, calendar: calendar))
+                cells.append(cell(day: day, daypart: daypart, window: window, slots: slots, recipients: recipients, calendar: calendar))
             }
         }
         if let bestIndex = bestIndex(in: cells) { cells[bestIndex].isBest = true }
         return HeatmapWeek(weekStart: weekStart, cells: cells)
     }
 
-    private static func cell(day: Date, daypart: Daypart, window: DateRange, slots: [AvailabilitySlot], total: Int, calendar: Calendar) -> HeatmapCell {
+    private static func cell(day: Date, daypart: Daypart, window: DateRange, slots: [AvailabilitySlot], recipients: [UUID], calendar: Calendar) -> HeatmapCell {
+        let total = recipients.count
         guard let interval = daypartInterval(day: day, daypart: daypart, calendar: calendar).flatMap({ clip($0, to: window) }) else {
             return HeatmapCell(day: day, daypart: daypart, interval: nil, freeCount: 0, commonCount: 0, commonWindow: nil, total: total)
         }
@@ -150,9 +171,21 @@ public enum HeatmapBuilder {
         for s in slots where s.range.intersects(interval) {
             if let clipped = clip(s.range, to: interval) { byUser[s.userID, default: []].append(clipped) }
         }
-        let coverage = byUser.values.map(merge)
-        let (count, common) = commonWindow(coverage)
-        return HeatmapCell(day: day, daypart: daypart, interval: interval, freeCount: byUser.count, commonCount: count, commonWindow: common, total: total)
+        let merged = byUser.mapValues(merge)
+        let (count, common) = commonWindow(Array(merged.values))
+        let anchor = common?.lowerBound ?? interval.lowerBound
+        var roster: [UUID: CellStatus] = [:]
+        for id in recipients {
+            guard let ranges = merged[id], let first = ranges.first else { roster[id] = .busy; continue }
+            if let w = common, ranges.contains(where: { $0.lowerBound <= w.lowerBound && w.upperBound <= $0.upperBound }) {
+                roster[id] = .free
+            } else if first.lowerBound > anchor {
+                roster[id] = .after(first.lowerBound)
+            } else {
+                roster[id] = .maybe
+            }
+        }
+        return HeatmapCell(day: day, daypart: daypart, interval: interval, freeCount: byUser.count, commonCount: count, commonWindow: common, total: total, roster: roster)
     }
 
     /// The window shared by the most recipients that lasts >= minimumCommonDuration; earliest wins ties.

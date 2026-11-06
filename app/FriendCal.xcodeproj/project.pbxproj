@@ -11,10 +11,12 @@
 		048B9DDBC98B53BC17D38C41 /* PokeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C956DEF60E9B069D56B7CF8 /* PokeService.swift */; };
 		069E2C230E37EA8D44937840 /* CabinetGrotesk-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = F31FF1DE86141788953FF2CE /* CabinetGrotesk-Bold.otf */; };
 		0E6E4865813B8DCFABFA20CF /* FriendCalCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		1077DAC20601BB7BEA056969 /* HeatmapRosterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1DFA62BFA6CBAAC00735C80 /* HeatmapRosterTests.swift */; };
 		10A3506332393219F1CFCECA /* Heatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = F386B3EF2683A519BACABB05 /* Heatmap.swift */; };
 		11F112A11705260E319E7FD6 /* Proposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5261F4E2562AAB0BC19A5 /* Proposal.swift */; };
 		12A4ABCC5AF7C8E0486C2A8C /* MyFavesWheelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ACD515F4A643655A19E1CCF /* MyFavesWheelView.swift */; };
 		12F696E2086D1245CD7ADBE5 /* LaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC5EA32A82A39117D0BA54FF /* LaunchTests.swift */; };
+		15727D146F6773B7772112DB /* HeatmapSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E49F43137230E745F76DE4A /* HeatmapSelection.swift */; };
 		199F5FFE6527BFDFBE6060DD /* AvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DCA69AD3A06B42825D4E23 /* AvailabilityTests.swift */; };
 		2014EC611CF05408426A0B75 /* FontTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1127C3B87E1AE6A735ADD83F /* FontTests.swift */; };
 		24FFAA6E5BA5D993C238E442 /* TicketTap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37FA32C19C5A52CE5C2D8744 /* TicketTap.swift */; };
@@ -44,6 +46,7 @@
 		C21E0D5C2320A80A49359F4C /* FriendCalCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C58790849824E82A1A6B742E /* AvailabilitySlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE37C5FDBC29D81B997E3B62 /* AvailabilitySlot.swift */; };
 		C8749322F777384D512D95F2 /* SourceSans3-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 99DC18F93685382E1B0AFEC1 /* SourceSans3-Bold.otf */; };
+		DEED03D4B977130E9A654DBA /* ShareText.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5F546F576B2902B3E7D20DA /* ShareText.swift */; };
 		E6B7A96A96EF91CB582648A3 /* JetBrainsMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 874677C546E1DCEB5E2AF9D7 /* JetBrainsMono-Regular.ttf */; };
 		EA9C3A387C0C6F3DA419B5E3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B4531A2350CDA183921F747E /* Assets.xcassets */; };
 		F00E85E3C8DB43A30E944C63 /* BusyBlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 713BB8CC406C59AE3E2B193F /* BusyBlockView.swift */; };
@@ -131,9 +134,12 @@
 		813D547380BAA92B5093B0AF /* StealthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StealthService.swift; sourceTree = "<group>"; };
 		874677C546E1DCEB5E2AF9D7 /* JetBrainsMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Regular.ttf"; sourceTree = "<group>"; };
 		99DC18F93685382E1B0AFEC1 /* SourceSans3-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SourceSans3-Bold.otf"; sourceTree = "<group>"; };
+		9E49F43137230E745F76DE4A /* HeatmapSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapSelection.swift; sourceTree = "<group>"; };
+		A1DFA62BFA6CBAAC00735C80 /* HeatmapRosterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapRosterTests.swift; sourceTree = "<group>"; };
 		A94A1452FCA58DF176DA80A4 /* FriendCalUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FriendCalUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AC5EA32A82A39117D0BA54FF /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
 		B4531A2350CDA183921F747E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B5F546F576B2902B3E7D20DA /* ShareText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareText.swift; sourceTree = "<group>"; };
 		C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = FriendCalCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DCA69AD3A06B42825D4E23 /* AvailabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilityTests.swift; sourceTree = "<group>"; };
 		C30090859881EBF4CB862B3A /* ProposalService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalService.swift; sourceTree = "<group>"; };
@@ -203,6 +209,7 @@
 			children = (
 				C2DCA69AD3A06B42825D4E23 /* AvailabilityTests.swift */,
 				1127C3B87E1AE6A735ADD83F /* FontTests.swift */,
+				A1DFA62BFA6CBAAC00735C80 /* HeatmapRosterTests.swift */,
 				1CAB38F3A4674048B01F5200 /* HeatmapTests.swift */,
 				D3ECA81E4D7508EF76A61E9E /* ProposalTests.swift */,
 				DE8AF7ACE8394A95382F1BD6 /* StealthTests.swift */,
@@ -310,8 +317,10 @@
 				75E25CC0C30F98E22405F7DB /* BusyBlock.swift */,
 				F57799F8A2115B96A2AB2A5D /* DateRange.swift */,
 				F386B3EF2683A519BACABB05 /* Heatmap.swift */,
+				9E49F43137230E745F76DE4A /* HeatmapSelection.swift */,
 				C655B941E7F436FF81DEDDE7 /* Poke.swift */,
 				D4E5261F4E2562AAB0BC19A5 /* Proposal.swift */,
+				B5F546F576B2902B3E7D20DA /* ShareText.swift */,
 				37FA32C19C5A52CE5C2D8744 /* TicketTap.swift */,
 				6C463503758CB21CEE0C9A3B /* User.swift */,
 			);
@@ -541,6 +550,7 @@
 			files = (
 				199F5FFE6527BFDFBE6060DD /* AvailabilityTests.swift in Sources */,
 				2014EC611CF05408426A0B75 /* FontTests.swift in Sources */,
+				1077DAC20601BB7BEA056969 /* HeatmapRosterTests.swift in Sources */,
 				FDBFEF455834F6754253C10B /* HeatmapTests.swift in Sources */,
 				28C9E584BE77456841D02A2F /* ProposalTests.swift in Sources */,
 				7A46F21718B42AD1ECD7D229 /* StealthTests.swift in Sources */,
@@ -557,11 +567,13 @@
 				6B687BDA72A1C0EA139CD0AC /* DateRange.swift in Sources */,
 				68A8C70A1523CE870E513637 /* DesignTokens.swift in Sources */,
 				10A3506332393219F1CFCECA /* Heatmap.swift in Sources */,
+				15727D146F6773B7772112DB /* HeatmapSelection.swift in Sources */,
 				7BBFC966AB5E63EB170E303D /* Poke.swift in Sources */,
 				048B9DDBC98B53BC17D38C41 /* PokeService.swift in Sources */,
 				5FF117C16E9E370E6F541A05 /* PrivacyManifest.swift in Sources */,
 				11F112A11705260E319E7FD6 /* Proposal.swift in Sources */,
 				01750CC4FB8527879168ABF6 /* ProposalService.swift in Sources */,
+				DEED03D4B977130E9A654DBA /* ShareText.swift in Sources */,
 				BEECE8D24F29D4D1043D6653 /* StealthService.swift in Sources */,
 				A4C8B3776385D8A83F116C9E /* SupabaseService.swift in Sources */,
 				24FFAA6E5BA5D993C238E442 /* TicketTap.swift in Sources */,
