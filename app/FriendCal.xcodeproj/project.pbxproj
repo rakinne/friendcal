@@ -46,6 +46,7 @@
 		C21E0D5C2320A80A49359F4C /* FriendCalCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C58790849824E82A1A6B742E /* AvailabilitySlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE37C5FDBC29D81B997E3B62 /* AvailabilitySlot.swift */; };
 		C8749322F777384D512D95F2 /* SourceSans3-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 99DC18F93685382E1B0AFEC1 /* SourceSans3-Bold.otf */; };
+		DCD0F51B4163C88CE95B976D /* FaceColorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1B85AB49F20C218AFC6C19 /* FaceColorTests.swift */; };
 		DEED03D4B977130E9A654DBA /* ShareText.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5F546F576B2902B3E7D20DA /* ShareText.swift */; };
 		E6B7A96A96EF91CB582648A3 /* JetBrainsMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 874677C546E1DCEB5E2AF9D7 /* JetBrainsMono-Regular.ttf */; };
 		EA9C3A387C0C6F3DA419B5E3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B4531A2350CDA183921F747E /* Assets.xcassets */; };
@@ -121,6 +122,7 @@
 		31E71A3733EE3E9DED3F22D1 /* FriendCal.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FriendCal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3727D684C7521C3352DBD0E6 /* FriendCalTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FriendCalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		37FA32C19C5A52CE5C2D8744 /* TicketTap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketTap.swift; sourceTree = "<group>"; };
+		3A1B85AB49F20C218AFC6C19 /* FaceColorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceColorTests.swift; sourceTree = "<group>"; };
 		4348F53B2C18D20055868E8B /* SourceSans3-Semibold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SourceSans3-Semibold.otf"; sourceTree = "<group>"; };
 		45C5E66C5F1BD7B5BEC73BB6 /* Secrets.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Secrets.plist; sourceTree = "<group>"; };
 		49B126AF82BC1D3F32CFA37F /* ProposalFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalFlowView.swift; sourceTree = "<group>"; };
@@ -208,6 +210,7 @@
 			isa = PBXGroup;
 			children = (
 				C2DCA69AD3A06B42825D4E23 /* AvailabilityTests.swift */,
+				3A1B85AB49F20C218AFC6C19 /* FaceColorTests.swift */,
 				1127C3B87E1AE6A735ADD83F /* FontTests.swift */,
 				A1DFA62BFA6CBAAC00735C80 /* HeatmapRosterTests.swift */,
 				1CAB38F3A4674048B01F5200 /* HeatmapTests.swift */,
@@ -549,6 +552,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				199F5FFE6527BFDFBE6060DD /* AvailabilityTests.swift in Sources */,
+				DCD0F51B4163C88CE95B976D /* FaceColorTests.swift in Sources */,
 				2014EC611CF05408426A0B75 /* FontTests.swift in Sources */,
 				1077DAC20601BB7BEA056969 /* HeatmapRosterTests.swift in Sources */,
 				FDBFEF455834F6754253C10B /* HeatmapTests.swift in Sources */,

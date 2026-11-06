@@ -42,7 +42,7 @@ public enum DesignTokens {
     }
     /// D27 type scale. Every token scales with Dynamic Type via `relativeTo:`.
     /// SwiftUI `Font` only: Shared/ also builds for macOS, so no UIFont here.
-    /// Tracking (wordmark -0.01em, display -0.02em) arrives with TextStyle (T12).
+    /// Tracking lives in `TextStyle`; Home components apply tokens via `.textStyle(_:)`.
     public enum Typography {
         public static let wordmark = custom(.cabinetExtrabold, 28, .title)
         public static let display = custom(.cabinetExtrabold, 26, .title2)
@@ -57,6 +57,57 @@ public enum DesignTokens {
         private static func custom(_ name: FontName, _ size: CGFloat, _ style: Font.TextStyle) -> Font {
             .custom(name.rawValue, size: size, relativeTo: style)
         }
+    }
+}
+
+extension DesignTokens {
+    /// A Typography font plus its tracking in points (em x size), since `Font` can't carry tracking.
+    public struct TextStyle {
+        public let font: Font
+        public let tracking: CGFloat
+
+        public static let wordmark = TextStyle(font: Typography.wordmark, tracking: -0.28) // -0.01em x 28
+        public static let display = TextStyle(font: Typography.display, tracking: -0.52)   // -0.02em x 26
+        public static let title = TextStyle(font: Typography.title, tracking: 0)
+        public static let button = TextStyle(font: Typography.button, tracking: 0)
+        public static let body = TextStyle(font: Typography.body, tracking: 0)
+        public static let label = TextStyle(font: Typography.label, tracking: 0)
+        public static let caption = TextStyle(font: Typography.caption, tracking: 0)
+        public static let mono = TextStyle(font: Typography.mono, tracking: 0)
+        public static let badge = TextStyle(font: Typography.badge, tracking: 0)
+    }
+
+    /// Fixed earth palette for initials faces (D28); never coral.
+    public enum FacePalette {
+        public static let colors: [Color] = [
+            Color(hex: "#A9BFA0"), // sage
+            Color(hex: "#E3B76B"), // ochre
+            Color(hex: "#9DB0C2"), // slate
+            Color(hex: "#D9A08A"), // clay
+            Color(hex: "#E2CFAF"), // sand
+            Color(hex: "#B7BE8E"), // moss
+        ]
+        public static let sand = colors[4]
+
+        /// FNV-1a 32-bit over the UUID string's UTF-8, mod 6. `hashValue` is reseeded per process
+        /// (SE-0206), so it would recolor every face on each launch.
+        public static func index(for id: UUID) -> Int {
+            var hash: UInt32 = 0x811C_9DC5
+            for byte in id.uuidString.utf8 {
+                hash ^= UInt32(byte)
+                hash = hash &* 0x0100_0193
+            }
+            return Int(hash % UInt32(colors.count))
+        }
+
+        public static func color(for id: UUID) -> Color { colors[index(for: id)] }
+    }
+}
+
+extension View {
+    /// Applies a type token with its tracking.
+    public func textStyle(_ style: DesignTokens.TextStyle) -> some View {
+        font(style.font).tracking(style.tracking)
     }
 }
 
