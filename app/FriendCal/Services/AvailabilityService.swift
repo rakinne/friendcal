@@ -27,27 +27,23 @@ public final class AvailabilityService {
         return .softHold(AvailabilitySlot(userID: userID, range: range, sourceProposalID: proposalID, state: .softHold, expiresAt: expiresAt))
     }
 
-    /// Promote SoftHolds covering locked date to Hard Busy; expire other SoftHolds for this proposal.
+    /// On lock, promote this proposal's recipient SoftHolds that cover the whole locked common
+    /// window (D3, D12) to Hard Busy; expire every other SoftHold for this proposal.
     /// Returns (promoted BusyBlocks, expired slot IDs) so caller can write transactionally.
-    public func promoteToBusy(onLock date: Date, proposalID: UUID, recipientIDs: [UUID], slots: [AvailabilitySlot]) -> (promoted: [BusyBlock], expiredIDs: [UUID]) {
+    public func promoteToBusy(window: DateRange, proposalID: UUID, recipientIDs: [UUID], slots: [AvailabilitySlot]) -> (promoted: [BusyBlock], expiredIDs: [UUID]) {
         var promoted: [BusyBlock] = []
         var expired: [UUID] = []
+        let recipients = Set(recipientIDs)
         let alive = expireStaleHolds(slots: slots)
-        for slot in alive where slot.sourceProposalID == proposalID {
-            let contains = slot.range.lowerBound <= date && date <= slot.range.upperBound
-            if contains && slot.state == .softHold {
+        for slot in alive where slot.sourceProposalID == proposalID && slot.state == .softHold {
+            let covers = slot.range.lowerBound <= window.lowerBound && window.upperBound <= slot.range.upperBound
+            if covers && recipients.contains(slot.userID) {
                 promoted.append(BusyBlock(userID: slot.userID, range: slot.range, visibility: .public, hiddenFrom: [], createdAt: Date()))
-            } else if slot.state == .softHold {
+            } else {
                 expired.append(slot.id)
             }
         }
         return (promoted, expired)
-    }
-
-    /// Legacy shim for tests that expect empty array return
-    func promoteToBusy(onLock date: Date, proposalID: UUID, recipientIDs: [UUID]) -> [BusyBlock] {
-        let (p, _) = promoteToBusy(onLock: date, proposalID: proposalID, recipientIDs: recipientIDs, slots: [])
-        return p
     }
 
     public func expireStaleHolds(slots: [AvailabilitySlot]) -> [AvailabilitySlot] {

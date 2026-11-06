@@ -168,10 +168,13 @@ final class HeatmapTests: XCTestCase {
 
         let apart = build([slot(alice, mon(6), mon(7)), slot(bob, mon(11), mon(12)), slot(cara, mon(11), mon(12))])[0].cell(dayIndex: 0, daypart: .morning)
         XCTAssertEqual(apart.freeCount, 3)
-        XCTAssertThrowsError(try svc.lock(&proposal, to: apart) { _, _ in [] })
+        let apartWeeks = build([slot(alice, mon(6), mon(7)), slot(bob, mon(11), mon(12)), slot(cara, mon(11), mon(12))])
+        XCTAssertThrowsError(try svc.lock(&proposal, to: apart.id, in: apartWeeks) { _, _ in [] })
 
-        let shared = build([slot(alice, mon(8), mon(10, 30)), slot(bob, mon(9), mon(11)), slot(cara, mon(9), mon(12))])[0].cell(dayIndex: 0, daypart: .morning)
-        try svc.lock(&proposal, to: shared) { _, _ in [] }
+        let sharedWeeks = build([slot(alice, mon(8), mon(10, 30)), slot(bob, mon(9), mon(11)), slot(cara, mon(9), mon(12))])
+        let shared = sharedWeeks[0].cell(dayIndex: 0, daypart: .morning)
+        let window = try svc.lock(&proposal, to: shared.id, in: sharedWeeks) { _, _ in [] }
+        XCTAssertEqual(window, DateRange(lower: mon(9), upper: mon(10, 30)))
         XCTAssertEqual(proposal.status, .locked)
         XCTAssertEqual(proposal.lockedDate, mon(9))
     }

@@ -7,7 +7,7 @@ final class ProposalTests: XCTestCase {
         let svc = ProposalService()
         svc.quorumThreshold = 0.8
         let lowCell = Self.cell(commonCount: 1, total: 5) // 20%
-        XCTAssertThrowsError(try svc.lock(&proposal, to: lowCell, busyWriter: { _,_ in [] })) { err in
+        XCTAssertThrowsError(try svc.lock(&proposal, to: lowCell.id, in: Self.weeks(lowCell), busyWriter: { _,_ in [] })) { err in
             XCTAssertTrue((err as? ProposalLockError) != nil)
         }
     }
@@ -17,8 +17,39 @@ final class ProposalTests: XCTestCase {
         let svc = ProposalService()
         svc.quorumThreshold = 0.8
         let highCell = Self.cell(commonCount: 5, total: 5)
-        try svc.lock(&proposal, to: highCell, busyWriter: { _,_ in [] })
+        try svc.lock(&proposal, to: highCell.id, in: Self.weeks(highCell), busyWriter: { _,_ in [] })
         XCTAssertEqual(proposal.status, .locked)
+    }
+
+    func testLockWithNoRecipientsThrowsInsufficientRecipients() {
+        var proposal = Self.proposal()
+        let cell = Self.cell(commonCount: 0, total: 0)
+        XCTAssertThrowsError(try ProposalService().lock(&proposal, to: cell.id, in: Self.weeks(cell), busyWriter: { _,_ in [] })) { err in
+            guard case .insufficientRecipients = err as? ProposalLockError else { return XCTFail("got \(err)") }
+        }
+        XCTAssertEqual(proposal.status, .requesting)
+    }
+
+    func testLockToCellOutsideWindowThrowsCellNotInWindow() {
+        let enabled = Self.cell(commonCount: 5, total: 5)
+        let disabled = HeatmapCell(day: enabled.day, daypart: .morning, interval: nil, freeCount: 0, commonCount: 0, commonWindow: nil, total: 5)
+        let missing = HeatmapCell(day: enabled.day.addingTimeInterval(-7 * 86400), daypart: .evening, interval: nil, freeCount: 0, commonCount: 0, commonWindow: nil, total: 5)
+        for target in [disabled.id, missing.id] {
+            var proposal = Self.proposal()
+            XCTAssertThrowsError(try ProposalService().lock(&proposal, to: target, in: Self.weeks(enabled, disabled), busyWriter: { _,_ in [] })) { err in
+                guard case .cellNotInWindow = err as? ProposalLockError else { return XCTFail("got \(err)") }
+                XCTAssertNotNil((err as? LocalizedError)?.errorDescription)
+            }
+            XCTAssertNil(proposal.lockedDate)
+        }
+    }
+
+    private static func proposal() -> Proposal {
+        Proposal(id: UUID(), title: "Brunch", window: DateRange(Date.now...Date.now.addingTimeInterval(86400*30)), createdBy: UUID(), distribution: Distribution(mode: .newGroup, recipientIDs: [UUID()]))
+    }
+
+    private static func weeks(_ cells: HeatmapCell...) -> [HeatmapWeek] {
+        [HeatmapWeek(weekStart: cells[0].day, cells: cells)]
     }
 
     private static func cell(commonCount: Int, total: Int) -> HeatmapCell {

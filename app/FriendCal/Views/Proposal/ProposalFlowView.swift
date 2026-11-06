@@ -25,13 +25,13 @@ final class ProposalFlowModel {
         rebuildHeatmap()
     }
 
-    func lock(to cell: HeatmapCell) throws {
+    func lock(to id: HeatmapCell.ID) throws {
         guard var p = proposal else { return }
-        try proposalService.lock(&p, to: cell) { _, _ in [] }
+        rebuildHeatmap() // fresh `now`, so a hold that just expired can't count toward quorum
+        let window = try proposalService.lock(&p, to: id, in: weeks) { _, _ in [] }
         proposal = p
-        guard let date = p.lockedDate else { return }
         // Promote + expire via service (DB write in real SupabaseService)
-        let (promoted, expiredIDs) = availabilityService.promoteToBusy(onLock: date, proposalID: p.id, recipientIDs: p.distribution.recipientIDs, slots: slots)
+        let (promoted, expiredIDs) = availabilityService.promoteToBusy(window: window, proposalID: p.id, recipientIDs: p.distribution.recipientIDs, slots: slots)
         slots = slots.filter { !expiredIDs.contains($0.id) }
         _ = promoted
     }
@@ -52,7 +52,7 @@ struct ProposalFlowView: View {
                 Text(p.window.lowerBound, style: .date).font(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
                 HeatmapView(weeks: model.weeks)
                 Button("Lock best date") {
-                    if let best = model.weeks.lazy.compactMap(\.best).first { try? model.lock(to: best) }
+                    if let best = model.weeks.lazy.compactMap(\.best).first { try? model.lock(to: best.id) }
                 }
                 .buttonStyle(.borderedProminent).tint(DesignTokens.Colors.primary)
             } else {
