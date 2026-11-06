@@ -63,6 +63,13 @@ struct FriendStatusChips: View {
         .padding(20).background(DesignTokens.Colors.background)
 }
 
+#Preview("Chips, 0-count cell selected") {
+    let model = HomeModel(fixture: FixtureData.make(.zeroOverlap))
+    if let cell = model.visibleWeek?.cells.first(where: \.isEnabled) { model.select(cell.id) }
+    return FriendStatusChips(content: .chips(model.chips ?? []))
+        .padding(20).background(DesignTokens.Colors.background)
+}
+
 #Preview("Chips, loading") {
     FriendStatusChips(content: .loading).padding(20).background(DesignTokens.Colors.background)
 }

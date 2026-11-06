@@ -27,7 +27,8 @@ struct MembersDrawer: View {
             .padding(.bottom, DesignTokens.Spacing.sm)
 
             ScrollView {
-                LazyVStack(spacing: 0) {
+                // Eager: at most a group's worth of rows, and UI tests count them all (D36).
+                VStack(spacing: 0) {
                     if isLoading {
                         ForEach(0..<6, id: \.self) { _ in skeletonRow }
                     } else {
@@ -64,6 +65,7 @@ struct MembersDrawer: View {
         .overlay(alignment: .bottom) { Rectangle().fill(DesignTokens.Colors.border).frame(height: 1) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel([m.name, status?.word(calendar: calendar), m.isOnline ? "online" : nil].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityIdentifier("drawer.row")
     }
 
     private var skeletonRow: some View {

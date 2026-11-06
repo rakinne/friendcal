@@ -101,4 +101,11 @@ struct HomeView: View {
 #Preview("Home, no proposal") { HomeView(model: HomeModel(fixture: FixtureData.make(.noProposal))) }
 #Preview("Home, zero overlap") { HomeView(model: HomeModel(fixture: FixtureData.make(.zeroOverlap))) }
 #Preview("Home, few friends") { HomeView(model: HomeModel(fixture: FixtureData.make(.fewFriends))) }
+#Preview("Home, 0-count cell selected") {
+    // X10: a tapped cell with nobody in common stays selected, chips show everyone busy,
+    // Share is disabled with "Nobody shares an hour here yet".
+    let model = HomeModel(fixture: FixtureData.make(.zeroOverlap))
+    if let cell = model.visibleWeek?.cells.first(where: \.isEnabled) { model.select(cell.id) }
+    return HomeView(model: model)
+}
 #Preview("Home, stale") { HomeView(model: HomeModel(fixture: FixtureData.make(.stale))) }

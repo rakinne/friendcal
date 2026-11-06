@@ -87,6 +87,11 @@ private struct PressScale: ButtonStyle {
         .padding(20).background(DesignTokens.Colors.background)
 }
 
+#Preview("Actions, 0-count cell selected") {
+    ActionRow(shareText: nil, shareDisabledHint: "Nobody shares an hour here yet")
+        .padding(20).background(DesignTokens.Colors.background)
+}
+
 #Preview("Actions, loading") {
     ActionRow(isLoading: true).padding(20).background(DesignTokens.Colors.background)
 }
