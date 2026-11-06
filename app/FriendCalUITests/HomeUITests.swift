@@ -30,6 +30,12 @@ final class HomeUITests: XCTestCase {
 
     private func toast(_ app: XCUIApplication) -> XCUIElement { app.staticTexts["toast"] }
 
+    /// The toast with exactly this text. One query for existence and label, so the 2.5s
+    /// auto-dismiss can't race a separate label read on a slow simulator.
+    private func toast(_ app: XCUIApplication, _ text: String) -> XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "identifier == 'toast' AND label == %@", text)).firstMatch
+    }
+
     // MARK: T7
 
     /// protects=Home launches into the populated fixture with all six modules above the floating
@@ -83,24 +89,23 @@ final class HomeUITests: XCTestCase {
     }
 
     /// protects=Poke is an honest stub: a toast, announced, that goes away (D20); fails_when=no
-    /// toast, wrong copy, or it never dismisses; no_claim=the impact haptic.
+    /// toast, wrong copy, or it never dismisses; no_claim=the impact haptic, and the exact 2.5s
+    /// duration (the toast runs 6s here so XCUITest's idle wait can't miss it).
     func testPokeShowsComingSoonToast() {
-        let app = Self.launch()
+        let app = Self.launch(extra: ["-FriendCalToastSeconds", "6"])
         app.buttons["home.poke"].tap()
-        XCTAssertTrue(toast(app).waitForExistence(timeout: 2))
-        XCTAssertEqual(toast(app).label, "Poke is coming soon")
+        XCTAssertTrue(toast(app, "Poke is coming soon").waitForExistence(timeout: 2))
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: toast(app))
-        wait(for: [gone], timeout: 5)
+        wait(for: [gone], timeout: 10)
     }
 
     /// protects=Stealth never shows a false privacy state (D21); fails_when=the tap turns the
-    /// switch on or no toast explains it; no_claim=stealth itself (not built).
+    /// switch on or no toast explains it; no_claim=stealth itself (not built); toast runs 6s here.
     func testStealthTapShowsToastAndStaysOff() {
-        let app = Self.launch()
+        let app = Self.launch(extra: ["-FriendCalToastSeconds", "6"])
         let stealth = app.switches["home.stealth"]
         stealth.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
-        XCTAssertTrue(toast(app).waitForExistence(timeout: 2))
-        XCTAssertEqual(toast(app).label, "Stealth is coming soon. Nothing is hidden yet.")
+        XCTAssertTrue(toast(app, "Stealth is coming soon. Nothing is hidden yet.").waitForExistence(timeout: 2))
         XCTAssertEqual(stealth.value as? String, "0")
         attach(app, "home-stealth-toast")
     }

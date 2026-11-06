@@ -8,12 +8,19 @@ final class ToastCenter {
     private(set) var message: String?
     private var dismissal: Task<Void, Never>?
 
+    /// 2.5s (D20). UI tests lengthen it with `-FriendCalToastSeconds <n>`: XCUITest's wait for the
+    /// app to idle can take over a second (the wheel arc never stops), long enough to miss a 2.5s toast.
+    static var displaySeconds: Double {
+        let override = UserDefaults.standard.double(forKey: "FriendCalToastSeconds")
+        return override > 0 ? override : 2.5
+    }
+
     func show(_ text: String) {
         message = text
         AccessibilityNotification.Announcement(text).post()
         dismissal?.cancel()
         dismissal = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(2.5))
+            try? await Task.sleep(for: .seconds(Self.displaySeconds))
             guard !Task.isCancelled else { return }
             self?.message = nil
         }
