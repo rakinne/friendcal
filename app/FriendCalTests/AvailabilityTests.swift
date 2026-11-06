@@ -85,9 +85,25 @@ final class AvailabilityTests: XCTestCase {
         let a = Self.hold(friend, pid, Self.at(18), Self.at(19))
         let b = Self.hold(friend, pid, Self.at(19), Self.at(20))
         let window = DateRange(lower: Self.at(18), upper: Self.at(19, 30))
-        let (promoted, _) = AvailabilityService().promoteToBusy(window: window, proposalID: pid, recipientIDs: [friend], slots: [a, b], now: Self.at(8))
+        let (promoted, cleared) = AvailabilityService().promoteToBusy(window: window, proposalID: pid, recipientIDs: [friend], slots: [a, b], now: Self.at(8))
         XCTAssertEqual(promoted.map(\.userID), [friend])
         XCTAssertEqual(promoted.first?.range, window)
+        XCTAssertEqual(Set(cleared), [a.id, b.id])
+    }
+
+    /// Value: protects=a lock settles only this proposal's softHolds: another proposal's hold and a
+    /// non-softHold slot of this proposal are neither cleared nor promoted; fails_when=the proposal or
+    /// state filter is dropped; why_new=no test passes such slots; seam=none; no_claim=lock_proposal
+    /// SQL (supabase/tests/lock_proposal_test.sql covers the server side).
+    func testLockLeavesOtherSlotsAlone() {
+        let pid = UUID(), otherPid = UUID(), friend = UUID()
+        let mine = Self.hold(friend, pid, Self.at(18), Self.at(20))
+        let foreign = Self.hold(friend, otherPid, Self.at(18), Self.at(20))
+        let busy = AvailabilitySlot(userID: friend, range: DateRange(lower: Self.at(21), upper: Self.at(22)), sourceProposalID: pid, state: .busy)
+        let window = DateRange(lower: Self.at(18), upper: Self.at(19))
+        let (promoted, cleared) = AvailabilityService().promoteToBusy(window: window, proposalID: pid, recipientIDs: [friend], slots: [mine, foreign, busy], now: Self.at(8))
+        XCTAssertEqual(promoted.count, 1)
+        XCTAssertEqual(cleared, [mine.id])
     }
 
     /// Value: protects=the BusyBlock covers the locked common window, not the whole hold (D3, no
