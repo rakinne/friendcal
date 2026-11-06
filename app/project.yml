@@ -100,9 +100,10 @@ targets:
         buildPhase: resources
       - path: FriendCal/Assets.xcassets
         optional: true
-      - path: FriendCal/Secrets.plist
-        optional: true
-        buildPhase: resources
+      # Secrets.plist is gitignored and nothing reads it yet, so it is not a build input:
+      # XcodeGen's `optional` only applies at generation time, and a project generated on a
+      # machine that has the file breaks every fresh clone (AC8). Add a config path when the
+      # Supabase backend is wired.
     preBuildScripts:
       # D7: fail every configuration (incl. Release archives) when a font is
       # missing. Cabinet Grotesk is gitignored, so fresh clones hit this.

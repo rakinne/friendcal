@@ -28,7 +28,6 @@
 		49338FCBE07DF5B007BE2A4E /* MembersDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E0E5BD680250D294643F803 /* MembersDrawer.swift */; };
 		4AF3711E20702BE0F0ADC21D /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B7362117FF0D47C0157A90DC /* Supabase */; };
 		5766E1A4EB58F547E2096230 /* Toast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D25C72D6C8F6EDCA7E6849 /* Toast.swift */; };
-		57E4A620AE09672DD1565CF0 /* Secrets.plist in Resources */ = {isa = PBXBuildFile; fileRef = 45C5E66C5F1BD7B5BEC73BB6 /* Secrets.plist */; };
 		5FAB44E4CE28E84686848761 /* SourceSans3-Semibold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 4348F53B2C18D20055868E8B /* SourceSans3-Semibold.otf */; };
 		5FF117C16E9E370E6F541A05 /* PrivacyManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078E091DFF9809EA8E5F20F2 /* PrivacyManifest.swift */; };
 		613088FF4F85533866A79325 /* OFL-SourceSans3.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5282CFED12EA1EA792E64264 /* OFL-SourceSans3.txt */; };
@@ -142,7 +141,6 @@
 		3A1B85AB49F20C218AFC6C19 /* FaceColorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceColorTests.swift; sourceTree = "<group>"; };
 		42BC80A0E18BEC0A9E6387C8 /* HomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeUITests.swift; sourceTree = "<group>"; };
 		4348F53B2C18D20055868E8B /* SourceSans3-Semibold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SourceSans3-Semibold.otf"; sourceTree = "<group>"; };
-		45C5E66C5F1BD7B5BEC73BB6 /* Secrets.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Secrets.plist; sourceTree = "<group>"; };
 		5282CFED12EA1EA792E64264 /* OFL-SourceSans3.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-SourceSans3.txt"; sourceTree = "<group>"; };
 		5C956DEF60E9B069D56B7CF8 /* PokeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PokeService.swift; sourceTree = "<group>"; };
 		5EE701D6BFF148DAC0B029FE /* DebugSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSheet.swift; sourceTree = "<group>"; };
@@ -333,7 +331,6 @@
 			children = (
 				B4531A2350CDA183921F747E /* Assets.xcassets */,
 				131835A9213461F546F3F7F5 /* FriendCalApp.swift */,
-				45C5E66C5F1BD7B5BEC73BB6 /* Secrets.plist */,
 				8F20D0CBF76E0C9A715121AD /* Fixtures */,
 				D2A5132D1A8809E92855DCBE /* Models */,
 				A6CC96095CC0597556DD01B7 /* Privacy */,
@@ -549,7 +546,6 @@
 				E6B7A96A96EF91CB582648A3 /* JetBrainsMono-Regular.ttf in Resources */,
 				3B3F595C307D45DC24113F9E /* OFL-JetBrainsMono.txt in Resources */,
 				613088FF4F85533866A79325 /* OFL-SourceSans3.txt in Resources */,
-				57E4A620AE09672DD1565CF0 /* Secrets.plist in Resources */,
 				C8749322F777384D512D95F2 /* SourceSans3-Bold.otf in Resources */,
 				A31320AB6D0437EEC0715521 /* SourceSans3-Regular.otf in Resources */,
 				5FAB44E4CE28E84686848761 /* SourceSans3-Semibold.otf in Resources */,
