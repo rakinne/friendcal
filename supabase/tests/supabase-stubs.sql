@@ -1,7 +1,8 @@
 -- Minimal stand-ins for what Supabase provides, so schema.sql loads in plain Postgres 14+.
 -- auth.uid() reads a per-transaction setting the tests set (test.uid).
-create role anon nologin;
-create role authenticated nologin;
+-- Roles are cluster-wide, so tolerate a second database in the same cluster.
+do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
+do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
 create schema auth;
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('test.uid', true), '')::uuid

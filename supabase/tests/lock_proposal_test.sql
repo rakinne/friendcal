@@ -33,20 +33,20 @@ insert into users(id, display_name) select t.u(n), 'u' || n from generate_series
 
 -- t.seed(pid, creator): proposal over Nov 10-24 for recipients u1..u5 (u5 listed twice), plus holds:
 -- u1 17-21 covers; u2 18-19 + 19-20 touch and cover together; u3, u4 18-20 cover; u5 18:30-20 partial;
--- u6 not invited. All on Nov 14 (UTC), expiring Dec 1.
+-- u6 not invited. All on Nov 14 (UTC), expiring 30 days after the test runs (expiry compares real now()).
 create function t.seed(pid uuid, creator uuid default t.u(1)) returns void language sql as $$
   insert into proposals(id, title, window_start, window_end, created_by, distribution)
   values (pid, 'Brunch', '2026-11-10 00:00Z', '2026-11-24 00:00Z', creator,
           jsonb_build_object('mode', 'newGroup', 'recipientIDs',
             jsonb_build_array(t.u(1), t.u(2), t.u(3), t.u(4), t.u(5), t.u(5))));
   insert into availability_slots(user_id, range, source_proposal_id, state, expires_at) values
-    (t.u(1), '[2026-11-14 17:00Z,2026-11-14 21:00Z)', pid, 'softHold', '2026-12-01Z'),
-    (t.u(2), '[2026-11-14 18:00Z,2026-11-14 19:00Z)', pid, 'softHold', '2026-12-01Z'),
-    (t.u(2), '[2026-11-14 19:00Z,2026-11-14 20:00Z)', pid, 'softHold', '2026-12-01Z'),
+    (t.u(1), '[2026-11-14 17:00Z,2026-11-14 21:00Z)', pid, 'softHold', now() + interval '30 days'),
+    (t.u(2), '[2026-11-14 18:00Z,2026-11-14 19:00Z)', pid, 'softHold', now() + interval '30 days'),
+    (t.u(2), '[2026-11-14 19:00Z,2026-11-14 20:00Z)', pid, 'softHold', now() + interval '30 days'),
     (t.u(3), '[2026-11-14 18:00Z,2026-11-14 20:00Z)', pid, 'softHold', null),
-    (t.u(4), '[2026-11-14 18:00Z,2026-11-14 20:00Z)', pid, 'softHold', '2026-12-01Z'),
-    (t.u(5), '[2026-11-14 18:30Z,2026-11-14 20:00Z)', pid, 'softHold', '2026-12-01Z'),
-    (t.u(6), '[2026-11-14 18:00Z,2026-11-14 20:00Z)', pid, 'softHold', '2026-12-01Z');
+    (t.u(4), '[2026-11-14 18:00Z,2026-11-14 20:00Z)', pid, 'softHold', now() + interval '30 days'),
+    (t.u(5), '[2026-11-14 18:30Z,2026-11-14 20:00Z)', pid, 'softHold', now() + interval '30 days'),
+    (t.u(6), '[2026-11-14 18:00Z,2026-11-14 20:00Z)', pid, 'softHold', now() + interval '30 days');
 $$;
 
 -- Fixed lock window used throughout.
@@ -104,7 +104,7 @@ select t.ok('expired hold not counted', t.lock('10000000-0000-0000-0000-00000000
 select t.seed('10000000-0000-0000-0000-000000000004');
 delete from availability_slots where source_proposal_id = '10000000-0000-0000-0000-000000000004';
 insert into availability_slots(user_id, range, source_proposal_id, state, expires_at)
-  select t.u(n), '[2026-11-21 18:00Z,2026-11-21 20:00Z)', '10000000-0000-0000-0000-000000000004', 'softHold', '2026-12-01Z'
+  select t.u(n), '[2026-11-21 18:00Z,2026-11-21 20:00Z)', '10000000-0000-0000-0000-000000000004', 'softHold', now() + interval '30 days'
     from generate_series(1, 5) n;
 insert into busy_blocks(user_id, range) values (t.u(3), '[2026-11-21 18:30Z,2026-11-21 19:00Z)');
 select t.ok('busy recipient skipped, lock still succeeds',
@@ -115,7 +115,7 @@ select t.ok('busy recipient got no second block',
 select t.seed('10000000-0000-0000-0000-000000000005');
 delete from availability_slots where source_proposal_id = '10000000-0000-0000-0000-000000000005';
 insert into availability_slots(user_id, range, source_proposal_id, state, expires_at)
-  select t.u(n), '[2026-11-21 18:00Z,2026-11-21 20:00Z)', '10000000-0000-0000-0000-000000000005', 'softHold', '2026-12-01Z'
+  select t.u(n), '[2026-11-21 18:00Z,2026-11-21 20:00Z)', '10000000-0000-0000-0000-000000000005', 'softHold', now() + interval '30 days'
     from generate_series(1, 4) n;
 select t.ok('busy recipient below quorum is a quorum refusal, not 23P01',
   t.lock('10000000-0000-0000-0000-000000000005', '2026-11-21 18:00Z', '2026-11-21 19:30Z', t.u(1)) = '22023');
