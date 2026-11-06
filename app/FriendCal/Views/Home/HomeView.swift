@@ -9,6 +9,8 @@ struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var toast = ToastCenter()
     @State private var showDrawer = false
+    /// Held in state so redraws don't resubscribe and restart the 60s countdown (X12).
+    @State private var minuteTick = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     #if DEBUG
     @State private var showDebug = false
     #endif
@@ -36,7 +38,7 @@ struct HomeView: View {
         .background(DesignTokens.Colors.background.ignoresSafeArea())
         .toast(toast)
         // X12: recount on the minute and on return to foreground so expired holds drop out.
-        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { model.refresh(now: $0) }
+        .onReceive(minuteTick) { model.refresh(now: $0) }
         .onChange(of: scenePhase) { _, phase in if phase == .active { model.refresh(now: .now) } }
         .sheet(isPresented: $showDrawer) {
             MembersDrawer(groupName: model.groupName, members: model.members, roster: model.chips == nil ? nil : model.selectedCell?.roster,

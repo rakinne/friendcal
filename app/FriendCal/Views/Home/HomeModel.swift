@@ -74,7 +74,8 @@ final class HomeModel {
 
     var visibleWeek: HeatmapWeek? { weeks.first { $0.id == visibleWeekID } }
     var selectedCell: HeatmapCell? { visibleWeek?.cells.first { $0.id == selectedCellID } }
-    var total: Int { proposal?.distribution.recipientIDs.count ?? 0 }
+    /// Distinct recipients, matching HeatmapBuilder's cell totals (D5).
+    var total: Int { Set(proposal?.distribution.recipientIDs ?? []).count }
     var onlineCount: Int { members.filter(\.isOnline).count }
 
     var shareText: String? {
