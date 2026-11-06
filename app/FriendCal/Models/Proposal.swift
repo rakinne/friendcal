@@ -29,10 +29,11 @@ public struct Proposal: Identifiable, Codable {
     public var distribution: Distribution
     public var status: ProposalStatus
     public var createdAt: Date
-    public var lockedDate: Date? // final chosen date (e.g. Nov 21st)
+    public var lockedDate: Date? // final chosen date (e.g. Nov 21st): the locked common window's start
+    public var lockedEnd: Date? // the locked common window's end (D12); persisted as proposals.locked_end
     public var venueHint: String? // location optional, e.g. host's place
 
-    public init(id: UUID, title: String, window: DateRange, createdBy: UUID, distribution: Distribution, status: ProposalStatus = .requesting, createdAt: Date = Date(), lockedDate: Date? = nil, venueHint: String? = nil) {
+    public init(id: UUID, title: String, window: DateRange, createdBy: UUID, distribution: Distribution, status: ProposalStatus = .requesting, createdAt: Date = Date(), lockedDate: Date? = nil, lockedEnd: Date? = nil, venueHint: String? = nil) {
         self.id = id
         self.title = title
         self.window = window
@@ -41,6 +42,7 @@ public struct Proposal: Identifiable, Codable {
         self.status = status
         self.createdAt = createdAt
         self.lockedDate = lockedDate
+        self.lockedEnd = lockedEnd
         self.venueHint = venueHint
     }
 }

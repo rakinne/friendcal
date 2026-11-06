@@ -38,6 +38,21 @@ final class ProposalTests: XCTestCase {
         XCTAssertEqual(atQuorum.status, .locked)
     }
 
+    /// Value: protects=lock hands the whole common window (start and end) to busyWriter and the
+    /// proposal, so the backend can persist both ends (review D5); fails_when=only the start crosses
+    /// the boundary again; why_new=other lock tests ignore busyWriter's argument; seam=none;
+    /// no_claim=the lock_proposal SQL function (checked against Postgres separately).
+    func testLockPassesWholeWindowToBusyWriter() throws {
+        var proposal = Self.proposal()
+        let cell = Self.cell(commonCount: 5, total: 5)
+        var written: DateRange?
+        let window = try ProposalService().lock(&proposal, to: cell.id, in: Self.weeks(cell)) { _, w in written = w; return [] }
+        XCTAssertEqual(written, cell.commonWindow)
+        XCTAssertEqual(window, cell.commonWindow)
+        XCTAssertEqual(proposal.lockedDate, cell.commonWindow?.lowerBound)
+        XCTAssertEqual(proposal.lockedEnd, cell.commonWindow?.upperBound)
+    }
+
     func testLockWithNoRecipientsThrowsInsufficientRecipients() {
         var proposal = Self.proposal()
         let cell = Self.cell(commonCount: 0, total: 0)

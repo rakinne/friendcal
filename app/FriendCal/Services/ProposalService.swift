@@ -28,9 +28,11 @@ public final class ProposalService {
     /// lock). Throws cellNotInWindow for a missing or disabled cell (D4), insufficientRecipients when
     /// nobody was invited, and notEnoughCoverage when fewer than quorumThreshold of the recipients
     /// share one >= 60-min window (D12). The lock date is the common window's start.
+    /// `busyWriter` receives the whole locked window, not just its start, so the backend can persist
+    /// both ends and promote in one transaction (`SupabaseService.lockProposal(_:window:)`).
     /// - Returns: the common window, which `AvailabilityService.promoteToBusy(window:...)` takes.
     @discardableResult
-    public func lock(_ proposal: inout Proposal, to id: HeatmapCell.ID, in weeks: [HeatmapWeek], busyWriter: (Proposal, Date) -> [BusyBlock]) throws -> DateRange {
+    public func lock(_ proposal: inout Proposal, to id: HeatmapCell.ID, in weeks: [HeatmapWeek], busyWriter: (Proposal, DateRange) -> [BusyBlock]) throws -> DateRange {
         guard let cell = weeks.lazy.flatMap(\.cells).first(where: { $0.id == id }), cell.isEnabled else {
             throw ProposalLockError.cellNotInWindow
         }
@@ -39,8 +41,9 @@ public final class ProposalService {
             throw ProposalLockError.notEnoughCoverage(required: quorumThreshold, actual: cell.coverage)
         }
         proposal.lockedDate = window.lowerBound
+        proposal.lockedEnd = window.upperBound
         proposal.status = .locked
-        _ = busyWriter(proposal, window.lowerBound)
+        _ = busyWriter(proposal, window)
         return window
     }
 }

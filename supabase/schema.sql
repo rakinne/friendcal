@@ -17,9 +17,12 @@ create table proposals (
   created_by uuid references users(id),
   distribution jsonb not null default '{}',
   status text not null default 'requesting',
-  locked_date timestamptz,
+  locked_date timestamptz, -- locked common window start
+  locked_end timestamptz,  -- locked common window end (D12)
   created_at timestamptz default now()
 );
+-- Existing databases created before locked_end:
+alter table proposals add column if not exists locked_end timestamptz;
 
 create table availability_slots (
   id uuid primary key default gen_random_uuid(),
@@ -79,3 +82,69 @@ create table if not exists circle_members (
   user_id uuid references users(id) on delete cascade,
   primary key (circle_id, user_id)
 );
+
+-- Lock a proposal atomically (D3, D12; review D5). The creator picks the common window; the server
+-- re-derives who is free instead of trusting the client: a recipient counts when the union of their
+-- unexpired softHolds for this proposal covers the window (range_agg merges touching ranges, like
+-- HeatmapBuilder.merge). One transaction sets status and both ends, inserts one window-sized Busy
+-- block per covering recipient and clears the proposal's softHolds. Any failure (quorum, status,
+-- the no_overlapping_busy constraint) rolls the whole lock back.
+create or replace function lock_proposal(p_id uuid, p_start timestamptz, p_end timestamptz, p_quorum numeric default 0.8)
+returns setof busy_blocks
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_prop proposals%rowtype;
+  v_window tstzrange := tstzrange(p_start, p_end, '[)');
+  v_recipients uuid[];
+  v_total int;
+  v_free int;
+  v_covering uuid[];
+begin
+  select * into v_prop from proposals where id = p_id for update;
+  if not found then
+    raise exception 'proposal % not found', p_id using errcode = 'P0002';
+  end if;
+  if v_prop.created_by is distinct from auth.uid() then
+    raise exception 'only the proposal creator can lock it' using errcode = '42501';
+  end if;
+  if v_prop.status <> 'requesting' then
+    raise exception 'proposal is %, not requesting', v_prop.status using errcode = '55000';
+  end if;
+  if p_end - p_start < interval '60 minutes' or p_start < v_prop.window_start or p_end > v_prop.window_end then
+    raise exception 'lock window must be at least 60 minutes inside the proposal window' using errcode = '22023';
+  end if;
+
+  select coalesce(array_agg(distinct r::uuid), '{}') into v_recipients
+    from jsonb_array_elements_text(coalesce(v_prop.distribution -> 'recipientIDs', '[]'::jsonb)) as r;
+  v_total := cardinality(v_recipients);
+  if v_total = 0 then
+    raise exception 'no recipients to lock' using errcode = '22023';
+  end if;
+
+  select coalesce(array_agg(c.user_id), '{}') into v_covering
+    from (select s.user_id
+            from availability_slots s
+           where s.source_proposal_id = p_id
+             and s.state = 'softHold'
+             and s.user_id = any (v_recipients)
+             and (s.expires_at is null or s.expires_at > now())
+           group by s.user_id
+          having range_agg(s.range) @> v_window) as c;
+  v_free := cardinality(v_covering);
+  if v_free::numeric / v_total < p_quorum then
+    raise exception 'need % percent free, only % percent', round(p_quorum * 100), round(v_free * 100.0 / v_total) using errcode = '22023';
+  end if;
+
+  update proposals set status = 'locked', locked_date = p_start, locked_end = p_end where id = p_id;
+  delete from availability_slots where source_proposal_id = p_id and state = 'softHold';
+  return query
+    insert into busy_blocks (user_id, range, visibility)
+    select u, v_window, 'public' from unnest(v_covering) as u
+    returning *;
+end;
+$$;
+revoke all on function lock_proposal(uuid, timestamptz, timestamptz, numeric) from public;
+grant execute on function lock_proposal(uuid, timestamptz, timestamptz, numeric) to authenticated;
