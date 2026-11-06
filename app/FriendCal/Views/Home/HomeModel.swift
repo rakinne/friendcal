@@ -41,12 +41,15 @@ final class HomeModel {
         proposal = fixture.proposal
         slots = fixture.slots
         lastUpdated = fixture.lastUpdated
-        rebuild(now: now)
+        refresh(now: now)
     }
 
-    /// Recounts with a fresh `now` (expired holds drop out), keeps the visible week when it still
-    /// exists, and re-resolves the selection.
-    func rebuild(now: Date) {
+    /// Recounts with a fresh `now`, so holds that expired while Home stayed open drop out of the
+    /// counts, roster, best badge and share text with no new data (X12). Keeps the visible week
+    /// when it still exists and re-resolves the selection (X6, X10). HomeView calls this every
+    /// minute and when the scene becomes active. `lastUpdated` is untouched: it tracks data
+    /// changes, not recounts.
+    func refresh(now: Date) {
         guard let p = proposal else {
             weeks = []; visibleWeekID = nil; selectedCellID = nil
             return

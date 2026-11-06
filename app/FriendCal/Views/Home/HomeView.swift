@@ -6,6 +6,7 @@ import FriendCalCore
 /// default Dynamic Type (D17); larger sizes scroll.
 struct HomeView: View {
     var model: HomeModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var toast = ToastCenter()
     @State private var showDrawer = false
     #if DEBUG
@@ -34,6 +35,9 @@ struct HomeView: View {
         .scrollBounceBehavior(.basedOnSize)
         .background(DesignTokens.Colors.background.ignoresSafeArea())
         .toast(toast)
+        // X12: recount on the minute and on return to foreground so expired holds drop out.
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { model.refresh(now: $0) }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { model.refresh(now: .now) } }
         .sheet(isPresented: $showDrawer) {
             MembersDrawer(groupName: model.groupName, members: model.members, roster: model.chips == nil ? nil : model.selectedCell?.roster,
                           calendar: model.calendar, isLoading: model.isLoading)
