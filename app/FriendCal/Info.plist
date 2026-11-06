@@ -22,8 +22,18 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>UILaunchStoryboardName</key>
-	<string></string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>CabinetGrotesk-Extrabold.otf</string>
+		<string>CabinetGrotesk-Bold.otf</string>
+		<string>SourceSans3-Regular.otf</string>
+		<string>SourceSans3-Semibold.otf</string>
+		<string>SourceSans3-Bold.otf</string>
+		<string>JetBrainsMono-Regular.ttf</string>
+		<string>JetBrainsMono-Medium.ttf</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -35,5 +45,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
 </dict>
 </plist>

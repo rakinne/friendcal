@@ -13,7 +13,7 @@ configs:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_EMIT_LOC_STRINGS: YES
@@ -27,7 +27,7 @@ targets:
   FriendCalCore:
     type: framework
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "18.0"
     supportedDestinations: [iOS]
     sources:
       - FriendCal/Models
@@ -42,13 +42,14 @@ targets:
         PRODUCT_NAME: FriendCalCore
         EXECUTABLE_NAME: FriendCalCore
         ENABLE_TESTABILITY: YES
+        GENERATE_INFOPLIST_FILE: YES
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
   FriendCal:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "18.0"
     supportedDestinations: [iOS]
     bundleId: com.friendcal.app
     info:
@@ -56,7 +57,16 @@ targets:
       properties:
         CFBundleDisplayName: FriendCal
         CFBundleName: FriendCal
-        UILaunchStoryboardName: ""
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Light
+        UIAppFonts:
+          - CabinetGrotesk-Extrabold.otf
+          - CabinetGrotesk-Bold.otf
+          - SourceSans3-Regular.otf
+          - SourceSans3-Semibold.otf
+          - SourceSans3-Bold.otf
+          - JetBrainsMono-Regular.ttf
+          - JetBrainsMono-Medium.ttf
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UISupportedInterfaceOrientations~ipad:
@@ -86,6 +96,11 @@ targets:
       - FriendCal/Privacy
       - FriendCal/Shared
       - FriendCal/Views
+      - path: FriendCal/Fixtures
+        optional: true
+      - path: FriendCal/Resources/Fonts
+        optional: true
+        buildPhase: resources
       - path: FriendCal/Assets.xcassets
         optional: true
       - path: FriendCal/Secrets.plist
@@ -98,7 +113,7 @@ targets:
   FriendCalTests:
     type: bundle.unit-test
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "18.0"
     supportedDestinations: [iOS]
     sources:
       - FriendCalTests
@@ -112,6 +127,23 @@ targets:
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
+  FriendCalUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    supportedDestinations: [iOS]
+    sources:
+      - FriendCalUITests
+    dependencies:
+      - target: FriendCal
+    settings:
+      base:
+        PRODUCT_NAME: FriendCalUITests
+        TEST_TARGET_NAME: FriendCal
+        GENERATE_INFOPLIST_FILE: YES
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
 
 schemes:
   FriendCal:
@@ -122,6 +154,7 @@ schemes:
       config: Debug
       targets:
         - FriendCalTests
+        - FriendCalUITests
       gatherCoverageData: true
     run:
       config: Debug

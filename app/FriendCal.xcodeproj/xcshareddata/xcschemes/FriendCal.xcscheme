@@ -51,6 +51,17 @@
                ReferencedContainer = "container:FriendCal.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "0B3C5B76D90ECABB323CB49F"
+               BuildableName = "FriendCalUITests.xctest"
+               BlueprintName = "FriendCalUITests"
+               ReferencedContainer = "container:FriendCal.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

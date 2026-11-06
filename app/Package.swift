@@ -2,7 +2,7 @@
 import PackageDescription
 let package = Package(
     name: "FriendCal",
-    platforms: [.iOS(.v17), .macOS(.v14)],
+    platforms: [.iOS("18.0"), .macOS(.v14)],
     products: [.library(name: "FriendCalCore", targets: ["FriendCalCore"])],
     dependencies: [
         .package(url: "https://github.com/supabase/supabase-swift", from: "2.5.0"),

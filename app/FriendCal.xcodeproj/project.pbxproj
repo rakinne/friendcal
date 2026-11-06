@@ -12,6 +12,7 @@
 		0E6E4865813B8DCFABFA20CF /* FriendCalCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		11F112A11705260E319E7FD6 /* Proposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5261F4E2562AAB0BC19A5 /* Proposal.swift */; };
 		12A4ABCC5AF7C8E0486C2A8C /* MyFavesWheelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ACD515F4A643655A19E1CCF /* MyFavesWheelView.swift */; };
+		12F696E2086D1245CD7ADBE5 /* LaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC5EA32A82A39117D0BA54FF /* LaunchTests.swift */; };
 		175F20ADF987C05ED6FA0C2E /* TicketTap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37FA32C19C5A52CE5C2D8744 /* TicketTap.swift */; };
 		188B63E03CD503EC9109B923 /* DateRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57799F8A2115B96A2AB2A5D /* DateRange.swift */; };
 		199F5FFE6527BFDFBE6060DD /* AvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DCA69AD3A06B42825D4E23 /* AvailabilityTests.swift */; };
@@ -60,6 +61,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 92B8F5A2E5B6F0658463BF51;
 			remoteInfo = FriendCalCore;
+		};
+		5735B1B88CB2C00BE61384AD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 234C905748B713D357773366 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 297B36CE7CE6EBA4D7F02DAE;
+			remoteInfo = FriendCal;
 		};
 		5AE7FDCAFE522901A9576419 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -118,6 +126,8 @@
 		713BB8CC406C59AE3E2B193F /* BusyBlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusyBlockView.swift; sourceTree = "<group>"; };
 		75E25CC0C30F98E22405F7DB /* BusyBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusyBlock.swift; sourceTree = "<group>"; };
 		813D547380BAA92B5093B0AF /* StealthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StealthService.swift; sourceTree = "<group>"; };
+		A94A1452FCA58DF176DA80A4 /* FriendCalUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FriendCalUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AC5EA32A82A39117D0BA54FF /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
 		B4531A2350CDA183921F747E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = FriendCalCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DCA69AD3A06B42825D4E23 /* AvailabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilityTests.swift; sourceTree = "<group>"; };
@@ -175,6 +185,7 @@
 				31E71A3733EE3E9DED3F22D1 /* FriendCal.app */,
 				C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */,
 				3727D684C7521C3352DBD0E6 /* FriendCalTests.xctest */,
+				A94A1452FCA58DF176DA80A4 /* FriendCalUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -196,6 +207,14 @@
 				49B126AF82BC1D3F32CFA37F /* ProposalFlowView.swift */,
 			);
 			path = Proposal;
+			sourceTree = "<group>";
+		};
+		854F52E2C172B55B54E2ED4B /* FriendCalUITests */ = {
+			isa = PBXGroup;
+			children = (
+				AC5EA32A82A39117D0BA54FF /* LaunchTests.swift */,
+			);
+			path = FriendCalUITests;
 			sourceTree = "<group>";
 		};
 		8B84ED94662E81A8D4DE427F /* Shared */ = {
@@ -268,6 +287,7 @@
 			children = (
 				AFD437FB42CD853731B8C6BD /* FriendCal */,
 				3AD75F3C42411261DCC39012 /* FriendCalTests */,
+				854F52E2C172B55B54E2ED4B /* FriendCalUITests */,
 				25837D54340989D2E28E5E82 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -285,6 +305,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0B3C5B76D90ECABB323CB49F /* FriendCalUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7EF5BD2D4C87E80CA50E4347 /* Build configuration list for PBXNativeTarget "FriendCalUITests" */;
+			buildPhases = (
+				BCA6471CD581227B98F41E7D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C9C4AAF0BDC5E77179080B08 /* PBXTargetDependency */,
+			);
+			name = FriendCalUITests;
+			packageProductDependencies = (
+			);
+			productName = FriendCalUITests;
+			productReference = A94A1452FCA58DF176DA80A4 /* FriendCalUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		297B36CE7CE6EBA4D7F02DAE /* FriendCal */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 622D80A414CDB90AC725B59B /* Build configuration list for PBXNativeTarget "FriendCal" */;
@@ -356,6 +394,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
+					0B3C5B76D90ECABB323CB49F = {
+						TestTargetID = 297B36CE7CE6EBA4D7F02DAE;
+					};
 					297B36CE7CE6EBA4D7F02DAE = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
@@ -363,7 +404,6 @@
 				};
 			};
 			buildConfigurationList = CA88EF0C5F9121773CB02E2C /* Build configuration list for PBXProject "FriendCal" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -376,12 +416,14 @@
 				299F86FC56B14A95A6157EDD /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 25837D54340989D2E28E5E82 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				297B36CE7CE6EBA4D7F02DAE /* FriendCal */,
 				92B8F5A2E5B6F0658463BF51 /* FriendCalCore */,
+				297B36CE7CE6EBA4D7F02DAE /* FriendCal */,
 				4B6570469B743BBF4C56C9C5 /* FriendCalTests */,
+				0B3C5B76D90ECABB323CB49F /* FriendCalUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -422,6 +464,14 @@
 				1AD0211CD30BD8F7F9515BF2 /* SupabaseService.swift in Sources */,
 				175F20ADF987C05ED6FA0C2E /* TicketTap.swift in Sources */,
 				1AE4D913604178B5C7D9E3C4 /* User.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BCA6471CD581227B98F41E7D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12F696E2086D1245CD7ADBE5 /* LaunchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -474,6 +524,11 @@
 			target = 92B8F5A2E5B6F0658463BF51 /* FriendCalCore */;
 			targetProxy = 5AE7FDCAFE522901A9576419 /* PBXContainerItemProxy */;
 		};
+		C9C4AAF0BDC5E77179080B08 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 297B36CE7CE6EBA4D7F02DAE /* FriendCal */;
+			targetProxy = 5735B1B88CB2C00BE61384AD /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -482,11 +537,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = "";
 				EXECUTABLE_NAME = FriendCal;
 				INFOPLIST_FILE = FriendCal/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -496,6 +552,8 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -512,8 +570,9 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_TESTABILITY = YES;
 				EXECUTABLE_NAME = FriendCalCore;
+				GENERATE_INFOPLIST_FILE = YES;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -524,6 +583,8 @@
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
@@ -534,7 +595,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				EXECUTABLE_NAME = FriendCalTests;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -545,6 +606,8 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FriendCal.app/FriendCal";
 			};
@@ -553,14 +616,91 @@
 		5B1D214FEE5D0EC3A0426659 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.9;
 			};
 			name = Debug;
+		};
+		5CADEA2A567F59F15B40BF92 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.friendcal.FriendCalUITests;
+				PRODUCT_NAME = FriendCalUITests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FriendCal;
+			};
+			name = Release;
 		};
 		6262A8F7E9CAF9EBB694273D /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -573,8 +713,9 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_TESTABILITY = YES;
 				EXECUTABLE_NAME = FriendCalCore;
+				GENERATE_INFOPLIST_FILE = YES;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -585,6 +726,8 @@
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
@@ -593,25 +736,96 @@
 		94F75148D5E5A86CE553899D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.9;
 			};
 			name = Release;
+		};
+		B58B4D8716376DFC010114C3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.friendcal.FriendCalUITests;
+				PRODUCT_NAME = FriendCalUITests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FriendCal;
+			};
+			name = Debug;
 		};
 		F2932F2BE216013EA24A35C8 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = "";
 				EXECUTABLE_NAME = FriendCal;
 				INFOPLIST_FILE = FriendCal/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -621,6 +835,8 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -631,7 +847,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				EXECUTABLE_NAME = FriendCalTests;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -642,6 +858,8 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FriendCal.app/FriendCal";
 			};
@@ -664,6 +882,15 @@
 			buildConfigurations = (
 				F2932F2BE216013EA24A35C8 /* Debug */,
 				1FFF21FD2FD37DBE5381E287 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7EF5BD2D4C87E80CA50E4347 /* Build configuration list for PBXNativeTarget "FriendCalUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B58B4D8716376DFC010114C3 /* Debug */,
+				5CADEA2A567F59F15B40BF92 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
