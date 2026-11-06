@@ -40,6 +40,38 @@ public enum DesignTokens {
         public static let lg: CGFloat = 24
         public static let xl: CGFloat = 32
     }
+    /// D27 type scale. Every token scales with Dynamic Type via `relativeTo:`.
+    /// SwiftUI `Font` only: Shared/ also builds for macOS, so no UIFont here.
+    /// Tracking (wordmark -0.01em, display -0.02em) arrives with TextStyle (T12).
+    public enum Typography {
+        public static let wordmark = custom(.cabinetExtrabold, 28, .title)
+        public static let display = custom(.cabinetExtrabold, 26, .title2)
+        public static let title = custom(.sourceSansSemibold, 17, .headline)
+        public static let button = custom(.sourceSansSemibold, 17, .headline)
+        public static let body = custom(.sourceSansRegular, 15, .body)
+        public static let label = custom(.sourceSansSemibold, 13, .footnote)
+        public static let caption = custom(.sourceSansRegular, 12, .caption)
+        public static let mono = custom(.jetBrainsMonoMedium, 12, .caption)
+        public static let badge = custom(.sourceSansSemibold, 10, .caption2)
+
+        private static func custom(_ name: FontName, _ size: CGFloat, _ style: Font.TextStyle) -> Font {
+            .custom(name.rawValue, size: size, relativeTo: style)
+        }
+    }
+}
+
+/// The single list of bundled PostScript names (no fallback fonts).
+/// Typography and the DEBUG launch assertion read this. The file names in
+/// project.yml (UIAppFonts, font preBuildScript) and scripts/fetch-fonts.sh
+/// necessarily repeat them.
+public enum FontName: String, CaseIterable {
+    case cabinetExtrabold = "CabinetGrotesk-Extrabold"
+    case cabinetBold = "CabinetGrotesk-Bold"
+    case sourceSansRegular = "SourceSans3-Regular"
+    case sourceSansSemibold = "SourceSans3-Semibold"
+    case sourceSansBold = "SourceSans3-Bold"
+    case jetBrainsMonoRegular = "JetBrainsMono-Regular"
+    case jetBrainsMonoMedium = "JetBrainsMono-Medium"
 }
 
 extension Color {

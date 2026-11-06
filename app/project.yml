@@ -103,6 +103,30 @@ targets:
       - path: FriendCal/Secrets.plist
         optional: true
         buildPhase: resources
+    preBuildScripts:
+      # D7: fail every configuration (incl. Release archives) when a font is
+      # missing. Cabinet Grotesk is gitignored, so fresh clones hit this.
+      - name: Check bundled fonts
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/FriendCal/Resources/Fonts/CabinetGrotesk-Extrabold.otf
+          - $(SRCROOT)/FriendCal/Resources/Fonts/CabinetGrotesk-Bold.otf
+          - $(SRCROOT)/FriendCal/Resources/Fonts/SourceSans3-Regular.otf
+          - $(SRCROOT)/FriendCal/Resources/Fonts/SourceSans3-Semibold.otf
+          - $(SRCROOT)/FriendCal/Resources/Fonts/SourceSans3-Bold.otf
+          - $(SRCROOT)/FriendCal/Resources/Fonts/JetBrainsMono-Regular.ttf
+          - $(SRCROOT)/FriendCal/Resources/Fonts/JetBrainsMono-Medium.ttf
+        script: |
+          status=0
+          for f in CabinetGrotesk-Extrabold.otf CabinetGrotesk-Bold.otf \
+                   SourceSans3-Regular.otf SourceSans3-Semibold.otf SourceSans3-Bold.otf \
+                   JetBrainsMono-Regular.ttf JetBrainsMono-Medium.ttf; do
+            if [ ! -f "${SRCROOT}/FriendCal/Resources/Fonts/$f" ]; then
+              echo "error: Missing font $f: run scripts/fetch-fonts.sh"
+              status=1
+            fi
+          done
+          exit $status
     dependencies:
       - target: FriendCalCore
   FriendCalTests:
