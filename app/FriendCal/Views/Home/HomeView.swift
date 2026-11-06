@@ -50,17 +50,31 @@ struct HomeView: View {
 
     // MARK: Modules
 
+    /// Wordmark and group pill side by side; stacked when that would truncate the pill at large
+    /// Dynamic Type sizes (D31: text outside the heatmap and wheel scales fully).
     private var header: some View {
-        HStack {
-            BrandWordmark()
-            #if DEBUG
-                .onLongPressGesture { showDebug = true }
-                .accessibilityAction(named: "Open debug tools") { showDebug = true }
-                .accessibilityIdentifier("home.wordmark")
-            #endif
-            Spacer(minLength: DesignTokens.Spacing.sm)
-            GroupPickerPill(name: model.groupName, members: model.members, isLoading: model.isLoading)
+        let pill = GroupPickerPill(name: model.groupName, members: model.members, isLoading: model.isLoading).fixedSize()
+        return ViewThatFits(in: .horizontal) {
+            HStack {
+                wordmark
+                Spacer(minLength: DesignTokens.Spacing.sm)
+                pill
+            }
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                wordmark
+                pill
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private var wordmark: some View {
+        BrandWordmark()
+        #if DEBUG
+            .onLongPressGesture { showDebug = true }
+            .accessibilityAction(named: "Open debug tools") { showDebug = true }
+            .accessibilityIdentifier("home.wordmark")
+        #endif
     }
 
     private var wheel: some View {

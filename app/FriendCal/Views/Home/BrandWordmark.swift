@@ -38,6 +38,7 @@ struct GroupPickerPill: View {
         .overlay { if isLoading { Capsule().fill(Color.skeleton).frame(width: 110, height: 28) } }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isLoading ? "Loading group" : "Group, \(name)")
+        .accessibilityIdentifier("home.groupPill")
     }
 }
 

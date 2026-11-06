@@ -3,7 +3,9 @@ import FriendCalCore
 
 /// The myFaves wheel (D28, D36). 240pt square, orbit radius 92, 40pt faces at 36° steps from
 /// 12 o'clock. One coral arc pulses toward the active friend: it is the app's only endlessly repeating
-/// animation (D23, AC5) and stops under Reduce Motion.
+/// animation (D23, AC5) and stops under Reduce Motion. Text stops growing at xxxLarge, like the
+/// heatmap (D31 amendment): faces, orbit and centre share fixed geometry, so larger sizes would
+/// push the centre text into the faces.
 struct FriendsWheel: View {
     enum Content {
         case loading
@@ -30,6 +32,7 @@ struct FriendsWheel: View {
         }
         .frame(width: Self.size, height: Self.size)
         .frame(maxWidth: .infinity)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     // MARK: States
@@ -98,6 +101,7 @@ struct FriendsWheel: View {
             .minimumScaleFactor(0.7)
             .frame(width: Self.orbit * 2 - Self.face - 8)
             .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("wheel.center")
 
             ForEach(Array(faces.enumerated()), id: \.element.id) { i, member in
                 WheelFace(member: member, status: status(member))
@@ -157,6 +161,7 @@ private struct WheelFace: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(member.name), \(status)")
+            .accessibilityIdentifier("wheel.face")
     }
 }
 

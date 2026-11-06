@@ -122,15 +122,29 @@ final class HomeStatesUITests: XCTestCase {
         XCTAssertGreaterThan(luma, 0.6, "tab bar sample is dark (\(luma)); light mode lock not applied")
     }
 
-    /// protects=at xxxLarge the heatmap stays capped and readable, and at AX3 the page scrolls to
-    /// reach every module (D31); fails_when=a heatmap cell grows past the card or the stealth row
-    /// can't be reached; no_claim=truncation elsewhere (screenshots show it).
+    /// protects=at xxxLarge and AX3 the heatmap and wheel stay capped (D31 + amendment), the
+    /// header stacks instead of truncating the group pill, and the page scrolls to every module;
+    /// fails_when=a heatmap cell grows past the card, the wheel centre text overlaps a face, the
+    /// pill stays beside the wordmark at AX3, or the stealth row can't be reached; no_claim=
+    /// truncation inside other modules (screenshots show it).
     func testDynamicTypeLargeSizes() {
         for (size, name) in [("UICTContentSizeCategoryXXXL", "xxxLarge"), ("UICTContentSizeCategoryAccessibilityL", "AX3")] {
             let app = launch("populated", extra: ["-UIPreferredContentSizeCategoryName", size])
             let sat = any(app, "heatmap.w0.d5.afternoon")
             XCTAssertTrue(sat.waitForExistence(timeout: 10), name)
             XCTAssertTrue(any(app, "heatmapCard").frame.contains(sat.frame), name)
+            let center = any(app, "wheel.center").frame
+            let faces = app.descendants(matching: .any).matching(identifier: "wheel.face")
+            XCTAssertEqual(faces.count, 9, name)
+            for i in 0..<faces.count {
+                XCTAssertFalse(center.intersects(faces.element(boundBy: i).frame), "\(name): centre overlaps \(faces.element(boundBy: i).label)")
+            }
+            let pill = any(app, "home.groupPill").frame
+            // Inside the 20pt margin, with 1pt for sub-point layout rounding at the pill's edge.
+            XCTAssertLessThanOrEqual(pill.maxX, app.windows.firstMatch.frame.maxX - 19, name)
+            if name == "AX3" {
+                XCTAssertGreaterThanOrEqual(pill.minY, any(app, "home.wordmark").frame.maxY, "AX3: pill not stacked under the wordmark")
+            }
             attach(app, "dynamic-type-\(name)")
             let stealth = app.switches["home.stealth"]
             var swipes = 0

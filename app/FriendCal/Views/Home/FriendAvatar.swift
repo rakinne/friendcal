@@ -11,7 +11,10 @@ struct FriendAvatar: View {
         SwiftUI.Circle()
             .fill(DesignTokens.FacePalette.color(for: member.id))
             .frame(width: size, height: size)
-            .overlay(Text(member.initials).textStyle(style).foregroundStyle(DesignTokens.Colors.text).minimumScaleFactor(0.6).lineLimit(1).padding(2))
+            .overlay(Text(member.initials).textStyle(style).foregroundStyle(DesignTokens.Colors.text).minimumScaleFactor(0.6).lineLimit(1).padding(2)
+                // The circle is fixed-size, so its initials stop growing at the default size; the
+                // name beside every avatar carries the scalable text.
+                .dynamicTypeSize(...DynamicTypeSize.large))
             .accessibilityHidden(true)
     }
 }
