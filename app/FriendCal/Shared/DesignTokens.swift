@@ -89,8 +89,6 @@ extension DesignTokens {
             Color(hex: "#E2CFAF"), // sand
             Color(hex: "#B7BE8E"), // moss
         ]
-        public static let sand = colors[4]
-
         /// FNV-1a 32-bit over the UUID string's UTF-8, mod 6. `hashValue` is reseeded per process
         /// (SE-0206), so it would recolor every face on each launch.
         public static func index(for id: UUID) -> Int {

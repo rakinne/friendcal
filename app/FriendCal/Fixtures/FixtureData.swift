@@ -49,6 +49,13 @@ enum FixtureData {
         [[4, 2, 5, 6, 8, 11, 9], [6, 5, 7, 8, 9, 10, 7], [5, 7, 6, 9, 12, 8, 4]],
     ]
 
+    /// The 3-member fixture's own counts (0-3), so it doesn't read as every cell 3/3.
+    /// Bests: Sat afternoon (week 1), Thu evening (week 2).
+    static let fewGrid: [[[Int?]]] = [
+        [[nil, 1, 0, 2, 1, 2, 1], [nil, 2, 1, 2, 2, 3, 1], [1, 0, 2, 1, 0, 2, 1]],
+        [[0, 1, 1, 2, 1, 2, 2], [1, 2, 1, 2, 1, 2, 1], [1, 1, 2, 3, 1, 1, 0]],
+    ]
+
     static func make(_ scenario: FixtureScenario, now: Date = .now, calendar: Calendar = .current) -> HomeFixture {
         let group = "Brunch crew"
         switch scenario {
@@ -95,14 +102,15 @@ enum FixtureData {
 
     private static func populated(group: String, members: [HomeMember], weeks: Int, now: Date, calendar: Calendar) -> HomeFixture {
         let p = proposal(to: members, weeks: weeks, calendar: calendar)
-        return HomeFixture(groupName: group, members: members, proposal: p, slots: slots(for: p, members: members, weeks: weeks, calendar: calendar), lastUpdated: now)
+        let counts = members.count <= 3 ? fewGrid : grid
+        return HomeFixture(groupName: group, members: members, proposal: p, slots: slots(for: p, members: members, grid: counts, weeks: weeks, calendar: calendar), lastUpdated: now)
     }
 
     /// Per cell with count n: n members get a slot covering the whole daypart (so commonCount = n);
     /// of the rest, one gets a 30-min slot at the start (maybe), one a 45-min slot two hours in
     /// (after N) when at least three are left, and the others nothing (busy). Both short slots are
     /// under 60 min, so they never change the common window.
-    private static func slots(for proposal: Proposal, members: [HomeMember], weeks: Int, calendar: Calendar) -> [AvailabilitySlot] {
+    private static func slots(for proposal: Proposal, members: [HomeMember], grid: [[[Int?]]], weeks: Int, calendar: Calendar) -> [AvailabilitySlot] {
         let mon = monday(calendar)
         var out: [AvailabilitySlot] = []
         func add(_ member: HomeMember, _ from: Date, _ minutes: Int) {

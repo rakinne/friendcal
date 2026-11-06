@@ -240,7 +240,10 @@ private struct HeatmapCellView: View {
         ZStack {
             if cell.isEnabled {
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.sm).fill(fill)
+                // 0-count cells are blank so zero overlap reads as an empty grid (D19); the
+                // selected cell keeps its number, and VoiceOver still says "0 of 15 free".
                 Text(cell.total == 0 ? "–" : "\(cell.commonCount)")
+                    .opacity(cell.total > 0 && cell.commonCount == 0 && !isSelected ? 0 : 1)
                     .textStyle(.mono)
                     .foregroundStyle(DesignTokens.Colors.text) // D25: >= 5.5:1 on every ramp step
                     .lineLimit(1)

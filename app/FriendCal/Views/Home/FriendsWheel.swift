@@ -109,10 +109,12 @@ struct FriendsWheel: View {
             }
             if overflow > 0 {
                 Button(action: onMore) {
-                    SwiftUI.Circle().fill(DesignTokens.FacePalette.sand)
+                    // Ivory + hairline, not a palette color, so "+N" never reads as a person
+                    // (2026-11-06 design review F3; replaces D36's sand fill).
+                    SwiftUI.Circle().fill(DesignTokens.Colors.surface)
                         .frame(width: Self.face, height: Self.face)
+                        .overlay(SwiftUI.Circle().strokeBorder(DesignTokens.Colors.border, lineWidth: 1))
                         .overlay(Text("+\(overflow)").textStyle(.label).foregroundStyle(DesignTokens.Colors.text).minimumScaleFactor(0.6).lineLimit(1))
-                        .overlay(SwiftUI.Circle().stroke(DesignTokens.Colors.background, lineWidth: 1.5))
                         .frame(width: 44, height: 44)
                         .contentShape(SwiftUI.Circle())
                 }
