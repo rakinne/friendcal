@@ -38,6 +38,8 @@
 		6B687BDA72A1C0EA139CD0AC /* DateRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57799F8A2115B96A2AB2A5D /* DateRange.swift */; };
 		7A46F21718B42AD1ECD7D229 /* StealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE8AF7ACE8394A95382F1BD6 /* StealthTests.swift */; };
 		7BBFC966AB5E63EB170E303D /* Poke.swift in Sources */ = {isa = PBXBuildFile; fileRef = C655B941E7F436FF81DEDDE7 /* Poke.swift */; };
+		800E6F2C5B2A789B51ADB789 /* HomeStatesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBCAD3F499F1E91A35808515 /* HomeStatesUITests.swift */; };
+		822B33FD1C4D5C5AA6C101AC /* HomeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42BC80A0E18BEC0A9E6387C8 /* HomeUITests.swift */; };
 		8D679BB532993A3A21BE2930 /* CabinetGrotesk-Extrabold.otf in Resources */ = {isa = PBXBuildFile; fileRef = F6A61DF12FD513C64CFC1996 /* CabinetGrotesk-Extrabold.otf */; };
 		A31320AB6D0437EEC0715521 /* SourceSans3-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 7AE49894C47843131A4EA321 /* SourceSans3-Regular.otf */; };
 		A4C8B3776385D8A83F116C9E /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B23FD039C44660FD7E81006 /* SupabaseService.swift */; };
@@ -137,6 +139,7 @@
 		3727D684C7521C3352DBD0E6 /* FriendCalTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FriendCalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		37FA32C19C5A52CE5C2D8744 /* TicketTap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketTap.swift; sourceTree = "<group>"; };
 		3A1B85AB49F20C218AFC6C19 /* FaceColorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceColorTests.swift; sourceTree = "<group>"; };
+		42BC80A0E18BEC0A9E6387C8 /* HomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeUITests.swift; sourceTree = "<group>"; };
 		4348F53B2C18D20055868E8B /* SourceSans3-Semibold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SourceSans3-Semibold.otf"; sourceTree = "<group>"; };
 		45C5E66C5F1BD7B5BEC73BB6 /* Secrets.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Secrets.plist; sourceTree = "<group>"; };
 		5282CFED12EA1EA792E64264 /* OFL-SourceSans3.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-SourceSans3.txt"; sourceTree = "<group>"; };
@@ -172,6 +175,7 @@
 		D3ECA81E4D7508EF76A61E9E /* ProposalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalTests.swift; sourceTree = "<group>"; };
 		D4E5261F4E2562AAB0BC19A5 /* Proposal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Proposal.swift; sourceTree = "<group>"; };
 		D59D849620F1CE21F7EEC476 /* FixtureData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureData.swift; sourceTree = "<group>"; };
+		DBCAD3F499F1E91A35808515 /* HomeStatesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeStatesUITests.swift; sourceTree = "<group>"; };
 		DE37C5FDBC29D81B997E3B62 /* AvailabilitySlot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilitySlot.swift; sourceTree = "<group>"; };
 		DE8AF7ACE8394A95382F1BD6 /* StealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StealthTests.swift; sourceTree = "<group>"; };
 		F31FF1DE86141788953FF2CE /* CabinetGrotesk-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CabinetGrotesk-Bold.otf"; sourceTree = "<group>"; };
@@ -290,6 +294,8 @@
 		854F52E2C172B55B54E2ED4B /* FriendCalUITests */ = {
 			isa = PBXGroup;
 			children = (
+				DBCAD3F499F1E91A35808515 /* HomeStatesUITests.swift */,
+				42BC80A0E18BEC0A9E6387C8 /* HomeUITests.swift */,
 				AC5EA32A82A39117D0BA54FF /* LaunchTests.swift */,
 			);
 			path = FriendCalUITests;
@@ -606,6 +612,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				800E6F2C5B2A789B51ADB789 /* HomeStatesUITests.swift in Sources */,
+				822B33FD1C4D5C5AA6C101AC /* HomeUITests.swift in Sources */,
 				12F696E2086D1245CD7ADBE5 /* LaunchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
