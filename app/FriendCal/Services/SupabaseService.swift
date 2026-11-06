@@ -69,7 +69,8 @@ final class SupabaseService: SupabaseServiceProtocol {
 }
 
 /// Mock for previews / SwiftUI + StealthTests — never leaks hiddenFrom payload.
-final class MockSupabaseService: SupabaseServiceProtocol {
+public final class MockSupabaseService: SupabaseServiceProtocol {
+    public init() {}
     var proposals: [Proposal] = []
     var busyBlocks: [BusyBlock] = []
     func fetchProposals(for userID: UUID) async throws -> [Proposal] { proposals }

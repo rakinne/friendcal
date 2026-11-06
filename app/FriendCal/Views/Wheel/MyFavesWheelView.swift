@@ -1,4 +1,5 @@
 import SwiftUI
+import FriendCalCore
 
 /// T-Mobile myFaves-inspired rotary of 5-10 friends. Nostalgic, tactile, shows network liveness.
 /// Tap face → profile sheet with sanitized upcoming Busy, open Tap-Ins, Tag Along events.

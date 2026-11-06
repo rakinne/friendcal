@@ -1,4 +1,5 @@
 import SwiftUI
+import FriendCalCore
 
 @main
 struct FriendCalApp: App {

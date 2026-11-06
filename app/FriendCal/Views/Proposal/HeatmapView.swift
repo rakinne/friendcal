@@ -1,4 +1,5 @@
 import SwiftUI
+import FriendCalCore
 import Combine
 
 /// Real-time heatmap converging as recipients tap free slots.

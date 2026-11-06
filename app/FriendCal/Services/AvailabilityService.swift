@@ -4,9 +4,11 @@ import Foundation
 /// Tap free in a Proposal → writes SoftHold to global profile + proposal-specific slot.
 /// Prevents 10am double-book without over-blocking explorers who tap multiple dates.
 /// Resolves eng-review P0/P1: expiry + promotion on lock + cleanup.
-final class AvailabilityService {
+public final class AvailabilityService {
 
-    enum TapResult {
+    public init() {}
+
+    public enum TapResult {
         case softHold(AvailabilitySlot)
         case alreadyHeld // second friend's request sees pre-commit hold
     }
@@ -16,7 +18,7 @@ final class AvailabilityService {
     ///   - existingSlots: current slots for this user (for collision check; caller provides DB rows)
     ///   - userID, range, proposalID, expiresAt: new hold
     /// Collision: if existing Hard Busy overlaps range → alreadyHeld; same for unexpired SoftHold from other proposal.
-    func tapFreeSlot(userID: UUID, range: DateRange, proposalID: UUID, expiresAt: Date?, existingSlots: [AvailabilitySlot] = []) -> TapResult {
+    public func tapFreeSlot(userID: UUID, range: DateRange, proposalID: UUID, expiresAt: Date?, existingSlots: [AvailabilitySlot] = []) -> TapResult {
         let alive = expireStaleHolds(slots: existingSlots)
         for slot in alive where slot.range.overlaps(range) {
             if slot.state == .busy { return .alreadyHeld }
@@ -27,7 +29,7 @@ final class AvailabilityService {
 
     /// Promote SoftHolds covering locked date to Hard Busy; expire other SoftHolds for this proposal.
     /// Returns (promoted BusyBlocks, expired slot IDs) so caller can write transactionally.
-    func promoteToBusy(onLock date: Date, proposalID: UUID, recipientIDs: [UUID], slots: [AvailabilitySlot]) -> (promoted: [BusyBlock], expiredIDs: [UUID]) {
+    public func promoteToBusy(onLock date: Date, proposalID: UUID, recipientIDs: [UUID], slots: [AvailabilitySlot]) -> (promoted: [BusyBlock], expiredIDs: [UUID]) {
         var promoted: [BusyBlock] = []
         var expired: [UUID] = []
         let alive = expireStaleHolds(slots: slots)
@@ -48,7 +50,7 @@ final class AvailabilityService {
         return p
     }
 
-    func expireStaleHolds(slots: [AvailabilitySlot]) -> [AvailabilitySlot] {
+    public func expireStaleHolds(slots: [AvailabilitySlot]) -> [AvailabilitySlot] {
         slots.filter { !$0.isExpired }
     }
 

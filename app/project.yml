@@ -90,11 +90,8 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
     sources:
+      # Models/, Services/, Privacy/ and Shared/ compile only into FriendCalCore (D14).
       - FriendCal/FriendCalApp.swift
-      - FriendCal/Models
-      - FriendCal/Services
-      - FriendCal/Privacy
-      - FriendCal/Shared
       - FriendCal/Views
       - path: FriendCal/Fixtures
         optional: true
@@ -108,8 +105,6 @@ targets:
         buildPhase: resources
     dependencies:
       - target: FriendCalCore
-      - package: Supabase
-        product: Supabase
   FriendCalTests:
     type: bundle.unit-test
     platform: iOS
@@ -124,6 +119,7 @@ targets:
       base:
         PRODUCT_NAME: FriendCalTests
         EXECUTABLE_NAME: FriendCalTests
+        GENERATE_INFOPLIST_FILE: YES
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO

@@ -1,4 +1,5 @@
 import SwiftUI
+import FriendCalCore
 
 @Observable
 final class ProposalFlowModel {

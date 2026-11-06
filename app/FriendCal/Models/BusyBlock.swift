@@ -1,17 +1,26 @@
 import Foundation
 
-enum BusyVisibility: String, Codable {
+public enum BusyVisibility: String, Codable {
     case `public`
     case stealth // hiddenFrom contains excluded user IDs (e.g. Jalen)
 }
 
-struct BusyBlock: Identifiable, Codable, Equatable {
-    var id: UUID = UUID()
-    var userID: UUID
-    var range: DateRange
-    var visibility: BusyVisibility = .public
-    var hiddenFrom: [UUID] = [] // empty = public; non-empty = stealth — must be enforced server-side (RLS)
-    var createdAt: Date = Date()
+public struct BusyBlock: Identifiable, Codable, Equatable {
+    public var id: UUID
+    public var userID: UUID
+    public var range: DateRange
+    public var visibility: BusyVisibility
+    public var hiddenFrom: [UUID] // empty = public; non-empty = stealth — must be enforced server-side (RLS)
+    public var createdAt: Date
+
+    public init(id: UUID = UUID(), userID: UUID, range: DateRange, visibility: BusyVisibility = .public, hiddenFrom: [UUID] = [], createdAt: Date = Date()) {
+        self.id = id
+        self.userID = userID
+        self.range = range
+        self.visibility = visibility
+        self.hiddenFrom = hiddenFrom
+        self.createdAt = createdAt
+    }
 
     // Server-side derived: what excluded viewer is allowed to see
     // NEVER include title/location/attendees — see StealthService
