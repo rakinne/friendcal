@@ -16,6 +16,8 @@ public enum DesignTokens {
         public static let accentSoft = Color(hex: "#E6F7F5")
         public static let peach = Color(hex: "#F7C9A4")
         public static let peachLight = Color(hex: "#FBE1C8")
+        /// Third heatmap ramp step, between peach and primary (coverage [0.5, 0.75)).
+        public static let heatOrange = Color(hex: "#FF6A32")
         public static let border = Color(hex: "#EADCCB")
         public static let shadow = Color(hex: "#C9A98A")
         public static let success = Color(hex: "#1A9E5C")

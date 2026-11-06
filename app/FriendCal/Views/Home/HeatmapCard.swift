@@ -289,7 +289,7 @@ private struct HeatmapCellView: View {
     private var fill: Color {
         switch cell.ramp {
         case .primary: return DesignTokens.Colors.primary
-        case .orange: return Color(hex: "#FF6A32")
+        case .orange: return DesignTokens.Colors.heatOrange
         case .peach: return DesignTokens.Colors.peach
         case .peachLight, nil: return DesignTokens.Colors.peachLight
         }
