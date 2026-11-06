@@ -27,23 +27,23 @@ public final class AvailabilityService {
         return .softHold(AvailabilitySlot(userID: userID, range: range, sourceProposalID: proposalID, state: .softHold, expiresAt: expiresAt))
     }
 
-    /// On lock, promote this proposal's recipient SoftHolds that cover the whole locked common
-    /// window (D3, D12) to Hard Busy; expire every other SoftHold for this proposal.
-    /// Returns (promoted BusyBlocks, expired slot IDs) so caller can write transactionally.
-    public func promoteToBusy(window: DateRange, proposalID: UUID, recipientIDs: [UUID], slots: [AvailabilitySlot]) -> (promoted: [BusyBlock], expiredIDs: [UUID]) {
-        var promoted: [BusyBlock] = []
-        var expired: [UUID] = []
-        let recipients = Set(recipientIDs)
-        let alive = expireStaleHolds(slots: slots)
-        for slot in alive where slot.sourceProposalID == proposalID && slot.state == .softHold {
-            let covers = slot.range.lowerBound <= window.lowerBound && window.upperBound <= slot.range.upperBound
-            if covers && recipients.contains(slot.userID) {
-                promoted.append(BusyBlock(userID: slot.userID, range: slot.range, visibility: .public, hiddenFrom: [], createdAt: Date()))
-            } else {
-                expired.append(slot.id)
-            }
+    /// Settles a lock (D3, D12). Each recipient whose eligible holds, merged the way the heatmap
+    /// merges them, cover the whole common `window` gets one Hard Busy block for exactly that window,
+    /// so quorum and promotion agree and nobody is blocked beyond the plan. Eligibility uses the same
+    /// injected `now` as HeatmapBuilder. Every SoftHold of this proposal is then cleared: promoted
+    /// ones are replaced by their BusyBlock, the rest are released.
+    /// Returns (promoted BusyBlocks, cleared slot IDs) so the caller can write both in one transaction.
+    public func promoteToBusy(window: DateRange, proposalID: UUID, recipientIDs: [UUID], slots: [AvailabilitySlot], now: Date) -> (promoted: [BusyBlock], expiredIDs: [UUID]) {
+        let ordered = HeatmapBuilder.distinct(recipientIDs)
+        let recipients = Set(ordered)
+        let eligible = slots.filter { HeatmapBuilder.isEligible($0, proposalID: proposalID, recipients: recipients, now: now) }
+        let promoted: [BusyBlock] = ordered.compactMap { user in
+            let coverage = HeatmapBuilder.merge(eligible.filter { $0.userID == user }.map(\.range))
+            guard coverage.contains(where: { $0.lowerBound <= window.lowerBound && window.upperBound <= $0.upperBound }) else { return nil }
+            return BusyBlock(userID: user, range: window, visibility: .public, hiddenFrom: [], createdAt: now)
         }
-        return (promoted, expired)
+        let cleared = slots.filter { $0.sourceProposalID == proposalID && $0.state == .softHold }.map(\.id)
+        return (promoted, cleared)
     }
 
     public func expireStaleHolds(slots: [AvailabilitySlot]) -> [AvailabilitySlot] {

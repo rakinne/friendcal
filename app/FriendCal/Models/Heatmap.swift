@@ -128,15 +128,9 @@ public enum HeatmapBuilder {
         var cal = calendar
         cal.firstWeekday = 2 // weeks start Monday regardless of locale
 
-        var seen = Set<UUID>()
-        let ordered = recipientIDs.filter { seen.insert($0).inserted }
+        let ordered = distinct(recipientIDs)
         let recipients = Set(ordered)
-        let eligible = slots.filter { s in
-            s.state == .softHold
-                && s.sourceProposalID == proposalID
-                && recipients.contains(s.userID)
-                && (s.expiresAt.map { $0 > now } ?? true)
-        }
+        let eligible = slots.filter { isEligible($0, proposalID: proposalID, recipients: recipients, now: now) }
 
         guard var weekStart = cal.dateInterval(of: .weekOfYear, for: window.lowerBound)?.start else { return [] }
         var weeks: [HeatmapWeek] = []
@@ -226,8 +220,23 @@ public enum HeatmapBuilder {
         return lower < upper ? DateRange(lower: lower, upper: upper) : nil
     }
 
+    /// Recipient IDs in first-seen order, duplicates dropped (D5).
+    static func distinct(_ ids: [UUID]) -> [UUID] {
+        var seen = Set<UUID>()
+        return ids.filter { seen.insert($0).inserted }
+    }
+
+    /// D9 eligibility, shared with lock promotion so quorum and promotion count the same holds:
+    /// this proposal's unexpired softHold from a recipient.
+    static func isEligible(_ s: AvailabilitySlot, proposalID: UUID, recipients: Set<UUID>, now: Date) -> Bool {
+        s.state == .softHold
+            && s.sourceProposalID == proposalID
+            && recipients.contains(s.userID)
+            && (s.expiresAt.map { $0 > now } ?? true)
+    }
+
     /// Sorted union; touching ranges join.
-    private static func merge(_ ranges: [DateRange]) -> [DateRange] {
+    static func merge(_ ranges: [DateRange]) -> [DateRange] {
         var out: [DateRange] = []
         for r in ranges.sorted(by: { $0.lowerBound < $1.lowerBound }) {
             if let last = out.last, r.lowerBound <= last.upperBound {

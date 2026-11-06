@@ -38,7 +38,7 @@ final class DebugProposalModel {
         do {
             let window = try proposalService.lock(&p, to: id, in: weeks) { _, _ in [] }
             proposal = p
-            let (_, expiredIDs) = availabilityService.promoteToBusy(window: window, proposalID: p.id, recipientIDs: p.distribution.recipientIDs, slots: slots)
+            let (_, expiredIDs) = availabilityService.promoteToBusy(window: window, proposalID: p.id, recipientIDs: p.distribution.recipientIDs, slots: slots, now: Date())
             slots = slots.filter { !expiredIDs.contains($0.id) }
             lastError = nil
         } catch {
@@ -73,7 +73,7 @@ struct DebugSheet: View {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
                     if let p = model.proposal {
                         Text("\(p.title) · \(p.status.rawValue)").textStyle(.title)
-                        HeatmapCard(title: p.title, content: .weeks(model.weeks), total: p.distribution.recipientIDs.count,
+                        HeatmapCard(title: p.title, content: .weeks(model.weeks), total: Set(p.distribution.recipientIDs).count,
                                     visibleWeekID: model.visibleWeekID, selectedCellID: model.selectedCellID,
                                     onShowWeek: model.showWeek, onSelect: model.select)
                         Button("Lock selected cell") { model.lockSelected() }
