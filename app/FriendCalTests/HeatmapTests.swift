@@ -183,7 +183,6 @@ final class HeatmapTests: XCTestCase {
 
     func testLockUsesCommonCountAndTarget() throws {
         let svc = ProposalService()
-        svc.quorumThreshold = 0.8
         var proposal = Proposal(id: proposalID, title: "Brunch", window: weekWindow, createdBy: alice, distribution: Distribution(mode: .newGroup, recipientIDs: recipients))
 
         let apartWeeks = build([slot(alice, mon(6), mon(7)), slot(bob, mon(11), mon(12)), slot(cara, mon(11), mon(12))])

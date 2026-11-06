@@ -34,11 +34,12 @@ final class DebugProposalModel {
 
     func lockSelected() {
         guard var p = proposal, let id = selectedCellID else { return }
-        rebuild() // fresh `now`, so a hold that just expired can't count toward quorum
+        let now = Date()
+        rebuild(now: now) // fresh `now`, so a hold that just expired can't count toward quorum
         do {
             let window = try proposalService.lock(&p, to: id, in: weeks) { _, _ in [] }
             proposal = p
-            let (_, expiredIDs) = availabilityService.promoteToBusy(window: window, proposalID: p.id, recipientIDs: p.distribution.recipientIDs, slots: slots, now: Date())
+            let (_, expiredIDs) = availabilityService.promoteToBusy(window: window, proposalID: p.id, recipientIDs: p.distribution.recipientIDs, slots: slots, now: now)
             slots = slots.filter { !expiredIDs.contains($0.id) }
             lastError = nil
         } catch {
@@ -55,9 +56,9 @@ final class DebugProposalModel {
 
     var visibleWeek: HeatmapWeek? { weeks.first { $0.id == visibleWeekID } }
 
-    private func rebuild() {
+    private func rebuild(now: Date = Date()) {
         guard let p = proposal else { return }
-        weeks = HeatmapBuilder.weeks(slots: slots, window: p.window, recipientIDs: p.distribution.recipientIDs, proposalID: p.id, now: Date(), calendar: .current)
+        weeks = HeatmapBuilder.weeks(slots: slots, window: p.window, recipientIDs: p.distribution.recipientIDs, proposalID: p.id, now: now, calendar: .current)
         if !weeks.contains(where: { $0.id == visibleWeekID }) { visibleWeekID = weeks.first?.id }
         selectedCellID = HeatmapSelection.resolve(current: selectedCellID, week: visibleWeek)
     }

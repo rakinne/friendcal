@@ -18,7 +18,10 @@ public final class ProposalService {
     public init() {}
 
     /// Minimum coverage to allow lock. 0.5 = at least half; 1.0 = unanimous. Default 0.8 for founding group tight-knit vibe.
-    public var quorumThreshold: Double = 0.8
+    /// Fixed, not configurable: lock_proposal() (supabase/lock_proposal.sql) enforces the same 0.8
+    /// server-side, and ProposalTests pins the two together.
+    public static let quorumThreshold: Double = 0.8
+    public var quorumThreshold: Double { Self.quorumThreshold }
 
     func createProposal(title: String, window: DateRange, distribution: Distribution, createdBy: UUID) -> Proposal {
         Proposal(id: UUID(), title: title, window: window, createdBy: createdBy, distribution: distribution)

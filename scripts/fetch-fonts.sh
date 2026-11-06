@@ -85,5 +85,9 @@ fetch source-sans-3 "$SOURCE_SANS_URL" \
 fetch jetbrains-mono "$JETBRAINS_URL" \
   JetBrainsMono-Regular.ttf JetBrainsMono-Medium.ttf
 
-for f in "$DEST"/*.otf "$DEST"/*.ttf; do verify "$f"; done
+# Verify every font the app bundles, by its pinned name (extra files in the folder are not ours to judge).
+for f in CabinetGrotesk-Extrabold.otf CabinetGrotesk-Bold.otf SourceSans3-Regular.otf SourceSans3-Semibold.otf \
+         SourceSans3-Bold.otf JetBrainsMono-Regular.ttf JetBrainsMono-Medium.ttf; do
+  verify "$DEST/$f"
+done
 echo "done: fonts in ${DEST#$ROOT/} (SHA-256 verified)"

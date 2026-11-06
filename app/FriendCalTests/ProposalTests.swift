@@ -5,7 +5,6 @@ final class ProposalTests: XCTestCase {
     func testLockRequiresQuorum() {
         var proposal = Proposal(id: UUID(), title: "Friendsgivemas", window: DateRange(Date.now...Date.now.addingTimeInterval(86400*30)), createdBy: UUID(), distribution: Distribution(mode: .newGroup, recipientIDs: [UUID(), UUID()]))
         let svc = ProposalService()
-        svc.quorumThreshold = 0.8
         let lowCell = Self.cell(commonCount: 1, total: 5) // 20%
         XCTAssertThrowsError(try svc.lock(&proposal, to: lowCell.id, in: Self.weeks(lowCell), busyWriter: { _,_ in [] })) { err in
             XCTAssertTrue((err as? ProposalLockError) != nil)
@@ -15,7 +14,6 @@ final class ProposalTests: XCTestCase {
     func testLockSucceedsAtQuorum() throws {
         var proposal = Proposal(id: UUID(), title: "Friendsgivemas", window: DateRange(Date.now...Date.now.addingTimeInterval(86400*30)), createdBy: UUID(), distribution: Distribution(mode: .newGroup, recipientIDs: [UUID(), UUID()]))
         let svc = ProposalService()
-        svc.quorumThreshold = 0.8
         let highCell = Self.cell(commonCount: 5, total: 5)
         try svc.lock(&proposal, to: highCell.id, in: Self.weeks(highCell), busyWriter: { _,_ in [] })
         XCTAssertEqual(proposal.status, .locked)
@@ -24,7 +22,6 @@ final class ProposalTests: XCTestCase {
     /// Quorum is inclusive: exactly 80% locks, one short does not.
     func testLockAtExactQuorumBoundary() throws {
         let svc = ProposalService()
-        svc.quorumThreshold = 0.8
         var below = Self.proposal()
         let threeOfFive = Self.cell(commonCount: 3, total: 5)
         XCTAssertThrowsError(try svc.lock(&below, to: threeOfFive.id, in: Self.weeks(threeOfFive), busyWriter: { _,_ in [] })) { err in
@@ -51,6 +48,18 @@ final class ProposalTests: XCTestCase {
         XCTAssertEqual(window, cell.commonWindow)
         XCTAssertEqual(proposal.lockedDate, cell.commonWindow?.lowerBound)
         XCTAssertEqual(proposal.lockedEnd, cell.commonWindow?.upperBound)
+    }
+
+    /// Value: protects=the client quorum equals the quorum lock_proposal() enforces, so the heatmap
+    /// never offers a lock the server refuses on quorum alone; fails_when=either side changes alone;
+    /// why_new=the server constant lives in SQL; seam=none; no_claim=server busy-block exclusion,
+    /// which the client cannot see (see Review notes).
+    func testClientQuorumMatchesServerQuorum() throws {
+        let sql = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../supabase/lock_proposal.sql").standardizedFileURL
+        let text = try String(contentsOf: sql, encoding: .utf8)
+        XCTAssertTrue(text.contains("c_quorum constant numeric := 0.8;"), "lock_proposal.sql quorum moved")
+        XCTAssertEqual(ProposalService.quorumThreshold, 0.8)
     }
 
     func testLockWithNoRecipientsThrowsInsufficientRecipients() {
