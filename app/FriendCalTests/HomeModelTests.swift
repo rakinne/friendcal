@@ -44,5 +44,62 @@ final class HomeModelTests: XCTestCase {
         XCTAssertEqual(model.shareDisabledHint, "Nobody shares an hour here yet")
         XCTAssertEqual(model.lastUpdated, mon(7))
     }
+    /// Value: protects=past 10 members the wheel shows 9 faces incl. the active friend plus +N (D36);
+    /// fails_when=the active swap, the 10-member cutoff or the overflow count changes;
+    /// why_new=UI tests check the drawer, not which faces show; seam=none;
+    /// no_claim=face layout on the orbit (FriendsWheel, UI lane only).
+    func testWheelKeepsActiveFriendPastNine() {
+        func members(_ n: Int, activeAt: Int) -> [HomeMember] {
+            (0..<n).map { HomeMember(id: UUID(), name: "M\($0)", isOnline: false, isActive: $0 == activeAt) }
+        }
+        func model(_ ms: [HomeMember]) -> HomeModel {
+            HomeModel(fixture: HomeFixture(groupName: "G", members: ms, proposal: nil, slots: [], lastUpdated: mon(7)), now: mon(8), calendar: HeatmapTests.calendar)
+        }
+        let ten = members(10, activeAt: 9)
+        XCTAssertEqual(model(ten).wheel.faces, ten)
+        XCTAssertEqual(model(ten).wheel.overflow, 0)
+
+        let twelve = members(12, activeAt: 11)
+        let w = model(twelve).wheel
+        XCTAssertEqual(w.overflow, 3)
+        XCTAssertEqual(w.faces.count, 9)
+        XCTAssertEqual(Array(w.faces.prefix(8)), Array(twelve.prefix(8)))
+        XCTAssertEqual(w.faces[8], twelve[11])
+
+        let early = members(12, activeAt: 2)
+        XCTAssertEqual(model(early).wheel.faces, Array(early.prefix(9)))
+    }
+
+    /// Value: protects=no proposal clears weeks/selection and Share says "Pick a time first"; only
+    /// enabled cells of the visible week select; unknown weeks are ignored; fails_when=a guard in
+    /// refresh/select/showWeek is dropped; why_new=existing test covers expiry only; seam=none;
+    /// no_claim=tap and swipe gestures (UI lane).
+    func testNoProposalAndSelectionGuards() {
+        let empty = HomeModel(fixture: HomeFixture(groupName: "G", members: [alice], proposal: nil, slots: [], lastUpdated: mon(7)), now: mon(8), calendar: HeatmapTests.calendar)
+        XCTAssertTrue(empty.weeks.isEmpty)
+        XCTAssertNil(empty.selectedCellID)
+        XCTAssertNil(empty.chips)
+        XCTAssertEqual(empty.shareDisabledHint, "Pick a time first")
+
+        // Window opens Monday 14:30 and spans two weeks; Monday morning is disabled.
+        let proposal = Proposal(id: UUID(), title: "Brunch", window: DateRange(lower: mon(14, 30), upper: HeatmapTests.date(2026, 11, 23, 0)),
+                                createdBy: alice.id, distribution: Distribution(mode: .newGroup, recipientIDs: [alice.id]))
+        let model = HomeModel(fixture: HomeFixture(groupName: "G", members: [alice], proposal: proposal, slots: [], lastUpdated: mon(7)), now: mon(8), calendar: HeatmapTests.calendar)
+        XCTAssertEqual(model.weeks.count, 2)
+        XCTAssertNil(model.selectedCellID)
+        model.select(HeatmapCell.ID(day: mon(0), daypart: .morning))
+        XCTAssertNil(model.selectedCellID)
+        let tueMorning = HeatmapCell.ID(day: HeatmapTests.date(2026, 11, 10, 0), daypart: .morning)
+        model.select(tueMorning)
+        XCTAssertEqual(model.selectedCellID, tueMorning)
+        XCTAssertEqual(model.chips?.map(\.status), [.busy])
+        model.select(HeatmapCell.ID(day: HeatmapTests.date(2026, 11, 17, 0), daypart: .morning)) // other week: ignored
+        XCTAssertEqual(model.selectedCellID, tueMorning)
+        model.showWeek(HeatmapTests.date(2026, 12, 1, 0)) // unknown week: ignored
+        XCTAssertEqual(model.visibleWeekID, model.weeks[0].id)
+        model.showWeek(model.weeks[1].id)
+        XCTAssertEqual(model.visibleWeekID, model.weeks[1].id)
+        XCTAssertNil(model.selectedCellID)
+    }
 }
 #endif
