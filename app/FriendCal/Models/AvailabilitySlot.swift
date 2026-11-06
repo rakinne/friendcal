@@ -30,25 +30,3 @@ public struct AvailabilitySlot: Identifiable, Codable, Equatable {
         return Date() > exp
     }
 }
-
-// Heatmap row: one candidate date's convergence
-public struct HeatmapRow: Identifiable {
-    public var id: Date { date }
-    public let date: Date
-    public let freeCount: Int
-    public let totalRecipients: Int
-    public init(date: Date, freeCount: Int, totalRecipients: Int) {
-        self.date = date
-        self.freeCount = freeCount
-        self.totalRecipients = totalRecipients
-    }
-    public var coverage: Double { totalRecipients == 0 ? 0 : Double(freeCount)/Double(totalRecipients) }
-    public var level: Level {
-        switch coverage {
-        case 1.0: return .green
-        case 0.5..<1.0: return .yellow
-        default: return .red
-        }
-    }
-    public enum Level { case green, yellow, red }
-}

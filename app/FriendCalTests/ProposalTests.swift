@@ -6,8 +6,8 @@ final class ProposalTests: XCTestCase {
         var proposal = Proposal(id: UUID(), title: "Friendsgivemas", window: DateRange(Date.now...Date.now.addingTimeInterval(86400*30)), createdBy: UUID(), distribution: Distribution(mode: .newGroup, recipientIDs: [UUID(), UUID()]))
         let svc = ProposalService()
         svc.quorumThreshold = 0.8
-        let lowRow = HeatmapRow(date: Date(), freeCount: 1, totalRecipients: 5) // 20%
-        XCTAssertThrowsError(try svc.lock(&proposal, to: Date(), heatmapRows: [lowRow], busyWriter: { _,_ in [] })) { err in
+        let lowCell = Self.cell(commonCount: 1, total: 5) // 20%
+        XCTAssertThrowsError(try svc.lock(&proposal, to: lowCell, busyWriter: { _,_ in [] })) { err in
             XCTAssertTrue((err as? ProposalLockError) != nil)
         }
     }
@@ -16,9 +16,15 @@ final class ProposalTests: XCTestCase {
         var proposal = Proposal(id: UUID(), title: "Friendsgivemas", window: DateRange(Date.now...Date.now.addingTimeInterval(86400*30)), createdBy: UUID(), distribution: Distribution(mode: .newGroup, recipientIDs: [UUID(), UUID()]))
         let svc = ProposalService()
         svc.quorumThreshold = 0.8
-        let highRow = HeatmapRow(date: Date(), freeCount: 5, totalRecipients: 5)
-        try svc.lock(&proposal, to: Date(), heatmapRows: [highRow], busyWriter: { _,_ in [] })
+        let highCell = Self.cell(commonCount: 5, total: 5)
+        try svc.lock(&proposal, to: highCell, busyWriter: { _,_ in [] })
         XCTAssertEqual(proposal.status, .locked)
+    }
+
+    private static func cell(commonCount: Int, total: Int) -> HeatmapCell {
+        let start = Date()
+        let interval = DateRange(lower: start, upper: start.addingTimeInterval(5 * 3600))
+        return HeatmapCell(day: start, daypart: .afternoon, interval: interval, freeCount: commonCount, commonCount: commonCount, commonWindow: commonCount > 0 ? interval : nil, total: total)
     }
 
     func testPokeRateLimit() async {

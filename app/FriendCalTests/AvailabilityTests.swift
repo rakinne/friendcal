@@ -37,17 +37,4 @@ final class AvailabilityTests: XCTestCase {
         XCTAssertEqual(expired.count, 1)
         XCTAssertEqual(expired.first, s2.id)
     }
-
-    func testHeatmapCoverage() {
-        let row = HeatmapRow(date: Date(), freeCount: 13, totalRecipients: 15)
-        XCTAssertEqual(row.level, .yellow)
-        XCTAssertEqual(row.coverage, 13.0/15.0, accuracy: 0.001)
-        let best = HeatmapRow(date: Date().addingTimeInterval(86400), freeCount: 15, totalRecipients: 15)
-        XCTAssertEqual(best.level, .green)
-    }
-
-    func testHeatmapRebuildEmpty() {
-        let rows: [HeatmapRow] = []
-        XCTAssertTrue(rows.isEmpty)
-    }
 }

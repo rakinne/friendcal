@@ -22,25 +22,15 @@ public final class ProposalService {
         Proposal(id: UUID(), title: title, window: window, createdBy: createdBy, distribution: distribution)
     }
 
-    /// Lock with quorum check. Throws if heatmap row for `date` is below threshold.
-    public func lock(_ proposal: inout Proposal, to date: Date, heatmapRows: [HeatmapRow], busyWriter: (Proposal, Date) -> [BusyBlock]) throws {
-        guard let row = heatmapRows.first(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }) else {
-            proposal.lockedDate = date
-            proposal.status = .locked
-            _ = busyWriter(proposal, date)
-            return
-        }
-        guard row.totalRecipients > 0 else { throw ProposalLockError.insufficientRecipients }
-        guard row.coverage >= quorumThreshold else {
-            throw ProposalLockError.notEnoughCoverage(required: quorumThreshold, actual: row.coverage)
+    /// Lock to a heatmap cell. Quorum is checked against commonCount (D12, D13); the lock date is
+    /// the start of the cell's common window.
+    public func lock(_ proposal: inout Proposal, to cell: HeatmapCell, busyWriter: (Proposal, Date) -> [BusyBlock]) throws {
+        guard cell.total > 0 else { throw ProposalLockError.insufficientRecipients }
+        guard cell.coverage >= quorumThreshold, let date = cell.lockTarget else {
+            throw ProposalLockError.notEnoughCoverage(required: quorumThreshold, actual: cell.coverage)
         }
         proposal.lockedDate = date
         proposal.status = .locked
         _ = busyWriter(proposal, date)
-    }
-
-    /// Legacy overload without heatmap (permissive) for previews
-    func lock(_ proposal: inout Proposal, to date: Date, busyWriter: (Proposal, Date) -> [BusyBlock]) {
-        try? lock(&proposal, to: date, heatmapRows: [], busyWriter: busyWriter)
     }
 }
