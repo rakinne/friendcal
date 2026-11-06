@@ -99,6 +99,17 @@ final class HeatmapTests: XCTestCase {
         XCTAssertEqual(sunday[0].cells.filter { $0.commonCount > 0 }.count, 1)
     }
 
+    func testWeeksAfterDSTStartAtLocalMidnight() {
+        // Fails if weeks or days advance by fixed 86400s: Nov 2 would start at Nov 1 23:00 EST.
+        let window = DateRange(lower: Self.date(2026, 10, 26, 0), upper: Self.date(2026, 11, 9, 0))
+        let weeks = build([slot(alice, Self.date(2026, 11, 2, 6), Self.date(2026, 11, 2, 8))], window: window)
+        XCTAssertEqual(weeks.map(\.weekStart), [Self.date(2026, 10, 26, 0), Self.date(2026, 11, 2, 0)])
+        let monday = weeks[1].cell(dayIndex: 0, daypart: .morning)
+        XCTAssertEqual(monday.interval, DateRange(lower: Self.date(2026, 11, 2, 6), upper: Self.date(2026, 11, 2, 12)))
+        XCTAssertEqual(monday.commonCount, 1)
+        XCTAssertEqual(weeks[0].cell(dayIndex: 6, daypart: .morning).interval, DateRange(lower: Self.date(2026, 11, 1, 6), upper: Self.date(2026, 11, 1, 12)))
+    }
+
     // MARK: Eligibility (run 1, D9; D8 expired softHold)
 
     func testOnlyThisProposalsUnexpiredRecipientSoftHoldsCount() {
@@ -133,6 +144,15 @@ final class HeatmapTests: XCTestCase {
         XCTAssertNil(morning.ramp)
         XCTAssertEqual(afternoon.interval, DateRange(lower: mon(14, 30), upper: mon(17)))
         XCTAssertEqual(afternoon.lockTarget, mon(14, 30))
+
+        var proposal = Proposal(id: proposalID, title: "Brunch", window: window, createdBy: alice, distribution: Distribution(mode: .newGroup, recipientIDs: [alice]))
+        let soloWeeks = HeatmapBuilder.weeks(slots: [slot(alice, mon(14), mon(17))], window: window, recipientIDs: [alice], proposalID: proposalID, now: now, calendar: Self.calendar)
+        let lockedWindow = try ProposalService().lock(&proposal, to: afternoon.id, in: soloWeeks) { _, _ in [] }
+        XCTAssertEqual(proposal.lockedDate, mon(14, 30))
+        XCTAssertEqual(lockedWindow, DateRange(lower: mon(14, 30), upper: mon(17)))
+        XCTAssertThrowsError(try ProposalService().lock(&proposal, to: morning.id, in: soloWeeks) { _, _ in [] }) { err in
+            guard case .cellNotInWindow = err as? ProposalLockError else { return XCTFail("got \(err)") }
+        }
     }
 
     // MARK: Common window (run 1, D12)
@@ -166,10 +186,14 @@ final class HeatmapTests: XCTestCase {
         svc.quorumThreshold = 0.8
         var proposal = Proposal(id: proposalID, title: "Brunch", window: weekWindow, createdBy: alice, distribution: Distribution(mode: .newGroup, recipientIDs: recipients))
 
-        let apart = build([slot(alice, mon(6), mon(7)), slot(bob, mon(11), mon(12)), slot(cara, mon(11), mon(12))])[0].cell(dayIndex: 0, daypart: .morning)
-        XCTAssertEqual(apart.freeCount, 3)
         let apartWeeks = build([slot(alice, mon(6), mon(7)), slot(bob, mon(11), mon(12)), slot(cara, mon(11), mon(12))])
-        XCTAssertThrowsError(try svc.lock(&proposal, to: apart.id, in: apartWeeks) { _, _ in [] })
+        let apart = apartWeeks[0].cell(dayIndex: 0, daypart: .morning)
+        XCTAssertEqual(apart.freeCount, 3)
+        XCTAssertEqual(apart.commonCount, 2)
+        XCTAssertThrowsError(try svc.lock(&proposal, to: apart.id, in: apartWeeks) { _, _ in [] }) { err in
+            guard case .notEnoughCoverage = err as? ProposalLockError else { return XCTFail("got \(err)") }
+        }
+        XCTAssertEqual(proposal.status, .requesting)
 
         let sharedWeeks = build([slot(alice, mon(8), mon(10, 30)), slot(bob, mon(9), mon(11)), slot(cara, mon(9), mon(12))])
         let shared = sharedWeeks[0].cell(dayIndex: 0, daypart: .morning)

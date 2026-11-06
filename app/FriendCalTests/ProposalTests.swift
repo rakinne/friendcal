@@ -21,6 +21,23 @@ final class ProposalTests: XCTestCase {
         XCTAssertEqual(proposal.status, .locked)
     }
 
+    /// Quorum is inclusive: exactly 80% locks, one short does not.
+    func testLockAtExactQuorumBoundary() throws {
+        let svc = ProposalService()
+        svc.quorumThreshold = 0.8
+        var below = Self.proposal()
+        let threeOfFive = Self.cell(commonCount: 3, total: 5)
+        XCTAssertThrowsError(try svc.lock(&below, to: threeOfFive.id, in: Self.weeks(threeOfFive), busyWriter: { _,_ in [] })) { err in
+            guard case .notEnoughCoverage(let required, let actual) = err as? ProposalLockError else { return XCTFail("got \(err)") }
+            XCTAssertEqual(required, 0.8)
+            XCTAssertEqual(actual, 0.6, accuracy: 0.0001)
+        }
+        var atQuorum = Self.proposal()
+        let fourOfFive = Self.cell(commonCount: 4, total: 5)
+        try svc.lock(&atQuorum, to: fourOfFive.id, in: Self.weeks(fourOfFive), busyWriter: { _,_ in [] })
+        XCTAssertEqual(atQuorum.status, .locked)
+    }
+
     func testLockWithNoRecipientsThrowsInsufficientRecipients() {
         var proposal = Self.proposal()
         let cell = Self.cell(commonCount: 0, total: 0)
