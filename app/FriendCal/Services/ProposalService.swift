@@ -1,44 +1,52 @@
 import Foundation
 
-enum ProposalLockError: Error, LocalizedError {
+public enum ProposalLockError: Error, LocalizedError {
     case notEnoughCoverage(required: Double, actual: Double)
     case insufficientRecipients
-    var errorDescription: String? {
+    case cellNotInWindow
+    public var errorDescription: String? {
         switch self {
         case .notEnoughCoverage(let req, let act): return "Need \(Int(req*100))% free, only \(Int(act*100))% on this date"
         case .insufficientRecipients: return "No recipients to lock"
+        case .cellNotInWindow: return "That time is outside the proposal window"
         }
     }
 }
 
 /// Proposal lifecycle: create → distribute (Send Separately / New Group) → collect availability → heatmap → lock
-final class ProposalService {
+public final class ProposalService {
+    public init() {}
+
     /// Minimum coverage to allow lock. 0.5 = at least half; 1.0 = unanimous. Default 0.8 for founding group tight-knit vibe.
-    var quorumThreshold: Double = 0.8
+    /// Fixed, not configurable: lock_proposal() (supabase/lock_proposal.sql) enforces the same 0.8
+    /// server-side, and ProposalTests pins the two together.
+    public static let quorumThreshold: Double = 0.8
+    public var quorumThreshold: Double { Self.quorumThreshold }
 
     func createProposal(title: String, window: DateRange, distribution: Distribution, createdBy: UUID) -> Proposal {
         Proposal(id: UUID(), title: title, window: window, createdBy: createdBy, distribution: distribution)
     }
 
-    /// Lock with quorum check. Throws if heatmap row for `date` is below threshold.
-    func lock(_ proposal: inout Proposal, to date: Date, heatmapRows: [HeatmapRow], busyWriter: (Proposal, Date) -> [BusyBlock]) throws {
-        guard let row = heatmapRows.first(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }) else {
-            proposal.lockedDate = date
-            proposal.status = .locked
-            _ = busyWriter(proposal, date)
-            return
+    /// Lock to the cell `id` as it stands in `weeks` (pass freshly built weeks, so a stale cell can't
+    /// lock). Throws cellNotInWindow for a missing or disabled cell (D4), insufficientRecipients when
+    /// nobody was invited, and notEnoughCoverage when fewer than quorumThreshold of the recipients
+    /// share one >= 60-min window (D12). The lock date is the common window's start.
+    /// `busyWriter` receives the whole locked window, not just its start, so the backend can persist
+    /// both ends and promote in one transaction (`SupabaseService.lockProposal(_:window:)`).
+    /// - Returns: the common window, which `AvailabilityService.promoteToBusy(window:...)` takes.
+    @discardableResult
+    public func lock(_ proposal: inout Proposal, to id: HeatmapCell.ID, in weeks: [HeatmapWeek], busyWriter: (Proposal, DateRange) -> [BusyBlock]) throws -> DateRange {
+        guard let cell = weeks.lazy.flatMap(\.cells).first(where: { $0.id == id }), cell.isEnabled else {
+            throw ProposalLockError.cellNotInWindow
         }
-        guard row.totalRecipients > 0 else { throw ProposalLockError.insufficientRecipients }
-        guard row.coverage >= quorumThreshold else {
-            throw ProposalLockError.notEnoughCoverage(required: quorumThreshold, actual: row.coverage)
+        guard cell.total > 0 else { throw ProposalLockError.insufficientRecipients }
+        guard cell.coverage >= quorumThreshold, let window = cell.commonWindow else {
+            throw ProposalLockError.notEnoughCoverage(required: quorumThreshold, actual: cell.coverage)
         }
-        proposal.lockedDate = date
+        proposal.lockedDate = window.lowerBound
+        proposal.lockedEnd = window.upperBound
         proposal.status = .locked
-        _ = busyWriter(proposal, date)
-    }
-
-    /// Legacy overload without heatmap (permissive) for previews
-    func lock(_ proposal: inout Proposal, to date: Date, busyWriter: (Proposal, Date) -> [BusyBlock]) {
-        try? lock(&proposal, to: date, heatmapRows: [], busyWriter: busyWriter)
+        _ = busyWriter(proposal, window)
+        return window
     }
 }

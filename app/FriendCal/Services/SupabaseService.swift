@@ -8,7 +8,9 @@ import Supabase
 protocol SupabaseServiceProtocol {
     func fetchProposals(for userID: UUID) async throws -> [Proposal]
     func createProposal(_ p: Proposal) async throws
-    func lockProposal(_ id: UUID, to date: Date) async throws
+    /// Locks atomically on the server (`lock_proposal` in supabase/schema.sql): sets status and both
+    /// window ends, promotes covering recipients to Busy and clears the proposal's holds.
+    func lockProposal(_ id: UUID, window: DateRange) async throws
     func fetchBusyBlocks(for viewerID: UUID, in range: DateRange) async throws -> [BusyBlock]
     func subscribeRealtime(onProposal id: UUID, handler: @escaping ([AvailabilitySlot]) -> Void) -> Any
 }
@@ -24,7 +26,8 @@ final class SupabaseService: SupabaseServiceProtocol {
         self.client = SupabaseClient(supabaseURL: url, supabaseKey: anonKey)
     }
 
-    /// Convenience: load from Secrets.plist (gitignored). Fails in previews if missing -> returns Mock behavior.
+    /// Convenience: load from Secrets.plist (gitignored). Not bundled yet (see app/project.yml), so this
+    /// returns nil and callers use the mock until a config path lands with the backend wiring.
     static func fromSecrets() -> SupabaseService? {
         guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
               let data = try? Data(contentsOf: url),
@@ -42,8 +45,9 @@ final class SupabaseService: SupabaseServiceProtocol {
         try await client.from("proposals").insert(p).execute()
     }
 
-    func lockProposal(_ id: UUID, to date: Date) async throws {
-        try await client.from("proposals").update(["locked_date": ISO8601DateFormatter().string(from: date), "status": "locked"]).eq("id", value: id.uuidString).execute()
+    func lockProposal(_ id: UUID, window: DateRange) async throws {
+        struct Params: Encodable { let p_id: UUID; let p_start: Date; let p_end: Date }
+        try await client.rpc("lock_proposal", params: Params(p_id: id, p_start: window.lowerBound, p_end: window.upperBound)).execute()
     }
 
     func fetchBusyBlocks(for viewerID: UUID, in range: DateRange) async throws -> [BusyBlock] {
@@ -69,12 +73,13 @@ final class SupabaseService: SupabaseServiceProtocol {
 }
 
 /// Mock for previews / SwiftUI + StealthTests — never leaks hiddenFrom payload.
-final class MockSupabaseService: SupabaseServiceProtocol {
+public final class MockSupabaseService: SupabaseServiceProtocol {
+    public init() {}
     var proposals: [Proposal] = []
     var busyBlocks: [BusyBlock] = []
     func fetchProposals(for userID: UUID) async throws -> [Proposal] { proposals }
     func createProposal(_ p: Proposal) async throws { proposals.append(p) }
-    func lockProposal(_ id: UUID, to date: Date) async throws { }
+    func lockProposal(_ id: UUID, window: DateRange) async throws { }
     func fetchBusyBlocks(for viewerID: UUID, in range: DateRange) async throws -> [BusyBlock] {
         busyBlocks.filter { $0.range.overlaps(range) }.map { block in
             if block.hiddenFrom.contains(viewerID) {

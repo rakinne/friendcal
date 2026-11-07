@@ -101,11 +101,13 @@ components:
 
 Light mode only — use scene is daytime social planning on phone in varied lighting; light preserves warmth and heatmap legibility. Dark would mute the coral pulse and force inverted heat intensity.
 
+Teal *text* ("online-ish", "LIVE") and the Share fill use accent-hover #0E6F68: teal #18A99A text is 2.6:1 on cream and 2.8:1 on ivory, so #18A99A stays for dots and non-text fills (D25). Muted text #7A6C5F is 4.55:1 on the cream canvas and 4.82:1 on ivory cards, so it's for captions and labels only, never on peach fills.
+
 Interaction signals: primary = coral fill + white text; secondary = teal; disabled = peach-light #FBE1C8; success/warning/error are semantic tints only. Hairline borders #EADCCB separate cards from the cream ground; soft warm shadow #C9A98A (8% opacity) lifts phones/cards without glow halos. Never use purple/violet gradients; never halo a dark surface.
 
 ## Typography
 
-Cabinet Grotesk (Fontshare, verified 600/700/800) for display/brand — geometric with rounded terminals, warm, owns wheel labels and screen titles like "Sunday Brunch?" and "myFaves". Source Sans 3 (Google Fonts, 400/500/600) for body/UI — humanist, superb at 13-14px for availability chips and messages. JetBrains Mono (Google Fonts) for data — heatmap day/time labels, Poke timestamps, tabular counts via `tnum`. Scale is purposeful: brand 26-28px / hero 34-38px / section 16px / body 13-14px / captions 10-12px. Loading: Fontshare CSS for Cabinet Grotesk, Google Fonts for Source Sans 3 + JetBrains Mono; system rounded fallback only.
+Cabinet Grotesk (Fontshare, verified 600/700/800) for display/brand — geometric with rounded terminals, warm, owns wheel labels and screen titles like "Sunday Brunch?" and "myFaves". Source Sans 3 (Google Fonts, 400/500/600) for body/UI — humanist, superb at 13-14px for availability chips and messages. JetBrains Mono (Google Fonts) for data — heatmap day/time labels, Poke timestamps, tabular counts via `tnum`. Scale is purposeful: brand 26-28px / hero 34-38px / section 16px / body 13-14px / captions 10-12px. **iOS** uses the D27 token table (`DesignTokens.Typography`, all scaling with Dynamic Type): wordmark Cabinet 800 28 (-0.01em), display Cabinet 800 26 (-0.02em), title and button Source Sans 3 Semibold 17, body Source Sans 3 Regular 15, label Semibold 13, caption Regular 12, mono JetBrains Mono Medium 12, badge Semibold 10. Fixed-geometry graphics stop growing: heatmap numerals and day headers and the wheel cap at xxxLarge (cells offer the Large Content Viewer), and avatar initials cap at the default size, since the name beside each avatar scales. All other text scales fully and the page scrolls. Loading: Fontshare CSS for Cabinet Grotesk, Google Fonts for Source Sans 3 + JetBrains Mono; system rounded fallback only.
 
 ## Layout
 
@@ -123,17 +125,17 @@ Radius hierarchy: inner heatmap cells sm 6px, cards lg 20px, pills/toggles full 
 
 **Poke (primary button):** coral #FF4E2E, pill, 52px height, white text + hand icon, hover #E8431A, active scale 0.98, disabled peach-light. Always dominant — one per screen.
 
-**Share slot (secondary button):** teal #18A99A, pill, same height, white text, placed adjacent to Poke but visually quieter (40% fill weight illusion via smaller icon).
+**Share slot (secondary button):** accent-hover #0E6F68 fill (white text 6.0:1, D25), pill, same height, placed adjacent to Poke but visually quieter (1 : 1.38 width split, smaller icon). Shares the selected slot as "Brunch? Sat, Nov 14 · 10:00-11:30 AM works for 13 of 15" (date + common window + count). Disabled (peach-light) when nothing is selected or the selected cell has nobody in common.
 
-**Heatmap:** 7-column grid (Mon–Sun) × Morning/Afternoon/Evening rows; rounded 6px cells; fill ramp peach-light #FBE1C8 → peach #F7C9A4 → coral-orange #FF6A32 → primary #FF4E2E for peak; "best" chip is coral text on warm ground. Live dot pulses with teal.
+**Heatmap:** 7-column grid (Mon–Sun) × Morning/Afternoon/Evening rows; rounded 6px cells; fill ramp peach-light #FBE1C8 → peach #F7C9A4 → coral-orange #FF6A32 → primary #FF4E2E for peak; numerals are always text #151515 (>= 5.5:1 on every ramp step); "best" is an ivory pill with a 1pt coral border on the cell's bottom edge, and the selected cell gets a 2pt text-color ring with a 2pt ivory gap (D26). The LIVE dot is solid teal and beats once (320ms) only when data changes; after 5 minutes it turns grey "Updated Nm ago".
 
-**Friend chip:** compact pill with avatar 28px, name 13px, status dot (green free / amber maybe / teal after-12 / grey stealth) — never an icon-in-circle grid; status is background tint + dot.
+**Friend chip:** compact pill with avatar 28px, name 13px, status dot + word in text color (green free / amber maybe / teal after N / grey busy) — never an icon-in-circle grid. "busy" means no slot marked for that time, so a manual hold, a hidden surprise plan and no reply look identical and stacked busy chips reveal nothing (X1).
 
 **Stealth toggle:** teal track when on, grey when off; label "Stealth until you're ready" + info dot; RLS-backed sanitization keeps BusyBlockView identical styling for hidden viewers.
 
 **Locked Invite card:** full-bleed illustration (coral sun + teal foliage), lock badge 24px coral circle, large stacked title 34px, unlock affordance teal link "Unlock with availability" with lock icon.
 
-**Bottom nav:** 5-item icon-led bar (Home Groups Pokes Invites Me), active coral, inactive muted brown, 44px min target.
+**Bottom nav:** iOS uses the native Liquid Glass `TabView` (Home `house`, Groups `person.2`, Pokes `hand.wave`, Invites `envelope`, Me `person.crop.circle`), active coral via tint; inactive items keep system glass styling instead of muted brown (D34). 44px min target.
 
 ## Do's and Don'ts
 
@@ -150,7 +152,7 @@ Radius hierarchy: inner heatmap cells sm 6px, cards lg 20px, pills/toggles full 
 
 ## Motion
 
-- **Approach:** intentional
+- **Approach:** intentional. Exactly one continuous animation on Home: the coral active arc on the wheel (spring response 0.5, damping 0.82), off under Reduce Motion (D23). Everything else animates once, on change.
 - **Easing:** enter ease-out exit ease-in move ease-in-out
 - **Duration:** micro 80ms short 180ms medium 320ms long 550ms
 - **The one authored moment:** Locking a time — the heatmap peak cell morphs into the invite art card via shared-element, wheel contracts to a success halo, confetti is minimal (three dots, not a shower). Wheel segments settle with spring (damping 0.82, no overshoot); heatmap cells stagger entrance 30ms; Realtime peak bumps to 1.02 scale then settles.
@@ -158,5 +160,6 @@ Radius hierarchy: inner heatmap cells sm 6px, cards lg 20px, pills/toggles full 
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-11-06 | iOS Home amendments from /plan-design-review and eng review run 2 | Share fill and teal text use accent-hover for AA (D25); iOS type table with body 15 (D27); chip "stealth" becomes "busy" = no slot marked (D35, X1); native glass tab bar, inactive system styling (D34); one continuous pulse, the active arc (D23); share copy names the date and common window (X9); wheel and avatar initials cap their text size (approved 2026-11-06) |
 | 2026-11-05 | Initial design system created (Kinetic Warmth) | Created by /design-consultation from FriendCal brief: pulsing heatmap/wheel as signature, interconnectedness + minimal fuss, iOS SwiftUI + Supabase Realtime; approved mockup variant A extracted for tokens |
 | 2026-11-04 | Backend Supabase chosen | See docs/DECISIONS.md D1 — RLS for stealth, Realtime for heatmap |

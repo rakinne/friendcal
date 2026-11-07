@@ -38,3 +38,11 @@ npm-debug.log*
 app/FriendCal/Secrets.plist
 SupabaseConfig.xcconfig
 .build/
+# supabase local
+supabase/.temp/
+
+# Xcode per-user state
+xcuserdata/
+
+# Cabinet Grotesk (ITF FFL forbids redistribution via a public repo); run scripts/fetch-fonts.sh
+app/FriendCal/Resources/Fonts/CabinetGrotesk-*.otf

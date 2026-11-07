@@ -3,12 +3,19 @@ import Foundation
 /// P0 Privacy: Stealth Holds must be indistinguishable from manual Busy.
 /// See eng-review P0 — single-block stripping not enough; need correlation resistance.
 /// Server must enforce hiddenFrom via RLS; client must not receive surprise payload.
-final class StealthService {
+public final class StealthService {
 
-    struct SanitizedBusy: Codable, Equatable {
-        var id: UUID
-        var userID: UUID
-        var range: DateRange
+    public init() {}
+
+    public struct SanitizedBusy: Codable, Equatable {
+        public var id: UUID
+        public var userID: UUID
+        public var range: DateRange
+        public init(id: UUID, userID: UUID, range: DateRange) {
+            self.id = id
+            self.userID = userID
+            self.range = range
+        }
         // No title, no location, no host avatar, no attendee list
         // Render as identical grey "Busy" — same component as manual Busy
     }

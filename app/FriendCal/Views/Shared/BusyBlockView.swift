@@ -1,4 +1,5 @@
 import SwiftUI
+import FriendCalCore
 
 /// Single component for rendering ANY Busy — manual, derived, or stealth.
 /// Indistinguishable styling is the privacy invariant (P0). No avatar stack, no host label for stealth.

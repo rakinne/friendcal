@@ -17,7 +17,8 @@ create table proposals (
   created_by uuid references users(id),
   distribution jsonb not null default '{}',
   status text not null default 'requesting',
-  locked_date timestamptz,
+  locked_date timestamptz, -- locked common window start
+  locked_end timestamptz,  -- locked common window end (D12)
   created_at timestamptz default now()
 );
 
@@ -79,3 +80,6 @@ create table if not exists circle_members (
   user_id uuid references users(id) on delete cascade,
   primary key (circle_id, user_id)
 );
+
+-- lock_proposal() lives in supabase/lock_proposal.sql: run it after this file on a new project,
+-- and on its own to upgrade an existing one (it is idempotent).
