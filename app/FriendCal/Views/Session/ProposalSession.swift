@@ -17,53 +17,204 @@ struct HomeMember: Identifiable, Equatable {
     }
 }
 
-/// Home screen state. Heatmap numbers, chips and Share all derive from HeatmapBuilder (X2);
-/// selection follows the visible week (X6, X10).
+/// One open proposal's state over a `ProposalStore` (issue #5 D2; HomeModel widened). Home, the
+/// Locked Invite, the availability and lock sheets and the debug sheet are views over it. Heatmap
+/// numbers, chips, the caption and Share all derive from HeatmapBuilder (X2) and `LockState` (S3);
+/// selection follows the visible week (X6, X10). One session per open proposal (C9); the Invites
+/// list has its own small `ProposalListModel`.
+///
+///     Creator phone                     store                        Recipient phone
+///     CreateProposalSheet ──create────▶ proposals ◀────join──────── onOpenURL friendcal://proposal/<id>
+///     ShareLink(friendcal://…) ── iMessage ───────────────────────▶ LockedInviteView "Locked until N more…"
+///     changes(for:) ◀─snapshot──────── availability_slots ◀──tapFree── AvailabilitySheet tap
+///       └─ HeatmapBuilder.weeks        proposals (recipients, status)   └─ rebuild, caption recounts
+///     LockSheet ── lock(window) ─────▶ lock (server-first, R3) ──snapshot──▶ card settles: date + window, "You're in"
+///           ▲ refusal mapped by UserFacingError, status stays requesting
 @Observable
-final class HomeModel {
+final class ProposalSession {
+    enum Screen: Equatable {
+        case loading
+        case ready
+        case error(UserFacingError)
+        case gone
+    }
+
     let groupName: String
     let calendar: Calendar
+    let store: ProposalStore
+    /// The clock every recount reads (C2); pinned by fixtures and tests.
+    var now: () -> Date
     var isLoading: Bool
     var members: [HomeMember]
     var proposal: Proposal?
     var slots: [AvailabilitySlot]
     var lastUpdated: Date
+    private(set) var proposalID: UUID?
+    private(set) var screen: Screen = .ready
 
     private(set) var weeks: [HeatmapWeek] = []
     private(set) var visibleWeekID: Date?
     private(set) var selectedCellID: HeatmapCell.ID?
+    /// The availability sheet's chips follow the last-toggled cell (design 1.5A), independent of
+    /// Home's selection.
+    private(set) var markFocusCellID: HeatmapCell.ID?
+    private(set) var lockState: LockState?
+    /// One-shot (design 3.4A, delta A3): true after a snapshot moves the plan requesting -> locked;
+    /// `consumeLockAcknowledgment()` clears it. A reload of an already-locked plan never sets it.
+    private(set) var didJustLock = false
 
-    init(fixture: HomeFixture, now: Date = .now, calendar: Calendar = .current) {
-        groupName = fixture.groupName
+    private var needsLoad = false
+
+    /// Home over a fixture (regression contract D10): seeds an in-memory store and the state in one
+    /// step, so the three HomeModelTests run unchanged under the new name.
+    convenience init(fixture: HomeFixture, now: Date = .now, calendar: Calendar = .current) {
+        self.init(store: FixtureData.store(fixture, clock: { now }), fixture: fixture, calendar: calendar, now: { now })
+    }
+
+    /// Home over a store the shell also hands to the Invites tab: state seeded from the fixture
+    /// synchronously, later changes observed from the store.
+    init(store: ProposalStore, fixture: HomeFixture, calendar: Calendar = .current, now: @escaping () -> Date) {
+        self.store = store
+        self.groupName = fixture.groupName
+        self.members = fixture.members
+        self.proposalID = fixture.proposal?.id
         self.calendar = calendar
+        self.now = now
         isLoading = fixture.isLoading
-        members = fixture.members
         proposal = fixture.proposal
         slots = fixture.slots
         lastUpdated = fixture.lastUpdated
-        refresh(now: now)
+        needsLoad = false
+        refresh(now: now())
     }
 
-    /// Recounts with a fresh `now`, so holds that expired while Home stayed open drop out of the
+    /// A proposal opened by id (Invites row, deep link, Home over a store): `run()` loads it.
+    init(store: ProposalStore, groupName: String = "", members: [HomeMember] = [], proposalID: UUID?, calendar: Calendar = .current, now: @escaping () -> Date = { .now }) {
+        self.store = store
+        self.groupName = groupName
+        self.members = members
+        self.proposalID = proposalID
+        self.calendar = calendar
+        self.now = now
+        isLoading = false
+        slots = []
+        lastUpdated = now()
+        needsLoad = proposalID != nil
+        screen = proposalID != nil ? .loading : .ready
+    }
+
+    // MARK: Identity
+
+    var currentUserID: UUID? { store.currentUserID }
+    /// The "DEMO" pill (D7): true on the in-memory store.
+    var isDemo: Bool { store is InMemoryProposalStore }
+    var isCreator: Bool { proposal?.isCreator(currentUserID) ?? false }
+    var isRecipient: Bool { proposal?.isRecipient(currentUserID) ?? false }
+    var creatorName: String? { proposal.flatMap { p in members.first { $0.id == p.createdBy }?.name } }
+    func name(of id: UUID) -> String { members.first { $0.id == id }?.name ?? "A friend" }
+
+    // MARK: Lifecycle
+
+    /// Loads the proposal when it was opened by id (or re-fetches one already on screen, since a
+    /// view's task restarts after a pushed screen covered it and snapshots emitted meanwhile were
+    /// missed), then applies every store snapshot until the task is cancelled (D11). Views run it
+    /// with `.task(id: session.proposalID)`.
+    func run() async {
+        guard let id = proposalID else {
+            if needsLoad { await load() }
+            return
+        }
+        // Subscribe before fetching: a snapshot emitted during the fetch is buffered, not lost.
+        let changes = store.changes(for: id)
+        if needsLoad { await load() } else { await reload() }
+        for await change in changes {
+            guard !Task.isCancelled else { return }
+            if case .snapshot(let snapshot) = change { apply(snapshot) }
+        }
+        // The store finished the stream: the plan was removed.
+        if !Task.isCancelled, proposalID == id { screen = .gone }
+    }
+
+    /// Fetches the snapshot. The first load shows the skeleton; a missing plan reads "gone" (design 2.2A).
+    func load() async {
+        guard let id = proposalID else { screen = .ready; return }
+        if proposal == nil { screen = .loading }
+        do {
+            apply(try await store.load(id))
+            needsLoad = false
+            screen = .ready
+        } catch ProposalStoreError.notFound {
+            screen = .gone
+        } catch {
+            screen = .error(UserFacingError.map(error, action: .load, creatorName: creatorName))
+        }
+    }
+
+    /// Re-fetches on return to foreground (failure-modes table): a failure keeps what is on screen.
+    func reload() async {
+        guard let id = proposalID else { return }
+        if let snapshot = try? await store.load(id) { apply(snapshot); screen = .ready }
+    }
+
+    /// Switches this session to a proposal that was just created or joined (Home adopts the new plan).
+    func adopt(_ id: UUID) {
+        proposalID = id
+        needsLoad = true
+        proposal = nil
+        slots = []
+        screen = .loading
+    }
+
+    /// Replaces the snapshot and recounts; fires the one-shot lock acknowledgment on requesting -> locked.
+    /// `lastUpdated` moves only when the rows changed (X12: it tracks data, not fetches), so a
+    /// foreground re-fetch of unchanged data keeps "Updated Nm ago".
+    func apply(_ snapshot: ProposalSnapshot) {
+        let wasRequesting = proposal?.status == .requesting
+        let changed = snapshot.proposal != proposal || snapshot.slots != slots
+        proposal = snapshot.proposal
+        slots = snapshot.slots
+        members = snapshot.members.map { user in
+            let known = members.first { $0.id == user.id }
+            return HomeMember(id: user.id, name: user.displayName, isOnline: known?.isOnline ?? false, isActive: known?.isActive ?? false)
+        }
+        if changed { lastUpdated = now() }
+        isLoading = false
+        refresh(now: now())
+        if wasRequesting, snapshot.proposal.status == .locked { didJustLock = true }
+    }
+
+    func consumeLockAcknowledgment() -> Bool {
+        defer { didJustLock = false }
+        return didJustLock
+    }
+
+    // MARK: Recount
+
+    /// Recounts with a fresh `now`, so holds that expired while the screen stayed open drop out of the
     /// counts, roster, best badge and share text with no new data (X12). Keeps the visible week
-    /// when it still exists and re-resolves the selection (X6, X10). HomeView calls this every
+    /// when it still exists and re-resolves the selection (X6, X10). Views call `tick()` every
     /// minute and when the scene becomes active. `lastUpdated` is untouched: it tracks data
     /// changes, not recounts.
     func refresh(now: Date) {
         guard let p = proposal else {
-            weeks = []; visibleWeekID = nil; selectedCellID = nil
+            weeks = []; visibleWeekID = nil; selectedCellID = nil; markFocusCellID = nil; lockState = nil
             return
         }
-        weeks = HeatmapBuilder.weeks(slots: slots, window: p.window, recipientIDs: p.distribution.recipientIDs,
+        weeks = HeatmapBuilder.weeks(slots: slots, window: p.window, recipientIDs: p.distribution.recipientIDs, expectedCount: p.expectedCount,
                                      proposalID: p.id, now: now, calendar: calendar)
         if !weeks.contains(where: { $0.id == visibleWeekID }) { visibleWeekID = weeks.first?.id }
         selectedCellID = HeatmapSelection.resolve(current: selectedCellID, week: visibleWeek)
+        if !(visibleWeek?.cells.contains { $0.id == markFocusCellID && $0.isEnabled } ?? false) { markFocusCellID = visibleWeek?.best?.id }
+        lockState = LockState.make(proposal: p, weeks: weeks)
     }
+
+    func tick() { refresh(now: now()) }
 
     func showWeek(_ id: Date?) {
         guard let id, id != visibleWeekID, weeks.contains(where: { $0.id == id }) else { return }
         visibleWeekID = id
         selectedCellID = HeatmapSelection.resolve(current: selectedCellID, week: visibleWeek)
+        markFocusCellID = visibleWeek?.best?.id
     }
 
     /// Only enabled cells of the visible week are selectable (D22).
@@ -74,13 +225,24 @@ final class HomeModel {
 
     var visibleWeek: HeatmapWeek? { weeks.first { $0.id == visibleWeekID } }
     var selectedCell: HeatmapCell? { visibleWeek?.cells.first { $0.id == selectedCellID } }
-    /// Distinct recipients, matching HeatmapBuilder's cell totals (D5).
-    var total: Int { Set(proposal?.distribution.recipientIDs ?? []).count }
+    var markFocusCell: HeatmapCell? { visibleWeek?.cells.first { $0.id == markFocusCellID } }
+    /// The quorum base, matching HeatmapBuilder's cell totals (D5, D13).
+    var total: Int { proposal?.headcount ?? 0 }
     var onlineCount: Int { members.filter(\.isOnline).count }
 
+    /// Home's Share: the selected slot while requesting (X9); the locked plan once locked (design 2.2A).
     var shareText: String? {
-        guard let cell = selectedCell, let p = proposal else { return nil }
+        guard let p = proposal else { return nil }
+        if let window = p.lockedWindow, p.isLocked {
+            return ShareText.locked(title: p.title, window: window, calendar: calendar, locale: .current)
+        }
+        guard let cell = selectedCell else { return nil }
         return ShareText.format(title: p.title, cell: cell, calendar: calendar, locale: .current)
+    }
+
+    /// The invite message with the deep link (design 3.5A).
+    var inviteText: String? {
+        proposal.map { ShareText.invite(title: $0.title, url: DeepLink.proposal($0.id).url) }
     }
 
     /// VoiceOver hint when Share is disabled (X6, X10).
@@ -103,5 +265,143 @@ final class HomeModel {
     var chips: [(member: HomeMember, status: CellStatus)]? {
         guard let roster = selectedCell?.roster, !roster.isEmpty else { return nil }
         return members.compactMap { m in roster[m.id].map { (m, $0) } }
+    }
+
+    /// The availability sheet's chips: the last-toggled cell's roster (design 1.5A).
+    var markChips: [(member: HomeMember, status: CellStatus)]? {
+        guard let roster = markFocusCell?.roster, !roster.isEmpty else { return nil }
+        return members.compactMap { m in roster[m.id].map { (m, $0) } }
+    }
+
+    /// Once locked, Home's chips read "in" for attendees (design 2.2A), from the proposal row (X1).
+    var attendeeChips: [(member: HomeMember, isIn: Bool)]? {
+        guard let p = proposal, p.isLocked else { return nil }
+        return members.map { ($0, p.lockedAttendeeIDs.contains($0.id)) }
+    }
+
+    /// The cell holding the locked window's start (design 2.2A "locked cell pill").
+    var lockedCellID: HeatmapCell.ID? {
+        guard let p = proposal, p.isLocked, let start = p.lockedDate else { return nil }
+        return weeks.lazy.flatMap(\.cells).first { $0.interval.map { $0.lowerBound <= start && start < $0.upperBound } ?? false }?.id
+    }
+
+    // MARK: Marking availability (D9, C3)
+
+    /// Cells the current user holds: an unexpired softHold of theirs on this plan covers the cell's
+    /// whole interval. Drives the ring + check in the availability sheet (design 5.1A).
+    var myHoldCellIDs: Set<HeatmapCell.ID> {
+        guard let me = currentUserID, let p = proposal else { return [] }
+        let mine = slots.filter { $0.userID == me && $0.sourceProposalID == p.id && $0.state == .softHold && !$0.isExpired(at: now()) }
+        guard !mine.isEmpty else { return [] }
+        var out = Set<HeatmapCell.ID>()
+        for cell in weeks.lazy.flatMap(\.cells) {
+            guard let interval = cell.interval else { continue }
+            if mine.contains(where: { $0.range.lowerBound <= interval.lowerBound && interval.upperBound <= $0.range.upperBound }) { out.insert(cell.id) }
+        }
+        return out
+    }
+
+    /// A past cell (design 5.2A, D9): its interval ended before now.
+    func isPast(_ cell: HeatmapCell) -> Bool {
+        guard let interval = cell.interval else { return false }
+        return interval.upperBound <= now()
+    }
+
+    /// "Sat morning, Sat afternoon, +2 more" (design 3.1A): up to three of my marked slots in order.
+    var freeSummary: String? {
+        let mine = myHoldCellIDs
+        guard !mine.isEmpty else { return nil }
+        let cells = weeks.lazy.flatMap(\.cells).filter { mine.contains($0.id) }
+        let names = cells.prefix(3).map { DateText.dayPart(day: $0.day, daypart: $0.daypart, calendar: self.calendar, locale: .current) }
+        let more = cells.count - names.count
+        return names.joined(separator: ", ") + (more > 0 ? ", +\(more) more" : "")
+    }
+
+    /// Toggles the current user's hold for `cell` (C3, D9): tap writes a softHold for the cell's
+    /// interval expiring at its end; a second tap releases it. Optimistic, reverted on failure.
+    /// Returns the mapped error for the sheet's toast, nil on success.
+    @discardableResult
+    func toggle(_ cell: HeatmapCell) async -> UserFacingError? {
+        guard let p = proposal, p.status == .requesting, let interval = cell.interval, !isPast(cell), let me = currentUserID else { return nil }
+        markFocusCellID = cell.id
+        let before = slots
+        if myHoldCellIDs.contains(cell.id) {
+            let mine = slots.filter { $0.userID == me && $0.sourceProposalID == p.id && $0.state == .softHold && $0.range.intersects(interval) }
+            slots.removeAll { s in mine.contains { $0.id == s.id } }
+            refresh(now: now())
+            do {
+                for slot in mine { try await store.release(slotID: slot.id) }
+                return nil
+            } catch {
+                slots = before
+                refresh(now: now())
+                return UserFacingError.map(error, action: .mark, creatorName: creatorName)
+            }
+        } else {
+            let optimistic = AvailabilitySlot(userID: me, range: interval, sourceProposalID: p.id, state: .softHold, createdAt: now(), expiresAt: interval.upperBound)
+            slots.append(optimistic)
+            refresh(now: now())
+            do {
+                let written = try await store.tapFree(proposalID: p.id, range: interval, expiresAt: interval.upperBound)
+                if let i = slots.firstIndex(where: { $0.id == optimistic.id }) { slots[i] = written }
+                refresh(now: now())
+                return nil
+            } catch {
+                slots.removeAll { $0.id == optimistic.id }
+                refresh(now: now())
+                return UserFacingError.map(error, action: .mark, creatorName: creatorName)
+            }
+        }
+    }
+
+    // MARK: Lock (C5, D14)
+
+    /// The common span the lock sheet offers durations over (design 5.3A, D22).
+    var lockSpan: DateRange? { lockState?.bestCell?.commonWindow }
+
+    /// Validates, asks the store (server-first, R3) and applies the returned proposal. Throws a
+    /// `UserFacingError`; the status stays requesting on refusal.
+    func lock(duration: TimeInterval?) async throws {
+        guard let p = proposal, let cell = lockState?.bestCell else { throw UserFacingError(message: "Nobody shares an hour yet.") }
+        do {
+            let window = try ProposalService().validateLock(cell: cell, duration: duration)
+            let locked = try await store.lock(p.id, window: window)
+            apply(ProposalSnapshot(proposal: locked, members: members.map { User(id: $0.id, displayName: $0.name) }, slots: slots.filter { $0.sourceProposalID != p.id }))
+        } catch {
+            throw UserFacingError.map(error, action: .lock, creatorName: creatorName)
+        }
+    }
+
+    // MARK: Join / create / edit
+
+    func join() async throws {
+        guard let id = proposalID else { return }
+        do {
+            _ = try await store.join(id)
+            await load()
+        } catch {
+            throw UserFacingError.map(error, action: .join, creatorName: creatorName)
+        }
+    }
+
+    /// Creator edits (design 5.4A); the store enforces the rules and the session applies the result.
+    func edit(_ draft: ProposalDraft) async throws {
+        guard var p = proposal else { return }
+        do {
+            let plan = try draft.validate(calendar: calendar)
+            p.title = plan.title
+            p.window = plan.window
+            p.expectedCount = max(plan.expectedCount, p.joinedCount)
+            let saved = try await store.update(p)
+            apply(ProposalSnapshot(proposal: saved, members: members.map { User(id: $0.id, displayName: $0.name) }, slots: slots))
+        } catch {
+            throw UserFacingError.map(error, action: .edit, creatorName: creatorName)
+        }
+    }
+
+    /// Any hold on the plan freezes the dates (design 5.4A).
+    var hasAnyHold: Bool {
+        guard let p = proposal else { return false }
+        return slots.contains { $0.sourceProposalID == p.id && $0.state == .softHold && !$0.isExpired(at: now()) }
     }
 }

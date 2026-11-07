@@ -3,11 +3,12 @@ import FriendCalCore
 
 /// Who is in or out for the selected cell (D22, D35), from its roster (X2). More than 4 scroll
 /// horizontally, with the last chip clipped at the edge (D19). HomeView hides the row when nothing
-/// is selected.
+/// is selected. Once a plan is locked the chips read "in" for attendees (issue #5 design 2.2A).
 struct FriendStatusChips: View {
     enum Content {
         case loading
         case chips([(member: HomeMember, status: CellStatus)])
+        case attendees([(member: HomeMember, isIn: Bool)])
     }
 
     let content: Content
@@ -23,7 +24,9 @@ struct FriendStatusChips: View {
                     }
                     .accessibilityHidden(true)
                 case .chips(let chips):
-                    ForEach(chips, id: \.member.id) { chip($0.member, $0.status) }
+                    ForEach(chips, id: \.member.id) { chip($0.member, word: $0.status.word(calendar: calendar), dot: $0.status.dotColor) }
+                case .attendees(let rows):
+                    ForEach(rows, id: \.member.id) { chip($0.member, word: $0.isIn ? "in" : "out", dot: $0.isIn ? DesignTokens.Colors.primary : DesignTokens.Colors.textMuted) }
                 }
             }
             .padding(.vertical, 3)
@@ -34,14 +37,13 @@ struct FriendStatusChips: View {
         .accessibilityIdentifier("chips")
     }
 
-    private func chip(_ m: HomeMember, _ status: CellStatus) -> some View {
-        let word = status.word(calendar: calendar)
-        return HStack(spacing: 8) {
+    private func chip(_ m: HomeMember, word: String, dot: Color) -> some View {
+        HStack(spacing: 8) {
             FriendAvatar(member: m, size: 28, style: .badge)
             VStack(alignment: .leading, spacing: 0) {
                 Text(m.name).textStyle(.label).foregroundStyle(DesignTokens.Colors.text)
                 HStack(spacing: 4) {
-                    StatusDot(color: status.dotColor)
+                    StatusDot(color: dot)
                     Text(word).textStyle(.caption).foregroundStyle(DesignTokens.Colors.text)
                 }
             }
@@ -58,15 +60,21 @@ struct FriendStatusChips: View {
 }
 
 #Preview("Chips, populated") {
-    let model = HomeModel(fixture: FixtureData.make(.populated))
+    let model = ProposalSession(fixture: FixtureData.make(.populated))
     FriendStatusChips(content: .chips(model.chips ?? []))
         .padding(20).background(DesignTokens.Colors.background)
 }
 
 #Preview("Chips, 0-count cell selected") {
-    let model = HomeModel(fixture: FixtureData.make(.zeroOverlap))
+    let model = ProposalSession(fixture: FixtureData.make(.zeroOverlap))
     if let cell = model.visibleWeek?.cells.first(where: \.isEnabled) { model.select(cell.id) }
     return FriendStatusChips(content: .chips(model.chips ?? []))
+        .padding(20).background(DesignTokens.Colors.background)
+}
+
+#Preview("Chips, locked") {
+    let model = ProposalSession(fixture: FixtureData.make(.lockedPlan))
+    FriendStatusChips(content: .attendees(model.attendeeChips ?? []))
         .padding(20).background(DesignTokens.Colors.background)
 }
 

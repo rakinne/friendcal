@@ -80,7 +80,7 @@ struct MembersDrawer: View {
 }
 
 #Preview("Drawer, selected cell") {
-    let model = HomeModel(fixture: FixtureData.make(.populated))
+    let model = ProposalSession(fixture: FixtureData.make(.populated))
     MembersDrawer(groupName: model.groupName, members: model.members, roster: model.selectedCell?.roster)
 }
 

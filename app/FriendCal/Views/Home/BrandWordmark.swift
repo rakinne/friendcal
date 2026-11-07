@@ -13,11 +13,13 @@ struct BrandWordmark: View {
 }
 
 /// Static group label (D20): avatar stack + name, no chevron, not a button. Switching groups is
-/// out of scope.
+/// out of scope. On the in-memory store it carries the DEMO badge as a trailing sibling (issue #5
+/// D7, D10: inside the header row, never a new row, so the AC2 one-screen layout holds).
 struct GroupPickerPill: View {
     let name: String
     let members: [HomeMember]
     var isLoading = false
+    var isDemo = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -28,22 +30,38 @@ struct GroupPickerPill: View {
                 }
             }
             Text(name).textStyle(.label).foregroundStyle(DesignTokens.Colors.text).lineLimit(1)
+            if isDemo { DemoBadge() }
         }
         .padding(.leading, members.isEmpty ? 10 : 6)
-        .padding(.trailing, 10)
+        .padding(.trailing, isDemo ? 6 : 10)
         .padding(.vertical, 4)
         .background(Capsule().fill(DesignTokens.Colors.surface))
         .overlay(Capsule().stroke(DesignTokens.Colors.border, lineWidth: 1))
         .opacity(isLoading ? 0 : 1)
         .overlay { if isLoading { Capsule().fill(Color.skeleton).frame(width: 110, height: 28) } }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(isLoading ? "Loading group" : "Group, \(name)")
+        .accessibilityLabel(isLoading ? "Loading group" : "Group, \(name)" + (isDemo ? ", demo data, not synced" : ""))
         .accessibilityIdentifier("home.groupPill")
     }
 }
 
+/// "DEMO": a badge-style capsule, `warning` outline, 20pt tall (design Pass 5 mechanics). The word is
+/// in `text`, not `warning`: amber text on ivory is 2.05:1 (ContrastTests), so only the outline carries the hue.
+struct DemoBadge: View {
+    var body: some View {
+        Text("DEMO")
+            .textStyle(.badge)
+            .tracking(0.4)
+            .foregroundStyle(DesignTokens.Colors.text)
+            .padding(.horizontal, 6)
+            .frame(height: 20)
+            .overlay(Capsule().stroke(DesignTokens.Colors.warning, lineWidth: 1))
+            .accessibilityIdentifier("home.demo")
+    }
+}
+
 #Preview("Header, populated") {
-    HStack { BrandWordmark(); Spacer(); GroupPickerPill(name: "Brunch crew", members: FixtureData.members) }
+    HStack { BrandWordmark(); Spacer(); GroupPickerPill(name: "Brunch crew", members: FixtureData.members, isDemo: true) }
         .padding(20).background(DesignTokens.Colors.background)
 }
 

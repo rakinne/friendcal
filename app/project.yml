@@ -59,6 +59,12 @@ targets:
         CFBundleName: FriendCal
         UILaunchScreen: {}
         UIUserInterfaceStyle: Light
+        # Issue #5 D3: friendcal://proposal/<id>; DeepLink.scheme is the Swift constant and
+        # DeepLinkBundleTests asserts the two match.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.friendcal.app.proposal
+            CFBundleURLSchemes:
+              - friendcal
         UIAppFonts:
           - CabinetGrotesk-Extrabold.otf
           - CabinetGrotesk-Bold.otf
