@@ -192,6 +192,7 @@
 		8EBFDB5E30FB3F398E31D5C0 /* FriendStatusChips.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendStatusChips.swift; sourceTree = "<group>"; };
 		94463580FAD349A303FD8295 /* DateText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateText.swift; sourceTree = "<group>"; };
 		99DC18F93685382E1B0AFEC1 /* SourceSans3-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SourceSans3-Bold.otf"; sourceTree = "<group>"; };
+		9A0908FE1313093A9F80BB8E /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		9E49F43137230E745F76DE4A /* HeatmapSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapSelection.swift; sourceTree = "<group>"; };
 		A04C00BE7E7D9F4576AEA7B8 /* LockStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockStateTests.swift; sourceTree = "<group>"; };
 		A1DFA62BFA6CBAAC00735C80 /* HeatmapRosterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapRosterTests.swift; sourceTree = "<group>"; };
@@ -322,6 +323,14 @@
 				5AFBF8D940A5E4A65C79B4A4 /* CreateProposalSheet.swift */,
 			);
 			path = Proposal;
+			sourceTree = "<group>";
+		};
+		542FAE005093F80F5FF0BB56 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				9A0908FE1313093A9F80BB8E /* Signing.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		6425B782CC79B245B08E57F5 /* Resources */ = {
@@ -476,6 +485,7 @@
 		DA86FEAE4F716E383F0993FD = {
 			isa = PBXGroup;
 			children = (
+				542FAE005093F80F5FF0BB56 /* Config */,
 				AFD437FB42CD853731B8C6BD /* FriendCal */,
 				3AD75F3C42411261DCC39012 /* FriendCalTests */,
 				854F52E2C172B55B54E2ED4B /* FriendCalUITests */,
@@ -602,7 +612,6 @@
 						TestTargetID = 297B36CE7CE6EBA4D7F02DAE;
 					};
 					297B36CE7CE6EBA4D7F02DAE = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -810,7 +819,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
 				EXECUTABLE_NAME = FriendCal;
 				INFOPLIST_FILE = FriendCal/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -887,6 +895,7 @@
 		};
 		5B1D214FEE5D0EC3A0426659 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9A0908FE1313093A9F80BB8E /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -1007,6 +1016,7 @@
 		};
 		94F75148D5E5A86CE553899D /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9A0908FE1313093A9F80BB8E /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -1094,7 +1104,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
 				EXECUTABLE_NAME = FriendCal;
 				INFOPLIST_FILE = FriendCal/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

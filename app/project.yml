@@ -10,6 +10,12 @@ configs:
   Debug: debug
   Release: release
 
+# DEVELOPMENT_TEAM comes from Local.xcconfig (gitignored, optional include), so a team
+# picked per machine survives `xcodegen generate`. See Signing.xcconfig.
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -88,7 +94,6 @@ targets:
         EXECUTABLE_NAME: FriendCal
         PRODUCT_BUNDLE_IDENTIFIER: com.friendcal.app
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
         SWIFT_VERSION: "5.9"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -98,6 +103,9 @@ targets:
     sources:
       # Models/, Services/, Privacy/ and Shared/ compile only into FriendCalCore (D14).
       - FriendCal/FriendCalApp.swift
+      # Referenced by configFiles; listed here so the project file ref gets a stable id.
+      - path: Config/Signing.xcconfig
+        buildPhase: none
       - FriendCal/Views
       - path: FriendCal/Fixtures
         optional: true

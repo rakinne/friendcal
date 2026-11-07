@@ -1,0 +1,2 @@
+// Copy to Local.xcconfig (gitignored). Team ID: Xcode > Settings > Apple Accounts.
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
