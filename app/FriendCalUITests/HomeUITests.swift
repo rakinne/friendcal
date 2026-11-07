@@ -141,16 +141,32 @@ final class HomeUITests: XCTestCase {
     }
 
     /// protects=stub tabs are reachable from the native tab bar (D34); fails_when=a tab is
-    /// missing or doesn't switch; no_claim=tab content (out of scope).
+    /// missing or doesn't switch; no_claim=tab content (out of scope). Issue #5 D10: Invites left
+    /// the stub list (testInvitesTabListsThePlan covers it).
     func testStubTabs() {
         let app = Self.launch()
-        for tab in ["Groups", "Pokes", "Invites", "Me"] {
+        for tab in ["Groups", "Pokes", "Me"] {
             app.tabBars.buttons[tab].tap()
             XCTAssertTrue(app.descendants(matching: .any)["stub.\(tab.lowercased())"].waitForExistence(timeout: 3), tab)
             attach(app, "tab-\(tab.lowercased())")
         }
         app.tabBars.buttons["Home"].tap()
         XCTAssertTrue(app.buttons["home.poke"].waitForExistence(timeout: 3))
+    }
+
+    /// protects=the Invites tab lists the group's plan as a real row (issue #5 D10's named change,
+    /// design 1.7A) and the DEMO badge sits inside the header row on the in-memory store (D7);
+    /// fails_when=the stub is back, the row is missing, or the badge is absent; no_claim=row order
+    /// (InvitesUITests).
+    func testInvitesTabListsThePlan() {
+        let app = Self.launch(extra: ["-FriendCalStore", "memory"])
+        XCTAssertTrue(app.descendants(matching: .any)["home.demo"].exists)
+        app.tabBars.buttons["Invites"].tap()
+        let row = app.descendants(matching: .any).matching(identifier: "invites.row").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(row.label.hasPrefix("Brunch, 15 of 15 joined"), row.label)
+        XCTAssertFalse(app.descendants(matching: .any)["stub.invites"].exists)
+        attach(app, "tab-invites")
     }
 
     // MARK: T13
