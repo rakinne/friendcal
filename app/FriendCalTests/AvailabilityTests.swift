@@ -65,6 +65,24 @@ final class AvailabilityTests: XCTestCase {
         XCTAssertEqual(Set(expired), [winner.id, partial.id, otherDay.id, notInvited.id])
     }
 
+    /// protects=the tap collision check judges expiry against the injected clock (issue #5 C2), like
+    /// HeatmapBuilder: another plan's hold that expires exactly at now no longer clashes, one second
+    /// earlier it does; fails_when=tapFreeSlot reads Date() or uses <=; no_claim=server exclusion (none for softHolds, A2).
+    func testTapFreeCollisionUsesInjectedNow() {
+        let svc = AvailabilityService()
+        let user = UUID(), mine = UUID(), other = UUID()
+        let lapse = Self.at(12)
+        let elsewhere = AvailabilitySlot(userID: user, range: DateRange(lower: Self.at(10), upper: Self.at(14)), sourceProposalID: other, state: .softHold, expiresAt: lapse)
+        if case .alreadyHeld = svc.tapFreeSlot(userID: user, range: DateRange(lower: Self.at(11), upper: Self.at(13)), proposalID: mine, expiresAt: nil, existingSlots: [elsewhere], now: lapse.addingTimeInterval(-1)) {} else {
+            XCTFail("an unexpired hold elsewhere must clash")
+        }
+        if case .softHold = svc.tapFreeSlot(userID: user, range: DateRange(lower: Self.at(11), upper: Self.at(13)), proposalID: mine, expiresAt: nil, existingSlots: [elsewhere], now: lapse) {} else {
+            XCTFail("a hold that lapsed at now must not clash")
+        }
+        XCTAssertTrue(elsewhere.isExpired(at: lapse))
+        XCTAssertFalse(elsewhere.isExpired(at: lapse.addingTimeInterval(-1)))
+    }
+
     // MARK: Promotion matches the heatmap's quorum rule (review D4)
 
     private static var nyc: Calendar {

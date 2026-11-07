@@ -2,6 +2,8 @@ import Foundation
 import Supabase
 
 /// Supabase backend contract for FriendCal — Phase 1: Supabase chosen (D1 Option A).
+/// Becomes `SupabaseProposalStore` (a `ProposalStore`) in issue #5 PR2; `InMemoryProposalStore` is the
+/// in-app stand-in until then.
 /// Server enforces stealth via Postgres RLS on busy_blocks.hidden_from.
 /// Client reads via sanitized_busy_blocks view for excluded viewers.
 
@@ -70,23 +72,4 @@ final class SupabaseService: SupabaseServiceProtocol {
         Task { _ = try? await channel.subscribeWithError() }
         return channel
     }
-}
-
-/// Mock for previews / SwiftUI + StealthTests — never leaks hiddenFrom payload.
-public final class MockSupabaseService: SupabaseServiceProtocol {
-    public init() {}
-    var proposals: [Proposal] = []
-    var busyBlocks: [BusyBlock] = []
-    func fetchProposals(for userID: UUID) async throws -> [Proposal] { proposals }
-    func createProposal(_ p: Proposal) async throws { proposals.append(p) }
-    func lockProposal(_ id: UUID, window: DateRange) async throws { }
-    func fetchBusyBlocks(for viewerID: UUID, in range: DateRange) async throws -> [BusyBlock] {
-        busyBlocks.filter { $0.range.overlaps(range) }.map { block in
-            if block.hiddenFrom.contains(viewerID) {
-                return BusyBlock(id: block.id, userID: block.userID, range: block.range, visibility: .public, hiddenFrom: [], createdAt: block.createdAt)
-            }
-            return block
-        }
-    }
-    func subscribeRealtime(onProposal id: UUID, handler: @escaping ([AvailabilitySlot]) -> Void) -> Any { NSObject() }
 }

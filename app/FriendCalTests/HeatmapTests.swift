@@ -236,6 +236,33 @@ final class HeatmapTests: XCTestCase {
         XCTAssertEqual(thirteenOfFifteen.ramp, .primary)
     }
 
+    // MARK: Expected headcount and slot-end expiry (issue #5 D13, D9)
+
+    /// protects=total = max(expectedCount, distinct recipients) in every cell, so "3 of 8" holds
+    /// before the crew joins and "5 of 5" once more join than expected; fails_when=expected is
+    /// ignored, or it caps a larger crew; no_claim=the server's greatest(expected_count, joined) (sql lane, PR2).
+    func testTotalIsMaxOfExpectedAndJoined() {
+        let more = HeatmapBuilder.weeks(slots: [slot(alice, mon(9), mon(11))], window: weekWindow, recipientIDs: recipients, expectedCount: 8, proposalID: proposalID, now: now, calendar: Self.calendar)
+        XCTAssertTrue(more[0].cells.allSatisfy { $0.total == 8 })
+        XCTAssertEqual(more[0].cell(dayIndex: 0, daypart: .morning).coverage, 1.0 / 8, accuracy: 0.0001)
+        let fewer = HeatmapBuilder.weeks(slots: [], window: weekWindow, recipientIDs: recipients, expectedCount: 2, proposalID: proposalID, now: now, calendar: Self.calendar)
+        XCTAssertTrue(fewer[0].cells.allSatisfy { $0.total == 3 })
+        XCTAssertTrue(build([])[0].cells.allSatisfy { $0.total == 3 }, "default: recipients only")
+    }
+
+    /// protects=a product tap's hold (expiresAt = its own slot end, D9) counts until that time and
+    /// not at it; fails_when=eligibility uses <= or the expiry is judged against the wall clock;
+    /// no_claim=the reaper.
+    func testHoldExpiringAtItsOwnSlotEnd() {
+        let hold = slot(alice, mon(9), mon(11), expires: mon(11))
+        func count(at now: Date) -> Int {
+            HeatmapBuilder.weeks(slots: [hold], window: weekWindow, recipientIDs: recipients, proposalID: proposalID, now: now, calendar: Self.calendar)[0]
+                .cell(dayIndex: 0, daypart: .morning).commonCount
+        }
+        XCTAssertEqual(count(at: mon(11).addingTimeInterval(-1)), 1)
+        XCTAssertEqual(count(at: mon(11)), 0)
+    }
+
     func testZeroRecipientsHasZeroCoverage() {
         let weeks = HeatmapBuilder.weeks(slots: [], window: weekWindow, recipientIDs: [], proposalID: proposalID, now: now, calendar: Self.calendar)
         let cell = weeks[0].cell(dayIndex: 0, daypart: .morning)

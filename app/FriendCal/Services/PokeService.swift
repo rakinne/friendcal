@@ -13,12 +13,6 @@ actor PokeService {
         return Date().timeIntervalSince(last) >= 24*3600
     }
 
-    func recordPoke(from: UUID, to: UUID, proposalID: UUID) -> Poke? {
-        guard canPoke(from: from, to: to, proposalID: proposalID) else { return nil }
-        // simplified overload
-        return nil
-    }
-
     func recordPokeSafe(from: UUID, to: UUID, proposalID: UUID) -> Poke? {
         let k = Key(from: from, to: to, proposalID: proposalID)
         if let last = lastSent[k], Date().timeIntervalSince(last) < 24*3600 { return nil }

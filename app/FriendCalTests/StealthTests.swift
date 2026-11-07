@@ -36,10 +36,11 @@ final class StealthTests: XCTestCase {
     }
 
     func testRlsViewDoesNotExposeHiddenFrom() throws {
-        // Mock fetch strips hiddenFrom for excluded viewer
+        // The in-memory store's sanitized read strips hiddenFrom for the excluded viewer (issue #5 S2:
+        // MockSupabaseService folded into InMemoryProposalStore; same assertion).
         let jalenID = UUID()
         let micaID = UUID()
-        let svc = MockSupabaseService()
+        let svc = InMemoryProposalStore()
         svc.busyBlocks = [BusyBlock(userID: micaID, range: DateRange(Date.now...Date.now.addingTimeInterval(3600)), visibility: .stealth, hiddenFrom: [jalenID])]
         let exp = expectation(description: "fetch")
         Task {

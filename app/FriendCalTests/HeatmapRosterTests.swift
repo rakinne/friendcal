@@ -117,4 +117,36 @@ final class HeatmapRosterTests: XCTestCase {
         let zero = HeatmapCell(day: cell.day, daypart: .evening, interval: window, freeCount: 1, commonCount: 0, commonWindow: nil, total: 15)
         XCTAssertNil(ShareText.format(title: "Brunch", cell: zero, calendar: HeatmapTests.calendar, locale: en))
     }
+
+    /// protects=the invite message carries the "?" title, the ask and the link (design 3.5A) and
+    /// Home's locked share names the date and window with no "?" (2.2A, 2.1A), both through
+    /// Proposal.displayTitle; fails_when=either surface grows a second "?" or loses the link/window;
+    /// no_claim=link tappability in Messages (DT11, device).
+    func testInviteAndLockedShareText() {
+        let id = UUID(uuidString: "00000000-0000-0000-0000-000000000900")!
+        XCTAssertEqual(ShareText.invite(title: "Brunch", url: DeepLink.proposal(id).url),
+                       "Brunch? Mark when you're free in FriendCal: friendcal://proposal/00000000-0000-0000-0000-000000000900")
+        let sat = HeatmapTests.date(2026, 11, 14, 10)
+        XCTAssertEqual(ShareText.locked(title: "Brunch", window: DateRange(lower: sat, upper: sat.addingTimeInterval(7200)), calendar: HeatmapTests.calendar, locale: Locale(identifier: "en_US")),
+                       "Brunch is locked: Sat, Nov 14 · 10:00 AM-12:00 PM")
+    }
+
+    /// protects=the one set of date formatters the invite, sheets and rows use; fails_when=a day,
+    /// time range, day range, duration or daypart string drifts (en_US); no_claim=other locales.
+    func testDateTextTable() {
+        let cal = HeatmapTests.calendar, en = Locale(identifier: "en_US")
+        let sat10 = HeatmapTests.date(2026, 11, 14, 10)
+        XCTAssertEqual(DateText.day(sat10, calendar: cal, locale: en), "Sat, Nov 14")
+        XCTAssertEqual(DateText.weekday(sat10, calendar: cal, locale: en), "Saturday")
+        XCTAssertEqual(DateText.timeRange(DateRange(lower: sat10, upper: sat10.addingTimeInterval(7200)), calendar: cal, locale: en), "10:00 AM–12:00 PM")
+        XCTAssertEqual(DateText.timeRange(DateRange(lower: sat10, upper: sat10.addingTimeInterval(5400)), calendar: cal, locale: en), "10:00–11:30 AM")
+        XCTAssertEqual(DateText.dayRange(DateRange(lower: HeatmapTests.date(2026, 11, 9, 0), upper: HeatmapTests.date(2026, 11, 22, 23)), calendar: cal, locale: en), "Nov 9–22")
+        XCTAssertEqual(DateText.dayRange(DateRange(lower: HeatmapTests.date(2026, 11, 30, 0), upper: HeatmapTests.date(2026, 12, 6, 0)), calendar: cal, locale: en), "Nov 30–Dec 6")
+        XCTAssertEqual(DateText.duration(7200), "2 h")
+        XCTAssertEqual(DateText.duration(5400), "1 h 30")
+        XCTAssertEqual(DateText.duration(4800), "1 h 20")
+        XCTAssertEqual(DateText.duration(2700), "45 min")
+        XCTAssertEqual(DateText.dayPart(day: cal.startOfDay(for: sat10), daypart: .morning, calendar: cal, locale: en), "Sat morning")
+        XCTAssertEqual(DateText.dayPart(day: cal.startOfDay(for: sat10), daypart: .afternoon, calendar: cal, locale: en, long: true), "Saturday afternoon")
+    }
 }
