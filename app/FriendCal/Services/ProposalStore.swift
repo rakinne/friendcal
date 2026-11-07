@@ -62,6 +62,11 @@ public enum ProposalStoreError: Error, Equatable {
 /// `lock` is server-first (R3): the caller applies the returned proposal and never marks a lock
 /// locally. The client-side collision check in `tapFree` (own commitments across plans) is a UX
 /// guard; the server has no exclusion for softHolds (A2).
+///
+/// Main-actor isolated: the session and the screens that read it live on the main actor, and a
+/// non-isolated `async` witness would run on the global executor and mutate the store's rows while
+/// SwiftUI reads them. The network store (PR2) suspends on I/O inside the same isolation.
+@MainActor
 public protocol ProposalStore: AnyObject {
     var currentUserID: UUID? { get }
     /// Signs in (or restores) the current user. The in-memory store creates a local identity.

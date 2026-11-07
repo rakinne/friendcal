@@ -5,6 +5,7 @@ import XCTest
 @testable import FriendCalCore
 
 /// The lock sheet's duration rule (issue #5 D22, design 5.3A).
+@MainActor
 final class LockSheetModelTests: XCTestCase {
     private func span(_ minutes: Int) -> DateRange {
         let start = HeatmapTests.date(2026, 11, 14, 12)
@@ -62,6 +63,7 @@ final class LockSheetModelTests: XCTestCase {
 }
 
 /// The Invites list order (design 1.7A).
+@MainActor
 final class ProposalListModelTests: XCTestCase {
     /// protects=locked upcoming plans first (soonest first), then requesting by window start, then
     /// past plans most recent first, with past judged by the locked end or the window end; fails_when=

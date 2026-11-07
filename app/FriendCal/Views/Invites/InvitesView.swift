@@ -3,6 +3,7 @@ import Observation
 import FriendCalCore
 
 /// The Invites list's small model (issue #5 C9, P6): `store.proposals()` only, no overlap counts.
+@MainActor
 @Observable
 final class ProposalListModel {
     enum State: Equatable {

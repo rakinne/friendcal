@@ -55,12 +55,14 @@ public struct ProposalDraft: Equatable {
         return ProposalDraft(from: monday, to: end)
     }
 
-    /// Editing an existing plan (design 5.4A).
+    /// Editing an existing plan (design 5.4A). The count starts at least at the people already
+    /// joined (the quorum base is max(expected, joined)), so a title-only edit never needs the
+    /// creator to bump a number they did not touch.
     public init(editing proposal: Proposal) {
         title = proposal.title
         from = proposal.window.lowerBound
         to = proposal.window.upperBound
-        expectedCount = proposal.expectedCount
+        expectedCount = max(proposal.expectedCount, proposal.joinedCount)
     }
 
     /// "Brunch" when blank; trailing "?" and whitespace stripped.

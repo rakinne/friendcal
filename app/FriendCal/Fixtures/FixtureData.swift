@@ -154,6 +154,7 @@ enum FixtureData {
     /// Seeds the in-memory store from a fixture (issue #5 D2, D7). Users come from the members
     /// (any other recipient id reads "Friend"); the current user is the fixture's, else the creator,
     /// else the first member.
+    @MainActor
     static func store(_ fixture: HomeFixture, clock: @escaping () -> Date) -> InMemoryProposalStore {
         let users = fixture.members.map { User(id: $0.id, displayName: $0.name) }
         let proposals = [fixture.proposal].compactMap { $0 } + fixture.extraProposals

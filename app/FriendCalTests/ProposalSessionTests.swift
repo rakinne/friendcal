@@ -6,6 +6,7 @@ import XCTest
 @testable import FriendCal
 @testable import FriendCalCore
 
+@MainActor
 final class ProposalSessionTests: XCTestCase {
     private let alice = HomeMember(id: UUID(), name: "Alice", isOnline: true, isActive: true)
     private let bob = HomeMember(id: UUID(), name: "Bob", isOnline: true, isActive: false)
@@ -194,6 +195,41 @@ final class ProposalSessionTests: XCTestCase {
         XCTAssertTrue(store.slots.filter { $0.userID == s.currentUserID }.isEmpty)
     }
 
+    /// Value: protects=a second tap on a cell whose save is still in flight is ignored, so the hold the first tap writes stays and no 'plan is gone' error appears (review pass 1); fails_when=toggle() reads the optimistic row as a saved hold and releases an id the store never issued; why_new=testToggle* tap one cell at a time; seam=none; no_claim=the sheet's gesture handling (UI lane)
+    func testRapidDoubleToggleIsIgnoredWhileTheFirstWriteIsInFlight() async throws {
+        let s = session(.lockedInvite)
+        let store = try XCTUnwrap(s.store as? InMemoryProposalStore)
+        store.latency = .milliseconds(40)
+        let cell = try bestCell(s)
+        async let first = s.toggle(cell)
+        async let second = s.toggle(cell)
+        let (e1, e2) = await (first, second)
+        XCTAssertNil(e1)
+        XCTAssertNil(e2, "the second tap is ignored, not a failed release")
+        XCTAssertTrue(s.myHoldCellIDs.contains(cell.id))
+        XCTAssertEqual(store.slots.filter { $0.userID == s.currentUserID }.count, 1, "one hold written, the second tap did not undo it")
+    }
+
+    /// Value: protects=a failed release puts back only its own hold, so a mark on another cell made while it was in flight keeps its saved row (review pass 1); fails_when=the revert restores a whole-array snapshot that drops the other cell's optimistic hold; why_new=testTogglePastCellIsIgnoredAndFailureReverts reverts a single mark; seam=none; no_claim=server-side release semantics
+    func testFailedReleaseKeepsAnOverlappingMarkOnAnotherCell() async throws {
+        let s = session(.lockedInvite)
+        let store = try XCTUnwrap(s.store as? InMemoryProposalStore)
+        let cells = try XCTUnwrap(s.visibleWeek?.cells.filter { $0.isEnabled && !s.isPast($0) })
+        let a = try XCTUnwrap(cells.first), b = try XCTUnwrap(cells.last)
+        XCTAssertNotEqual(a.day, b.day)
+        let marked = await s.toggle(a)
+        XCTAssertNil(marked)
+        store.latency = .milliseconds(40)
+        store.failNext[.release] = ProposalStoreError.network("offline")
+        async let release = s.toggle(a)
+        async let mark = s.toggle(b)
+        let (releaseError, markError) = await (release, mark)
+        XCTAssertEqual(releaseError?.message, "Couldn't save your availability. Retry.")
+        XCTAssertNil(markError)
+        XCTAssertEqual(s.myHoldCellIDs, [a.id, b.id], "A is back after the failed release; B kept its saved hold")
+        XCTAssertEqual(store.slots.filter { $0.userID == s.currentUserID }.count, 2)
+    }
+
     /// protects=lock is server-first (C5, R3): below quorum it throws without touching the plan, a
     /// store refusal leaves it requesting, and a success applies the returned proposal (locked cell,
     /// attendees, share text) and fires the acknowledgment once (3.4A, delta A3); fails_when=the
@@ -264,6 +300,57 @@ final class ProposalSessionTests: XCTestCase {
         let gone = ProposalSession(store: emptyStore, proposalID: UUID(), calendar: cal, now: { [launch] in launch })
         await gone.load()
         XCTAssertEqual(gone.screen, .gone)
+    }
+
+    /// Value: protects=edit() applies the creator's title and count through the store, floors the count at those already joined, and maps the frozen-dates refusal (design 5.4A); fails_when=the floor is dropped, the saved plan is not applied, or the refusal is not mapped; why_new=only the store tests cover update(), not the session wrapper; seam=none; no_claim=the edit sheet UI (not driven here)
+    func testEditAppliesTitleFloorsCountAndMapsFrozenDates() async throws {
+        let s = session(.lockedInviteCreator)
+        let p = try XCTUnwrap(s.proposal)
+        XCTAssertTrue(s.hasAnyHold)
+        var draft = ProposalDraft(editing: p)
+        draft.title = "Dinner?"
+        draft.expectedCount = 2
+        draft.from = cal.date(byAdding: .day, value: 1, to: draft.from)!
+        do { try await s.edit(draft); XCTFail("dates are frozen once friends marked times") } catch let e as UserFacingError {
+            XCTAssertEqual(e.message, "Can't change the dates once friends have marked times.")
+        }
+        XCTAssertEqual(s.proposal?.title, p.title)
+        let store = try XCTUnwrap(s.store as? InMemoryProposalStore)
+        store.seed(users: store.users, proposals: store.proposals, slots: [], busyBlocks: store.busyBlocks, currentUserID: store.currentUserID)
+        s.apply(try store.snapshot(of: p.id))
+        XCTAssertFalse(s.hasAnyHold)
+        draft = ProposalDraft(editing: s.proposal!)
+        draft.title = "Dinner?"
+        draft.expectedCount = 2
+        try await s.edit(draft)
+        XCTAssertEqual(s.proposal?.title, "Dinner")
+        XCTAssertEqual(s.proposal?.expectedCount, p.joinedCount)
+    }
+
+    /// Value: protects=join() reloads after joining and maps a failed join to the invite sentence, load() maps a network failure to .error; fails_when=the error is rethrown raw or the screen stays loading; why_new=no test calls join(), and load()'s generic-failure branch is untested; seam=none; no_claim=the deep-link navigation (UI tests)
+    func testJoinReloadsAndLoadFailureMapsToErrorScreen() async throws {
+        let s = session(.lockedInvite)
+        let store = try XCTUnwrap(s.store as? InMemoryProposalStore)
+        try await s.join()
+        XCTAssertEqual(s.screen, .ready)
+        store.failNext[.join] = ProposalStoreError.network("offline")
+        do { try await s.join(); XCTFail("join should fail") } catch let e as UserFacingError {
+            XCTAssertEqual(e.message, "Couldn't open this invite.")
+            XCTAssertEqual(e.details, "offline")
+        }
+        let fresh = ProposalSession(store: store, proposalID: FixtureData.proposalID, calendar: cal, now: { [launch] in launch })
+        store.failNext[.load] = ProposalStoreError.network("offline")
+        await fresh.load()
+        XCTAssertEqual(fresh.screen, .error(UserFacingError(message: "Couldn't open this invite.", details: "offline")))
+    }
+
+    /// Value: protects=the invite message carries the plan's deep link and the DEMO flag follows the in-memory store; fails_when=inviteText drops the link or isDemo is wrong; why_new=ShareText.invite is tested in isolation, not the session wiring; seam=none; no_claim=the share sheet
+    func testInviteTextCarriesDeepLinkAndDemoFlag() throws {
+        let s = session(.lockedInviteCreator)
+        let id = try XCTUnwrap(s.proposal?.id)
+        XCTAssertTrue(try XCTUnwrap(s.inviteText).contains(DeepLink.proposal(id).url.absoluteString))
+        XCTAssertTrue(s.isDemo)
+        XCTAssertNil(session(.noProposal).inviteText)
     }
 }
 #endif

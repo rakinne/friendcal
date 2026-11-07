@@ -30,6 +30,11 @@ struct HomeMember: Identifiable, Equatable {
 ///       └─ HeatmapBuilder.weeks        proposals (recipients, status)   └─ rebuild, caption recounts
 ///     LockSheet ── lock(window) ─────▶ lock (server-first, R3) ──snapshot──▶ card settles: date + window, "You're in"
 ///           ▲ refusal mapped by UserFacingError, status stays requesting
+/// Main-actor isolated: SwiftUI reads these observed properties on the main thread, and the async
+/// methods below (lock, toggle, join, edit, load) write them. Without isolation a `Task` started
+/// from a view hops to the global executor on the first `await session.x()` and mutates `weeks`,
+/// `lockState` and `slots` mid-render (crash: bad release in `outlined destroy of HeatmapCell`).
+@MainActor
 @Observable
 final class ProposalSession {
     enum Screen: Equatable {
@@ -317,23 +322,36 @@ final class ProposalSession {
         return names.joined(separator: ", ") + (more > 0 ? ", +\(more) more" : "")
     }
 
+    /// Cells whose hold write (mark or release) is still in flight. A second tap on one is ignored
+    /// until the first settles: it would otherwise read the optimistic row as a saved hold, release
+    /// an id the store never issued and revert a write that then lands anyway.
+    @ObservationIgnored private var pendingCellIDs: Set<HeatmapCell.ID> = []
+
     /// Toggles the current user's hold for `cell` (C3, D9): tap writes a softHold for the cell's
-    /// interval expiring at its end; a second tap releases it. Optimistic, reverted on failure.
-    /// Returns the mapped error for the sheet's toast, nil on success.
+    /// interval expiring at its end; a second tap releases it. Optimistic, reverted on failure by
+    /// slot id, so an overlapping toggle on another cell is never rolled back with it.
+    /// Returns the mapped error for the sheet's toast, nil on success (and nil for an ignored tap).
     @discardableResult
     func toggle(_ cell: HeatmapCell) async -> UserFacingError? {
-        guard let p = proposal, p.status == .requesting, let interval = cell.interval, !isPast(cell), let me = currentUserID else { return nil }
+        guard let p = proposal, p.status == .requesting, let interval = cell.interval, !isPast(cell), let me = currentUserID,
+              !pendingCellIDs.contains(cell.id) else { return nil }
+        pendingCellIDs.insert(cell.id)
+        defer { pendingCellIDs.remove(cell.id) }
         markFocusCellID = cell.id
-        let before = slots
         if myHoldCellIDs.contains(cell.id) {
             let mine = slots.filter { $0.userID == me && $0.sourceProposalID == p.id && $0.state == .softHold && $0.range.intersects(interval) }
             slots.removeAll { s in mine.contains { $0.id == s.id } }
             refresh(now: now())
+            var released = Set<UUID>()
             do {
-                for slot in mine { try await store.release(slotID: slot.id) }
+                for slot in mine {
+                    try await store.release(slotID: slot.id)
+                    released.insert(slot.id)
+                }
                 return nil
             } catch {
-                slots = before
+                // Put back only the holds the store still has: those it already dropped stay gone.
+                slots.append(contentsOf: mine.filter { !released.contains($0.id) })
                 refresh(now: now())
                 return UserFacingError.map(error, action: .mark, creatorName: creatorName)
             }

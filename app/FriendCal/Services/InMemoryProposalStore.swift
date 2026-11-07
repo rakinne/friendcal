@@ -4,7 +4,10 @@ import Foundation
 /// It is the real seam, not a stub: every rule lock_proposal.sql and join_proposal.sql enforce is
 /// mirrored here with the same SQLSTATE and `FC_*` hint, so the session and the screens behave the
 /// same on demo data as on the network store that PR2 adds. Absorbs the former DebugProposalModel
-/// and MockSupabaseService (S1, S2). Main-thread use; `changes(for:)` continuations are locked.
+/// and MockSupabaseService (S1, S2). Main-actor isolated, so overlapping taps never mutate the rows
+/// from two threads; only the `changes(for:)` continuations are touched off-actor (on stream
+/// termination), and those stay behind `lock`.
+@MainActor
 public final class InMemoryProposalStore: ProposalStore {
     public enum Operation: Hashable, CaseIterable {
         case proposals, load, create, update, join, tapFree, release, lock
@@ -24,7 +27,7 @@ public final class InMemoryProposalStore: ProposalStore {
     public var latency: Duration = .zero
 
     private let availability = AvailabilityService()
-    private var continuations: [UUID: [UUID: AsyncStream<ProposalChange>.Continuation]] = [:]
+    nonisolated(unsafe) private var continuations: [UUID: [UUID: AsyncStream<ProposalChange>.Continuation]] = [:]
     private let lock = NSLock()
 
     public init(users: [User] = [], proposals: [Proposal] = [], slots: [AvailabilitySlot] = [], busyBlocks: [BusyBlock] = [], currentUserID: UUID? = nil, now: @escaping () -> Date = { .now }) {

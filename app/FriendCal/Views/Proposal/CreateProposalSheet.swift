@@ -123,7 +123,7 @@ struct CreateProposalSheet: View {
                         Text("\(draft.expectedCount)").textStyle(.title).foregroundStyle(DesignTokens.Colors.text)
                             .accessibilityIdentifier("create.expectedValue")
                         Spacer()
-                        Stepper("People", value: $draft.expectedCount, in: minimumPeople...50)
+                        Stepper("People", value: $draft.expectedCount, in: minimumPeople...max(50, minimumPeople))
                             .labelsHidden()
                             .accessibilityValue("\(draft.expectedCount)")
                     }

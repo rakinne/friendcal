@@ -142,6 +142,7 @@ final class ProposalTests: XCTestCase {
     /// protects=the lock stays server-first (C5, TODOS "Make lock server-first"): a store refusal
     /// leaves the proposal requesting and no local field set; fails_when=the session or service
     /// applies the lock before the store answers; no_claim=RPC behavior (the in-memory store refuses).
+    @MainActor
     func testStoreRefusalLeavesStatusRequesting() async throws {
         let creator = UUID(), friend = UUID()
         var p = Self.proposal()

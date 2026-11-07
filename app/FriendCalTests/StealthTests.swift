@@ -35,20 +35,16 @@ final class StealthTests: XCTestCase {
         XCTAssertNotEqual(svc.sanitizedPushBody(for: block, viewer: UUID()), "New busy time added")
     }
 
-    func testRlsViewDoesNotExposeHiddenFrom() throws {
+    @MainActor
+    func testRlsViewDoesNotExposeHiddenFrom() async throws {
         // The in-memory store's sanitized read strips hiddenFrom for the excluded viewer (issue #5 S2:
         // MockSupabaseService folded into InMemoryProposalStore; same assertion).
         let jalenID = UUID()
         let micaID = UUID()
         let svc = InMemoryProposalStore()
         svc.busyBlocks = [BusyBlock(userID: micaID, range: DateRange(Date.now...Date.now.addingTimeInterval(3600)), visibility: .stealth, hiddenFrom: [jalenID])]
-        let exp = expectation(description: "fetch")
-        Task {
-            let blocks = try await svc.fetchBusyBlocks(for: jalenID, in: DateRange(Date.now...Date.now.addingTimeInterval(7200)))
-            XCTAssertEqual(blocks.count, 1)
-            XCTAssertTrue(blocks.first?.hiddenFrom.isEmpty == true, "hiddenFrom must be stripped for excluded viewer")
-            exp.fulfill()
-        }
-        wait(for: [exp], timeout: 2)
+        let blocks = try await svc.fetchBusyBlocks(for: jalenID, in: DateRange(Date.now...Date.now.addingTimeInterval(7200)))
+        XCTAssertEqual(blocks.count, 1)
+        XCTAssertTrue(blocks.first?.hiddenFrom.isEmpty == true, "hiddenFrom must be stripped for excluded viewer")
     }
 }

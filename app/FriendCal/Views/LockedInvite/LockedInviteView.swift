@@ -157,7 +157,7 @@ struct LockedInviteView: View {
         guard session.proposal != nil, !session.isRecipient, force || joinError == nil else { return }
         joinError = nil
         Task {
-            do { try await session.join() } catch let error as UserFacingError { joinError = error } catch {}
+            do { try await session.join() } catch { joinError = UserFacingError.map(error, action: .join, creatorName: session.creatorName) }
         }
     }
 

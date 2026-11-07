@@ -27,7 +27,9 @@ public struct UserFacingError: Error, Equatable {
             case "FC_QUORUM": return UserFacingError(message: "Not enough friends are free anymore. Pick another time.", details: details)
             case "FC_CHANGED": return UserFacingError(message: "Availability changed while locking. Try again.", details: details)
             case "FC_LOCKED": return UserFacingError(message: "This plan is already locked.", details: details)
-            case "FC_NOT_CREATOR": return UserFacingError(message: "Only \(host) can lock this plan.", details: details)
+            case "FC_CLOSED": return UserFacingError(message: "This plan is closed.", details: details)
+            case "FC_NOT_CREATOR": return UserFacingError(message: creatorOnly(action, host), details: details)
+            case "FC_NOT_OWNER": return UserFacingError(message: "That hold isn't yours.", details: details)
             case "FC_DATES_FROZEN": return UserFacingError(message: "Can't change the dates once friends have marked times.", details: details)
             case "FC_WINDOW": return UserFacingError(message: "That time doesn't fit inside the plan.", details: details)
             case "FC_NO_RECIPIENTS": return UserFacingError(message: "No one has joined yet.", details: details)
@@ -38,7 +40,7 @@ public struct UserFacingError: Error, Equatable {
             case "22023": return UserFacingError(message: "Not enough friends are free anymore. Pick another time.", details: details)
             case "40001": return UserFacingError(message: "Availability changed while locking. Try again.", details: details)
             case "55000": return UserFacingError(message: "This plan is already locked.", details: details)
-            case "42501": return UserFacingError(message: "Only \(host) can lock this plan.", details: details)
+            case "42501": return UserFacingError(message: creatorOnly(action, host), details: details)
             default: return UserFacingError(message: generic(action), details: details)
             }
         case ProposalStoreError.notFound:
@@ -61,6 +63,11 @@ public struct UserFacingError: Error, Equatable {
         default:
             return UserFacingError(message: generic(action), details: String(describing: error))
         }
+    }
+
+    /// The creator-only refusal reads as the action that was refused (a lock or an edit).
+    static func creatorOnly(_ action: Action, _ host: String) -> String {
+        action == .edit ? "Only \(host) can edit this plan." : "Only \(host) can lock this plan."
     }
 
     static func generic(_ action: Action) -> String {

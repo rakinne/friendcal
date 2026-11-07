@@ -3,6 +3,7 @@ import XCTest
 
 /// The loop contract every screen relies on (issue #5 D2, D3, D4, D9, D13, D15, C3, C5), against the
 /// in-memory store that mirrors lock_proposal.sql / join_proposal.sql. Fixed New York calendar.
+@MainActor
 final class InMemoryProposalStoreTests: XCTestCase {
     private let sam = User(id: UUID(), displayName: "Sam")
     private let maya = User(id: UUID(), displayName: "Maya")
@@ -105,7 +106,9 @@ final class InMemoryProposalStoreTests: XCTestCase {
         } catch {
             XCTAssertEqual(error as? ProposalStoreError, .heldElsewhere)
         }
-        XCTAssertTrue(s1.slots.isEmpty && s2.slots.isEmpty && s3.slots.isEmpty && s4.slots.isEmpty)
+        let (s5, p5) = store(as: maya, status: .cancelled)
+        await assertRefused(try await s5.tapFree(proposalID: p5.id, range: DateRange(lower: mon(6), upper: mon(12)), expiresAt: nil), code: "55000", hint: "FC_LOCKED")
+        XCTAssertTrue(s1.slots.isEmpty && s2.slots.isEmpty && s3.slots.isEmpty && s4.slots.isEmpty && s5.slots.isEmpty)
     }
 
     /// protects=release removes only the caller's own hold (C3); fails_when=another user's hold can
@@ -169,6 +172,10 @@ final class InMemoryProposalStoreTests: XCTestCase {
         await assertRefused(try await notCreator.lock(p1.id, window: DateRange(lower: mon(9), upper: mon(11))), code: "42501", hint: "FC_NOT_CREATOR")
         let (already, p2) = store(as: sam, status: .locked)
         await assertRefused(try await already.lock(p2.id, window: DateRange(lower: mon(9), upper: mon(11))), code: "55000", hint: "FC_LOCKED")
+        let (cancelled, pc) = store(as: sam, status: .cancelled)
+        await assertRefused(try await cancelled.lock(pc.id, window: DateRange(lower: mon(9), upper: mon(11))), code: "55000", hint: "FC_LOCKED")
+        XCTAssertEqual(cancelled.proposals[0].status, .cancelled, "a cancelled plan stays cancelled")
+        XCTAssertTrue(cancelled.busyBlocks.isEmpty)
         let (short, p3) = store(as: sam)
         await assertRefused(try await short.lock(p3.id, window: DateRange(lower: mon(9), upper: mon(9, 45))), code: "22023", hint: "FC_WINDOW")
         await assertRefused(try await short.lock(p3.id, window: DateRange(lower: HeatmapTests.date(2026, 11, 8, 9), upper: mon(11))), code: "22023", hint: "FC_WINDOW")
@@ -224,6 +231,11 @@ final class InMemoryProposalStoreTests: XCTestCase {
         await assertRefused(try await recipient.update(rp), code: "42501", hint: "FC_NOT_CREATOR")
         let (locked, lp) = store(as: sam, status: .locked)
         await assertRefused(try await locked.update(lp), code: "55000", hint: "FC_LOCKED")
+        let (gone, gp) = store(as: sam, status: .cancelled)
+        var renamed = gp
+        renamed.title = "Dinner"
+        await assertRefused(try await gone.update(renamed), code: "55000", hint: "FC_LOCKED")
+        XCTAssertEqual(gone.proposals[0].title, gp.title, "a cancelled plan is not editable")
     }
 
     // MARK: changes / failures
@@ -233,20 +245,22 @@ final class InMemoryProposalStoreTests: XCTestCase {
     /// plan keeps emitting; no_claim=Realtime channel teardown (PR2).
     func testChangesFinishOnCancelAndRemoval() async throws {
         let (s, p) = store(as: maya)
+        // Open both streams before any task runs: a subscription made inside the task can lose the
+        // race with tapFree/remove below, which left the count at 0 or the stream never finishing.
+        let stream = s.changes(for: p.id)
         let collected = Task { () -> Int in
             var n = 0
-            for await _ in s.changes(for: p.id) { n += 1 }
+            for await _ in stream { n += 1 }
             return n
         }
-        await Task.yield()
         _ = try await s.tapFree(proposalID: p.id, range: DateRange(lower: mon(6), upper: mon(12)), expiresAt: nil)
         s.remove(proposalID: p.id)
         let events = await collected.value
         XCTAssertEqual(events, 1)
         do { _ = try await s.load(p.id); XCTFail("loaded a removed plan") } catch { XCTAssertEqual(error as? ProposalStoreError, .notFound(p.id)) }
 
-        let cancelled = Task { for await _ in s.changes(for: p.id) {} }
-        await Task.yield()
+        let reopened = s.changes(for: p.id)
+        let cancelled = Task { for await _ in reopened {} }
         cancelled.cancel()
         await cancelled.value
     }
