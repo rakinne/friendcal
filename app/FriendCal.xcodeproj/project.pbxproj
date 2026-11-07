@@ -229,6 +229,7 @@
 		FD67EF405AB65AC359B9DA43 /* ProposalDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalDraft.swift; sourceTree = "<group>"; };
 		FF5E6475C89176421BA513A0 /* BrandWordmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandWordmark.swift; sourceTree = "<group>"; };
 		FF9D9F95106F6E5CC77E9A9A /* ProposalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalStore.swift; sourceTree = "<group>"; };
+		"TEMP_FD45F98F-CFE5-4151-979C-E0F552E1D8B2" /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -506,6 +507,14 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		"TEMP_C76FAB87-9C6A-4641-81FC-DC202C76B29D" /* app */ = {
+			isa = PBXGroup;
+			children = (
+				"TEMP_FD45F98F-CFE5-4151-979C-E0F552E1D8B2" /* Signing.xcconfig */,
+			);
+			path = app;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -602,7 +611,6 @@
 						TestTargetID = 297B36CE7CE6EBA4D7F02DAE;
 					};
 					297B36CE7CE6EBA4D7F02DAE = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -805,12 +813,12 @@
 /* Begin XCBuildConfiguration section */
 		1FFF21FD2FD37DBE5381E287 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = "TEMP_FD45F98F-CFE5-4151-979C-E0F552E1D8B2" /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
 				EXECUTABLE_NAME = FriendCal;
 				INFOPLIST_FILE = FriendCal/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1089,12 +1097,12 @@
 		};
 		F2932F2BE216013EA24A35C8 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = "TEMP_FD45F98F-CFE5-4151-979C-E0F552E1D8B2" /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
 				EXECUTABLE_NAME = FriendCal;
 				INFOPLIST_FILE = FriendCal/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
