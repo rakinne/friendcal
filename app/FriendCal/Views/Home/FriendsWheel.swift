@@ -216,7 +216,7 @@ extension Color {
 }
 
 #Preview("Wheel, 15 members") {
-    let model = HomeModel(fixture: FixtureData.make(.populated))
+    let model = ProposalSession(fixture: FixtureData.make(.populated))
     FriendsWheel(content: .members(faces: model.wheel.faces, overflow: model.wheel.overflow, onlineCount: model.onlineCount))
         .background(DesignTokens.Colors.background)
 }

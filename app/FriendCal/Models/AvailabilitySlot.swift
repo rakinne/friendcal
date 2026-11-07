@@ -25,8 +25,13 @@ public struct AvailabilitySlot: Identifiable, Codable, Equatable {
         self.expiresAt = expiresAt
     }
 
-    public var isExpired: Bool {
+    /// Against the wall clock. Prefer `isExpired(at:)` with an injected `now` (issue #5 C2).
+    public var isExpired: Bool { isExpired(at: Date()) }
+
+    /// nil `expiresAt` never expires; otherwise expired once `now` has passed it (expiresAt <= now
+    /// is gone, matching HeatmapBuilder.isEligible's `expiresAt > now`).
+    public func isExpired(at now: Date) -> Bool {
         guard let exp = expiresAt else { return false }
-        return Date() > exp
+        return now >= exp
     }
 }

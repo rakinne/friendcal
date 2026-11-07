@@ -1,8 +1,8 @@
 import SwiftUI
 import FriendCalCore
 
-/// One bottom toast for honest stubs (D20, D21): auto-dismisses after 2.5s and is announced
-/// to VoiceOver.
+/// One bottom toast for honest stubs (D20, D21) and for failures with nothing to retry in place
+/// (issue #5 design 2.3A): auto-dismisses after 2.5s (4s for errors) and is announced to VoiceOver.
 @Observable
 final class ToastCenter {
     private(set) var message: String?
@@ -15,12 +15,19 @@ final class ToastCenter {
         return override > 0 ? override : 2.5
     }
 
-    func show(_ text: String) {
+    /// Error toasts stay 4s (design 2.3A); the same test override applies.
+    static var errorSeconds: Double {
+        let override = UserDefaults.standard.double(forKey: "FriendCalToastSeconds")
+        return override > 0 ? override : 4
+    }
+
+    func show(_ text: String, duration: Double? = nil) {
         message = text
         AccessibilityNotification.Announcement(text).post()
         dismissal?.cancel()
+        let seconds = duration ?? Self.displaySeconds
         dismissal = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(Self.displaySeconds))
+            try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
             self?.message = nil
         }

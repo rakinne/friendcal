@@ -12,6 +12,14 @@ final class FontTests: XCTestCase {
         }
     }
 
+    /// protects=the invite headline style (issue #5 R9, design 6.2A): Cabinet Grotesk ExtraBold at
+    /// 34pt with -0.02em tracking, registered in the app; fails_when=the hero token drifts or its font
+    /// is not bundled; no_claim=the xxxLarge cap (a view modifier on the card; UI screenshots show it).
+    func testHeroStyleIsRegisteredCabinetExtraboldAt34() {
+        XCTAssertNotNil(UIFont(name: FontName.cabinetExtrabold.rawValue, size: 34))
+        XCTAssertEqual(DesignTokens.TextStyle.hero.tracking, -0.68, accuracy: 0.001)
+    }
+
     func testUIAppFontsListsSevenBundledFiles() throws {
         let files = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "UIAppFonts") as? [String])
         XCTAssertEqual(files.count, FontName.allCases.count)

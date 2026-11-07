@@ -85,6 +85,86 @@ final class ProposalTests: XCTestCase {
         }
     }
 
+    // MARK: validateLock (issue #5 C5, D14, D18)
+
+    private static var nyc: Calendar { HeatmapTests.calendar }
+    private static func sat(_ h: Int, _ m: Int = 0, _ s: Double = 0) -> Date { HeatmapTests.date(2026, 11, 14, h, m).addingTimeInterval(s) }
+    private static func cell(common: DateRange, interval: DateRange? = nil, commonCount: Int = 5, total: Int = 5) -> HeatmapCell {
+        HeatmapCell(day: nyc.startOfDay(for: common.lowerBound), daypart: .afternoon, interval: interval ?? DateRange(lower: sat(12), upper: sat(17)),
+                    freeCount: commonCount, commonCount: commonCount, commonWindow: common, total: total)
+    }
+
+    /// protects=the window starts at the common window's start (#4 D12) and runs the chosen duration,
+    /// 2 h by default, clipped to the common span (D14), with nil meaning the whole span (D22 "All");
+    /// fails_when=the end overshoots the span, the default drifts, or All clips; no_claim=the sheet's
+    /// disabled segments (UI lane).
+    func testValidateLockDurationDefaultClipAndAll() throws {
+        let svc = ProposalService()
+        let span = DateRange(lower: Self.sat(12), upper: Self.sat(17))
+        XCTAssertEqual(ProposalService.defaultDuration, 2 * 3600)
+        XCTAssertEqual(ProposalService.durations, [3600, 5400, 7200, 10800])
+        XCTAssertEqual(try svc.validateLock(cell: Self.cell(common: span), duration: ProposalService.defaultDuration), DateRange(lower: Self.sat(12), upper: Self.sat(14)))
+        XCTAssertEqual(try svc.validateLock(cell: Self.cell(common: span), duration: 3 * 3600), DateRange(lower: Self.sat(12), upper: Self.sat(15)))
+        let short = DateRange(lower: Self.sat(12), upper: Self.sat(13, 30))
+        XCTAssertEqual(try svc.validateLock(cell: Self.cell(common: short), duration: 2 * 3600), short, "clipped at the span's end")
+        XCTAssertEqual(try svc.validateLock(cell: Self.cell(common: span), duration: nil), span, "All = the whole span")
+    }
+
+    /// protects=a clipped window under 60 minutes is refused and a refusal mutates nothing;
+    /// fails_when=windowTooShort is missing or the floor is not 60 min; no_claim=none beyond protects.
+    func testValidateLockRefusesUnderSixtyMinutes() {
+        let tiny = DateRange(lower: Self.sat(12), upper: Self.sat(12, 45))
+        XCTAssertThrowsError(try ProposalService().validateLock(cell: Self.cell(common: tiny), duration: 3600)) { err in
+            XCTAssertEqual(err as? ProposalLockError, .windowTooShort)
+            XCTAssertNotNil((err as? LocalizedError)?.errorDescription)
+        }
+        XCTAssertNoThrow(try ProposalService().validateLock(cell: Self.cell(common: DateRange(lower: Self.sat(12), upper: Self.sat(13))), duration: 3600))
+    }
+
+    /// protects=the window's start rounds down and its end up to whole minutes (D18) so the Supabase
+    /// client's millisecond truncation can never land a bound below a hold's, and a hold whose start
+    /// carries microseconds still promotes (window start equals the hold's minute); fails_when=
+    /// snapping is dropped, the end is computed from the raw start, or promotion compares raw
+    /// sub-second bounds; no_claim=lock_proposal's own range check (sql lane).
+    func testValidateLockSnapsToWholeMinutesAndMicrosecondHoldPromotes() throws {
+        let fuzzy = DateRange(lower: Self.sat(12, 0, 0.000123), upper: Self.sat(17, 0, 0.000123))
+        let window = try ProposalService().validateLock(cell: Self.cell(common: fuzzy), duration: 2 * 3600)
+        XCTAssertEqual(window, DateRange(lower: Self.sat(12), upper: Self.sat(14)))
+        XCTAssertEqual(try ProposalService().validateLock(cell: Self.cell(common: fuzzy), duration: nil), DateRange(lower: Self.sat(12), upper: Self.sat(17, 1)), "the end rounds up")
+
+        let pid = UUID(), friend = UUID()
+        let hold = AvailabilitySlot(userID: friend, range: fuzzy, sourceProposalID: pid, state: .softHold, expiresAt: Self.sat(23))
+        let (promoted, _) = AvailabilityService().promoteToBusy(window: window, proposalID: pid, recipientIDs: [friend], slots: [hold], now: Self.sat(8))
+        XCTAssertEqual(promoted.map(\.userID), [friend])
+        XCTAssertEqual(promoted.first?.range, window)
+    }
+
+    /// protects=the lock stays server-first (C5, TODOS "Make lock server-first"): a store refusal
+    /// leaves the proposal requesting and no local field set; fails_when=the session or service
+    /// applies the lock before the store answers; no_claim=RPC behavior (the in-memory store refuses).
+    @MainActor
+    func testStoreRefusalLeavesStatusRequesting() async throws {
+        let creator = UUID(), friend = UUID()
+        var p = Self.proposal()
+        p.createdBy = creator
+        p.distribution.recipientIDs = [creator, friend]
+        p.expectedCount = 2
+        let store = InMemoryProposalStore(proposals: [p], currentUserID: creator)
+        let window = DateRange(lower: p.window.lowerBound.addingTimeInterval(3600), upper: p.window.lowerBound.addingTimeInterval(3 * 3600))
+        do {
+            _ = try await store.lock(p.id, window: window)
+            XCTFail("locked with nobody free")
+        } catch {
+            guard case let ProposalStoreError.server(code, _, hint) = error else { return XCTFail("\(error)") }
+            XCTAssertEqual(code, "22023")
+            XCTAssertEqual(hint, "FC_QUORUM")
+        }
+        let after = try await store.load(p.id).proposal
+        XCTAssertEqual(after.status, .requesting)
+        XCTAssertNil(after.lockedDate)
+        XCTAssertTrue(after.lockedAttendeeIDs.isEmpty)
+    }
+
     private static func proposal() -> Proposal {
         Proposal(id: UUID(), title: "Brunch", window: DateRange(Date.now...Date.now.addingTimeInterval(86400*30)), createdBy: UUID(), distribution: Distribution(mode: .newGroup, recipientIDs: [UUID()]))
     }
@@ -94,7 +174,9 @@ final class ProposalTests: XCTestCase {
     }
 
     private static func cell(commonCount: Int, total: Int) -> HeatmapCell {
-        let start = Date()
+        // Whole-minute start: validateLock snaps the window to minutes (issue #5 D18), so a
+        // seconds-precision Date() would no longer equal the window it hands back.
+        let start = Date(timeIntervalSinceReferenceDate: (Date().timeIntervalSinceReferenceDate / 60).rounded(.down) * 60)
         let interval = DateRange(lower: start, upper: start.addingTimeInterval(5 * 3600))
         return HeatmapCell(day: start, daypart: .afternoon, interval: interval, freeCount: commonCount, commonCount: commonCount, commonWindow: commonCount > 0 ? interval : nil, total: total)
     }

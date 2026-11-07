@@ -57,4 +57,23 @@ final class ContrastTests: XCTestCase {
         }
         XCTAssertGreaterThanOrEqual(Self.ratio(C.onPrimary, C.primary), 3.0, "Poke label (17pt semibold)")
     }
+
+    /// `top` at `alpha` composited over `base` in sRGB space, as a SwiftUI opacity overlay draws it.
+    private static func blend(_ top: Color, over base: Color, alpha: Double) -> Color {
+        let t = top.resolve(in: EnvironmentValues()), b = base.resolve(in: EnvironmentValues())
+        func mix(_ a: Float, _ c: Float) -> Double { Double(a) * alpha + Double(c) * (1 - alpha) }
+        return Color(.sRGB, red: mix(t.red, b.red), green: mix(t.green, b.green), blue: mix(t.blue, b.blue), opacity: 1)
+    }
+
+    /// protects=the invite card's text region (design 4.1A as corrected by delta O4): `onPrimary` over
+    /// the flat 60% `text` scrim blended onto pure white, the palest art imaginable, meets 4.5:1; the
+    /// white check glyph on the `success` badge meets the 3:1 non-text bar; fails_when=the scrim
+    /// opacity drops, `text` lightens, or `success` lightens; no_claim=real artwork luminance beyond
+    /// the white worst case, and the hero's 34pt size (large text would allow 3:1; 4.5:1 is held anyway).
+    func testInviteCardScrimAndBadgeMeetAA() {
+        let scrim = Self.blend(C.text, over: .white, alpha: 0.6)
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.onPrimary, scrim), 4.5, "hero / caption on the scrim over white art")
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.onPrimary, C.success), 3.0, "check glyph on the success badge")
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.text, C.surface2), 4.5, "DEMO badge and past-cell text on surface2")
+    }
 }
