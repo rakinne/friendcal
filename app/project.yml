@@ -10,6 +10,12 @@ configs:
   Debug: debug
   Release: release
 
+# DEVELOPMENT_TEAM comes from Local.xcconfig (gitignored, optional include), so a team
+# picked per machine survives `xcodegen generate`. See Signing.xcconfig.
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -81,11 +87,6 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         LSRequiresIPhoneOS: true
-    # DEVELOPMENT_TEAM comes from Local.xcconfig (gitignored, optional include), so a team
-    # picked per machine survives `xcodegen generate`. See Signing.xcconfig.
-    configFiles:
-      Debug: Signing.xcconfig
-      Release: Signing.xcconfig
     settings:
       base:
         INFOPLIST_FILE: FriendCal/Info.plist
@@ -102,6 +103,9 @@ targets:
     sources:
       # Models/, Services/, Privacy/ and Shared/ compile only into FriendCalCore (D14).
       - FriendCal/FriendCalApp.swift
+      # Referenced by configFiles; listed here so the project file ref gets a stable id.
+      - path: Config/Signing.xcconfig
+        buildPhase: none
       - FriendCal/Views
       - path: FriendCal/Fixtures
         optional: true
