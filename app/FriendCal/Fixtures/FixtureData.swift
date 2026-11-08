@@ -24,6 +24,20 @@ enum FixtureScenario: String, CaseIterable {
     case signedOut             // populated roster but no signed-in identity (gate test)
     case expiringHold          // one hold expired, one expiring in 2h (G18)
     case invites               // several plans for the Invites list order
+    // Place voting (#10, #12). All use the ten-person crew and a pinned city of Austin, TX.
+    case placesEmpty           // friend; requesting, city set, no places
+    case placesVoting          // friend; four places from three suggesters, nine votes, the viewer voted for one
+    case placesTied            // friend; two places tied 2 to 2, different creation times
+    case placesVetoed          // host; three active places and one the host passed on
+    case placesLockReady       // host; at quorum, city set, four places, exactly one leads
+    case placesLocked          // friend; locked, lockedPlaceID set, places and votes frozen
+    case placesLockedNoWinner  // friend; locked, places exist, none had a vote, lockedPlaceID nil
+    case noCity                // friend; requesting, no city
+    case noCityHost            // host; requesting, no city
+    case placesZeroVotes       // friend; three places, none with a vote
+    case placesOwnLeader       // friend; the viewer's own suggestion has the most votes
+    case placesDeparted        // friend; locked; one suggester and one voter have deleted their accounts
+    case placesCapped          // friend; the viewer has 2 active places, so Suggest is replaced by the cap line
 
     /// `-FriendCalFixture <name>` on the launch arguments (UI tests); populated otherwise.
     static var fromLaunchArguments: FixtureScenario {
@@ -59,6 +73,9 @@ struct HomeFixture {
     /// Other plans the store lists on the Invites tab.
     var extraProposals: [Proposal] = []
     var busyBlocks: [BusyBlock] = []
+    /// Place voting (#10): the places and votes of `proposal`.
+    var places: [Place] = []
+    var votes: [PlaceVote] = []
 }
 
 enum FixtureData {
@@ -150,6 +167,9 @@ enum FixtureData {
             var f = invite(group: group, you: member("Sam"), now: now, calendar: calendar)
             f.extraProposals = invitesList(calendar: calendar)
             return f
+        case .placesEmpty, .placesVoting, .placesTied, .placesVetoed, .placesLockReady, .placesLocked, .placesLockedNoWinner,
+             .noCity, .noCityHost, .placesZeroVotes, .placesOwnLeader, .placesDeparted, .placesCapped:
+            return placesScenario(scenario, group: group, now: now, calendar: calendar)
         }
     }
 
@@ -167,7 +187,8 @@ enum FixtureData {
         let users = fixture.members.map { User(id: $0.id, displayName: $0.name) }
         let proposals = [fixture.proposal].compactMap { $0 } + fixture.extraProposals
         let current = fixture.currentUserID ?? fixture.proposal?.createdBy ?? fixture.members.first?.id
-        return InMemoryProposalStore(users: users, proposals: proposals, slots: fixture.slots, busyBlocks: fixture.busyBlocks, currentUserID: current, now: clock)
+        return InMemoryProposalStore(users: users, proposals: proposals, slots: fixture.slots, busyBlocks: fixture.busyBlocks,
+                                     places: fixture.places, votes: fixture.votes, currentUserID: current, now: clock)
     }
 
     private static func expiringHold(group: String, now: Date, calendar: Calendar) -> HomeFixture {
@@ -177,6 +198,126 @@ enum FixtureData {
         let expiring = AvailabilitySlot(id: fixtureID(8101), userID: members[0].id, range: DateRange(lower: now.addingTimeInterval(7200), upper: now.addingTimeInterval(10800)), sourceProposalID: proposal.id, state: .softHold, createdAt: now, expiresAt: now.addingTimeInterval(7200))
         f.slots = [expired, expiring] + f.slots
         f.currentUserID = members[0].id
+        return f
+    }
+
+    // MARK: Places
+
+    static let austin = SearchArea(name: "Austin, TX", latitude: 30.2672, longitude: -97.7431)
+
+    /// Collects places and votes with stable ids and times, so two builds of one scenario compare equal.
+    private struct PlaceBuilder {
+        let proposalID: UUID
+        let base: Date
+        var places: [Place] = []
+        var votes: [PlaceVote] = []
+
+        @discardableResult
+        mutating func add(_ name: String, by: HomeMember, address: String? = nil, lat: Double = 30.2672, lon: Double = -97.7431, vetoed: Bool = false) -> Place {
+            let n = places.count + 1
+            let at = base.addingTimeInterval(Double(n) * 60)
+            let place = Place(id: FixtureData.fixtureID(7000 + n), proposalID: proposalID, suggestedBy: by.id, name: name, address: address,
+                              latitude: lat, longitude: lon, mapRef: "fixture:\(name)", vetoedAt: vetoed ? at.addingTimeInterval(3600) : nil, createdAt: at)
+            places.append(place)
+            return place
+        }
+
+        mutating func vote(_ voter: HomeMember, for place: Place) {
+            votes.append(PlaceVote(proposalID: proposalID, voterID: voter.id, placeID: place.id,
+                                   createdAt: base.addingTimeInterval(Double(places.count) * 60 + Double(votes.count + 1))))
+        }
+    }
+
+    private static func placesScenario(_ scenario: FixtureScenario, group: String, now: Date, calendar: Calendar) -> HomeFixture {
+        let sam = member("Sam"), maya = member("Maya"), leo = member("Leo"), nina = member("Nina"), arlo = member("Arlo")
+        let mika = member("Mika"), rosa = member("Rosa"), dev = member("Dev"), theo = member("Theo"), cleo = member("Cleo")
+        var f: HomeFixture
+        switch scenario {
+        case .placesLocked, .placesLockedNoWinner, .placesDeparted:
+            f = locked(group: group, you: maya, now: now, calendar: calendar)
+        case .placesLockReady, .placesVetoed, .noCityHost:
+            f = invite(group: group, you: sam, now: now, calendar: calendar)
+        default:
+            f = invite(group: group, you: cleo, now: now, calendar: calendar)
+        }
+        guard var plan = f.proposal else { return f }
+        if scenario != .noCity && scenario != .noCityHost { plan.area = austin }
+        var b = PlaceBuilder(proposalID: plan.id, base: plan.createdAt)
+
+        switch scenario {
+        case .placesVoting:
+            let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            let juniper = b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
+            let bluebonnet = b.add("Bluebonnet Diner", by: cleo, address: "1209 Barton Springs Rd", lat: 30.2640, lon: -97.7600)
+            let taqueria = b.add("Eastside Taqueria", by: maya, address: "1501 E 7th St", lat: 30.2650, lon: -97.7270)
+            for v in [sam, nina, arlo, rosa] { b.vote(v, for: lola) }
+            for v in [maya, dev] { b.vote(v, for: juniper) }
+            for v in [mika, theo] { b.vote(v, for: bluebonnet) }
+            b.vote(cleo, for: taqueria)           // nine votes; the viewer's is for Eastside Taqueria
+        case .placesTied:
+            let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            let juniper = b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
+            for v in [sam, nina] { b.vote(v, for: lola) }
+            for v in [arlo, rosa] { b.vote(v, for: juniper) }
+        case .placesVetoed:
+            let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            let juniper = b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
+            let bluebonnet = b.add("Bluebonnet Diner", by: nina, address: "1209 Barton Springs Rd", lat: 30.2640, lon: -97.7600)
+            b.add("Hole in the Wall", by: dev, address: "2538 Guadalupe St", lat: 30.2960, lon: -97.7430, vetoed: true)
+            for v in [arlo, rosa, mika] { b.vote(v, for: lola) }
+            for v in [maya, theo] { b.vote(v, for: juniper) }
+            b.vote(leo, for: bluebonnet)
+        case .placesLockReady:
+            let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            let juniper = b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
+            let bluebonnet = b.add("Bluebonnet Diner", by: nina, address: "1209 Barton Springs Rd", lat: 30.2640, lon: -97.7600)
+            b.add("Eastside Taqueria", by: dev, address: "1501 E 7th St", lat: 30.2650, lon: -97.7270)
+            for v in [arlo, rosa, mika] { b.vote(v, for: lola) }      // exactly one place leads
+            for v in [maya, theo] { b.vote(v, for: juniper) }
+            b.vote(leo, for: bluebonnet)
+        case .placesLocked:
+            let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            let juniper = b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
+            for v in [sam, nina, arlo, rosa] { b.vote(v, for: lola) }
+            for v in [dev, mika] { b.vote(v, for: juniper) }
+            plan.lockedPlaceID = lola.id
+        case .placesLockedNoWinner:
+            b.add("Cafe Lola", by: leo, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            b.add("Juniper Table", by: nina, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
+        case .placesZeroVotes:
+            b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
+            b.add("Bluebonnet Diner", by: nina, address: "1209 Barton Springs Rd", lat: 30.2640, lon: -97.7600)
+        case .placesOwnLeader:
+            let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            let bluebonnet = b.add("Bluebonnet Diner", by: cleo, address: "1209 Barton Springs Rd", lat: 30.2640, lon: -97.7600)
+            for v in [sam, nina, arlo] { b.vote(v, for: bluebonnet) }  // the viewer's own place leads: YOURS, no Vote pill
+            b.vote(leo, for: lola)
+        case .placesDeparted:
+            // Locked; Leo suggested Juniper Table and Arlo voted for it, and both have deleted their accounts:
+            // the tombstone's name is what the store hands back, and the session shows "A friend".
+            let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            let juniper = b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
+            for v in [sam, nina] { b.vote(v, for: lola) }
+            for v in [arlo, theo] { b.vote(v, for: juniper) }
+            plan.lockedPlaceID = lola.id
+            f.members = f.members.map { m in
+                guard m.id == leo.id || m.id == arlo.id else { return m }
+                return HomeMember(id: m.id, name: User.deletedDisplayName, isOnline: m.isOnline, isActive: m.isActive)
+            }
+        case .placesCapped:
+            b.add("Bluebonnet Diner", by: cleo, address: "1209 Barton Springs Rd", lat: 30.2640, lon: -97.7600)
+            b.add("Eastside Taqueria", by: cleo, address: "1501 E 7th St", lat: 30.2650, lon: -97.7270)
+            let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            for v in [sam, nina] { b.vote(v, for: lola) }
+        case .placesEmpty, .noCity, .noCityHost:
+            break
+        default:
+            break
+        }
+        f.proposal = plan
+        f.places = b.places
+        f.votes = b.votes
         return f
     }
 

@@ -31,7 +31,13 @@ public struct Proposal: Identifiable, Codable, Equatable {
     public var createdAt: Date
     public var lockedDate: Date? // final chosen date (e.g. Nov 21st): the locked common window's start
     public var lockedEnd: Date? // the locked common window's end (D12); persisted as proposals.locked_end
-    public var venueHint: String? // location optional, e.g. host's place
+    /// The host's city, the anchor for place search (#10 R1): replaced while requesting, never cleared.
+    /// Persisted as proposals.area_name/area_lat/area_lon. nil on a plan that predates places.
+    public var area: SearchArea?
+    /// The place frozen at lock (R7), chosen by the server in the lock transaction; nil until locked
+    /// and nil when no place had a vote. Persisted as proposals.locked_place_id. After lock this, never
+    /// a recount from votes, is the winner.
+    public var lockedPlaceID: UUID?
     /// How many people the creator expects, counting themselves (D13, design 3.3A). The quorum base
     /// is max(expectedCount, joinedCount) on both client and server; persisted as proposals.expected_count.
     public var expectedCount: Int
@@ -51,7 +57,7 @@ public struct Proposal: Identifiable, Codable, Equatable {
     /// mirror the server's predicate for the screens to behave the way they will in production.
     public var hiddenFrom: [UUID]
 
-    public init(id: UUID, title: String, window: DateRange, createdBy: UUID, distribution: Distribution, status: ProposalStatus = .requesting, createdAt: Date = Date(), lockedDate: Date? = nil, lockedEnd: Date? = nil, venueHint: String? = nil, expectedCount: Int = 1, lockedAttendeeIDs: [UUID] = [], postLockRecipientIDs: [UUID] = [], lockedAt: Date? = nil, hiddenFrom: [UUID] = []) {
+    public init(id: UUID, title: String, window: DateRange, createdBy: UUID, distribution: Distribution, status: ProposalStatus = .requesting, createdAt: Date = Date(), lockedDate: Date? = nil, lockedEnd: Date? = nil, area: SearchArea? = nil, lockedPlaceID: UUID? = nil, expectedCount: Int = 1, lockedAttendeeIDs: [UUID] = [], postLockRecipientIDs: [UUID] = [], lockedAt: Date? = nil, hiddenFrom: [UUID] = []) {
         self.id = id
         self.title = title
         self.window = window
@@ -61,7 +67,8 @@ public struct Proposal: Identifiable, Codable, Equatable {
         self.createdAt = createdAt
         self.lockedDate = lockedDate
         self.lockedEnd = lockedEnd
-        self.venueHint = venueHint
+        self.area = area
+        self.lockedPlaceID = lockedPlaceID
         self.expectedCount = expectedCount
         self.lockedAttendeeIDs = lockedAttendeeIDs
         self.postLockRecipientIDs = postLockRecipientIDs

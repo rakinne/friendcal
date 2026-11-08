@@ -176,6 +176,7 @@ One state is **Proposed**: with exactly one place and no passed places, the "Vie
 | `FC_BAD_PLACE` | "Couldn't save that place. Try another." |
 | `FC_PLACE_NOT_FOUND` | "That place is gone." The row is removed on reload. |
 | `FC_NOT_YOUR_PLACE` | "Only the person who suggested a place can withdraw it." |
+| `FC_AREA_REQUIRED` | "Every plan keeps a city. Choose a different one instead." No screen offers to clear the city, so this is a client bug if seen. |
 | `FC_NOT_MEMBER` (place actions) | "Join this plan to suggest or vote." During an in-flight join, a read-only skeleton instead. |
 | `FC_NOT_CREATOR` on a veto | "Only Sam can pass on a place." |
 | `FC_LOCKED` on a place action | the screen reloads to the locked state with "This plan just locked. Voting is closed." |

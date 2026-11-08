@@ -352,5 +352,107 @@ final class ProposalSessionTests: XCTestCase {
         XCTAssertTrue(s.isDemo)
         XCTAssertNil(session(.noProposal).inviteText)
     }
+
+    // MARK: Places (#10): the session over the place store
+
+    /// protects=the session's places, votes, board, winner and lockProjection track the store, with the
+    /// board derived from the viewer; winner is the locked row only (nil when no winner even with votes),
+    /// lockProjection previews what locking now would freeze; fails_when=board ignores the viewer, winner
+    /// recomputes from votes after lock, or a stale projection is shown; no_claim=the places UI.
+    func testPlacesBoardWinnerAndLockProjectionTrackTheStore() async throws {
+        let s = session(.placesVoting)
+        XCTAssertNotNil(s.board)
+        XCTAssertEqual(s.board?.active.count, 4)
+        XCTAssertEqual(s.board?.myVotePlaceID, s.places.first(where: { $0.name == "Juniper Table" })?.id)
+        XCTAssertNil(s.winner, "requesting: no frozen winner")
+        guard case .winner(let place, let votes) = s.lockProjection else { return XCTFail("expected winner projection") }
+        XCTAssertEqual(place.name, "Cafe Lola")
+        XCTAssertEqual(votes, 4)
+
+        let locked = session(.placesLocked)
+        XCTAssertEqual(locked.winner?.name, "Cafe Lola")
+        XCTAssertEqual(locked.lockProjection, .none, "locked with nil winner still projects none while requesting semantics: use winner instead")
+
+        let noWinner = session(.placesLockedNoWinner)
+        XCTAssertNil(noWinner.winner)
+        let zeroVotes = session(.placesZeroVotes)
+        XCTAssertEqual(zeroVotes.lockProjection, .none)
+        let tied = session(.placesTied)
+        guard case .tied(let w, let others, let v) = tied.lockProjection else { return XCTFail("expected tied projection") }
+        XCTAssertEqual(v, 2)
+        XCTAssertEqual(others.count, 1)
+        XCTAssertNotNil(w)
+    }
+
+    /// protects=suggestAvailability reports the first applicable reason (notMember > locked > noCity > personalCap > planFull > available) and the session's suggest/vote/veto/withdraw are server-first through the store; fails_when=the precedence is wrong, or the session invents state instead of applying the store snapshot; no_claim=Realtime delivery.
+    func testSuggestAvailabilityAndPlaceMutationsAreServerFirst() async throws {
+        let s = session(.placesEmpty)
+        XCTAssertEqual(s.suggestAvailability, .available)
+        XCTAssertTrue(s.canSuggest)
+        XCTAssertTrue(s.hasArea)
+
+        let noCity = session(.noCity)
+        XCTAssertEqual(noCity.suggestAvailability, .noCity)
+        XCTAssertFalse(noCity.hasArea)
+        XCTAssertFalse(noCity.canSuggest)
+
+        let capped = session(.placesCapped)
+        XCTAssertEqual(capped.suggestAvailability, .personalCap)
+
+        // A mutation that the store refuses leaves the session unchanged and throws the mapped sentence.
+        let store = try XCTUnwrap(s.store as? InMemoryProposalStore)
+        store.failNext[.suggestPlace] = ProposalStoreError.server(code: "54000", message: "limit", hint: "FC_PLACE_LIMIT")
+        do {
+            _ = try await s.suggest(NewPlace(name: "X", latitude: 30.27, longitude: -97.74))
+            XCTFail("suggest should fail")
+        } catch let e as UserFacingError {
+            XCTAssertEqual(e.message, "You've suggested 2 places. Withdraw one to add another.")
+        }
+        XCTAssertEqual(s.places.count, 0)
+
+        // A successful suggest applies the store snapshot immediately (no need to wait for the stream).
+        let saved = try await s.suggest(NewPlace(name: "Cafe Lola", latitude: 30.27, longitude: -97.74))
+        XCTAssertEqual(s.places, [saved])
+        XCTAssertEqual(s.board?.active.count, 1)
+
+        // Vote, veto, withdraw round-trip through the same path.
+        let host = session(.placesVetoed)
+        let hostStore = try XCTUnwrap(host.store as? InMemoryProposalStore)
+        // host vetoes one place
+        let target = try XCTUnwrap(host.places.first)
+        try await host.setVeto(target.id, vetoed: true)
+        XCTAssertTrue(host.places.first(where: { $0.id == target.id })?.isVetoed == true)
+        try await host.setVeto(target.id, vetoed: false)
+        XCTAssertFalse(host.places.first(where: { $0.id == target.id })?.isVetoed == true)
+        // vote
+        let placeID = try XCTUnwrap(host.places.first?.id)
+        try await host.vote(placeID)
+        XCTAssertEqual(host.board?.myVotePlaceID, placeID)
+        try await host.vote(nil)
+        XCTAssertNil(host.board?.myVotePlaceID)
+        // withdraw own place
+        let mine = try XCTUnwrap(host.places.first(where: { $0.suggestedBy == host.currentUserID }))
+        try await host.withdraw(mine.id)
+        XCTAssertNil(host.places.first(where: { $0.id == mine.id }))
+        _ = hostStore // keep alive
+    }
+
+    /// protects=edit carries the city (area) with the rest of the draft, so a title-only edit does not drop it; fails_when=the session copies only title/window/headcount and the store blanks the city; no_claim=the city picker UI.
+    func testEditCarriesTheCity() async throws {
+        let s = session(.placesEmpty)
+        let before = try XCTUnwrap(s.proposal?.area)
+        var draft = ProposalDraft(editing: try XCTUnwrap(s.proposal))
+        draft.title = "Brunch 2"
+        try await s.edit(draft)
+        XCTAssertEqual(s.proposal?.area, before)
+        XCTAssertEqual(s.proposal?.title, "Brunch 2")
+
+        let newCity = SearchArea(name: "Dallas, TX", latitude: 32.7767, longitude: -96.7970)
+        draft = ProposalDraft(editing: try XCTUnwrap(s.proposal))
+        draft.area = newCity
+        try await s.edit(draft)
+        XCTAssertEqual(s.proposal?.area, newCity)
+    }
+
 }
 #endif

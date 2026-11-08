@@ -5,11 +5,14 @@ public struct NewProposal: Equatable {
     public let title: String
     public let window: DateRange
     public let expectedCount: Int
+    /// The host's city (#10 R1); nil on a draft that did not ask for one.
+    public let area: SearchArea?
 
-    public init(title: String, window: DateRange, expectedCount: Int) {
+    public init(title: String, window: DateRange, expectedCount: Int, area: SearchArea? = nil) {
         self.title = title
         self.window = window
         self.expectedCount = expectedCount
+        self.area = area
     }
 }
 
@@ -28,6 +31,8 @@ public struct ProposalDraft: Equatable {
         case endBeforeStart
         case tooLong(days: Int)
         case tooFewPeople
+        /// A new plan needs a city (only when `requiresArea`).
+        case noArea
     }
 
     public var title: String
@@ -35,12 +40,22 @@ public struct ProposalDraft: Equatable {
     public var to: Date
     /// Inclusive of the creator (design 3.3A: "How many people, counting you?").
     public var expectedCount: Int
+    /// The host's city. Create requires one once #14 adds the field; edit never does.
+    public var area: SearchArea?
+    /// Whether `area == nil` is an error. False by default in this issue: the shipped New plan form has
+    /// no city field until #14, so a true default would disable Create for everyone. #14 sets it true
+    /// when it adds the field. `init(editing:)` always leaves it false, so a plan that predates places
+    /// (no city) can still save a new title.
+    public var requiresArea: Bool
 
-    public init(title: String = "", from: Date, to: Date, expectedCount: Int = ProposalDraft.defaultExpected) {
+    public init(title: String = "", from: Date, to: Date, expectedCount: Int = ProposalDraft.defaultExpected,
+                area: SearchArea? = nil, requiresArea: Bool = false) {
         self.title = title
         self.from = from
         self.to = to
         self.expectedCount = expectedCount
+        self.area = area
+        self.requiresArea = requiresArea
     }
 
     /// Next Monday for two weeks (D4), 8 people.
@@ -63,6 +78,10 @@ public struct ProposalDraft: Equatable {
         from = proposal.window.lowerBound
         to = proposal.window.upperBound
         expectedCount = max(proposal.expectedCount, proposal.joinedCount)
+        // Seeded from the plan so the edit sheet starts on its current city and a title-only edit
+        // saves it back unchanged. Without this the city would silently drop on every edit.
+        area = proposal.area
+        requiresArea = false
     }
 
     /// "Brunch" when blank; trailing "?" and whitespace stripped.
@@ -92,7 +111,8 @@ public struct ProposalDraft: Equatable {
         if days < 1 { throw ValidationError.endBeforeStart }
         if days > Self.maxDays { throw ValidationError.tooLong(days: days) }
         if expectedCount < Self.minimumExpected { throw ValidationError.tooFewPeople }
-        return NewProposal(title: cleanTitle, window: window(calendar: calendar), expectedCount: expectedCount)
+        if requiresArea, area == nil { throw ValidationError.noArea }
+        return NewProposal(title: cleanTitle, window: window(calendar: calendar), expectedCount: expectedCount, area: area)
     }
 
     /// Per-field errors for inline presentation (design 5.4A); empty when valid.
@@ -101,6 +121,7 @@ public struct ProposalDraft: Equatable {
         let days = dayCount(calendar: calendar)
         if days < 1 { out.append(.endBeforeStart) } else if days > Self.maxDays { out.append(.tooLong(days: days)) }
         if expectedCount < Self.minimumExpected { out.append(.tooFewPeople) }
+        if requiresArea, area == nil { out.append(.noArea) }
         return out
     }
 }
