@@ -91,7 +91,9 @@ public struct PlaceBoard: Equatable {
         let ref = PlaceText.trimmedOrNil(place.mapRef)
         func matches(_ other: Place) -> Bool {
             if let ref, other.mapRef == ref { return true }
-            return other.name.lowercased() == name
+            // Scalar for scalar, like Postgres `lower(a) = lower(b)`: Swift's `==` on String would also
+            // treat canonically equivalent spellings ("Café" vs "Cafe\u{301}") as the same place.
+            return other.name.lowercased().unicodeScalars.elementsEqual(name.unicodeScalars)
                 && abs(other.latitude - place.latitude) < duplicateDegrees
                 && abs(other.longitude - place.longitude) < duplicateDegrees
         }

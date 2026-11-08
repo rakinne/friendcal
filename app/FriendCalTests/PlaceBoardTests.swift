@@ -167,6 +167,18 @@ final class PlaceBoardTests: XCTestCase {
         XCTAssertNil(PlaceBoard.existing(matching: NewPlace(name: "Other", latitude: 30, longitude: -97), in: [first]))
     }
 
+    /// protects=duplicate names compare scalar for scalar, as Postgres `lower(a) = lower(b)` does, so two
+    /// canonically equivalent spellings are different places while the same scalars after lowercasing
+    /// still match; fails_when=Swift String equality merges "Café" and "Cafe\u{301}" and the in-memory
+    /// store refuses a suggestion the server accepts; no_claim=case folding beyond lowercased().
+    func testDuplicateNamesCompareByScalarsLikePostgres() {
+        let precomposed = place("Caf\u{00E9}", lat: 30.0, lon: -97.0)
+        XCTAssertNil(PlaceBoard.existing(matching: NewPlace(name: "Cafe\u{0301}", latitude: 30.0, longitude: -97.0), in: [precomposed]),
+                     "canonically equivalent spellings are different code points, so different places")
+        XCTAssertEqual(PlaceBoard.existing(matching: NewPlace(name: "CAF\u{00C9}", latitude: 30.0, longitude: -97.0), in: [precomposed])?.id,
+                       precomposed.id, "the same scalars after lowercasing still match")
+    }
+
     /// protects=the same map reference is the same place whatever the name; fails_when=the reference
     /// is ignored or a nil reference matches another nil; no_claim=none beyond protects.
     func testExistingMatchesByMapRef() {

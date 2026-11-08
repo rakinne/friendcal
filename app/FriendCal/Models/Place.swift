@@ -49,9 +49,11 @@ public struct SearchArea: Codable, Equatable, Sendable {
 
 /// Text rules shared by the city and the place fields, matching the SQL's `btrim`.
 public enum PlaceText {
-    /// Postgres `btrim(x)` removes leading and trailing SPACES (U+0020) only.
+    /// Postgres `btrim(x)` removes leading and trailing SPACES (U+0020) only, one code point at a time.
+    /// It walks the Unicode scalars, not Characters: a space followed by a combining mark is ONE
+    /// Character in Swift, and trimming by Character would leave the space that `btrim` removes.
     public static func trim(_ text: String) -> String {
-        var scalars = Substring(text)
+        var scalars = Substring(text).unicodeScalars
         while scalars.first == " " { scalars = scalars.dropFirst() }
         while scalars.last == " " { scalars = scalars.dropLast() }
         return String(scalars)

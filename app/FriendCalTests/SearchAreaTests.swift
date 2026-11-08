@@ -49,6 +49,12 @@ final class SearchAreaTests: XCTestCase {
         XCTAssertEqual(combining.unicodeScalars.count, 122)
         XCTAssertFalse(valid(combining), "122 code points exceed 120 even though there are 61 characters")
         XCTAssertTrue(valid("\t"), "btrim removes spaces only, so a lone tab is one code point")
+        // A space followed by a combining mark is ONE Character in Swift, but btrim still removes the
+        // space: 121 code points before the trim, 120 after.
+        let spaced = " \u{0301}" + String(repeating: "a", count: 119)
+        XCTAssertEqual(spaced.unicodeScalars.count, 121)
+        XCTAssertTrue(valid(spaced), "the leading space goes even when a combining mark follows it")
+        XCTAssertEqual(PlaceText.trim(" \u{0301}x "), "\u{0301}x")
     }
 
     /// protects=out-of-range and non-finite coordinates are invalid; fails_when=latitude 91, longitude
