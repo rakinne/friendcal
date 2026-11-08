@@ -10,6 +10,7 @@ All notable changes to FriendCal are listed here, newest first. The version live
 - Server rules for place voting — new `places.sql` guard (`friendcal_places_plan`), four client-callable functions (suggest, vote, veto, withdraw), and winner selection wired into `lock_proposal()`.
 - Place board in the session — `PlaceBoard` model tracks suggestions, votes and vetoes per plan, with in-memory and Supabase-backed stores.
 - Proposal session now carries places — fixtures, drafts and the session layer include place state so previews and tests can exercise the full flow.
+- Kinetic Welcome login screen — refreshed `AuthGateView` (Variant E, board b-20261108-095026-gciflg): coral sun + teal foliage illustration, invited pill, hide-until-true trust footer and `DESIGN.md` token compliance.
 
 ### Changed
 - Place-related error messages now surface as user-facing copy via `UserFacingError` (new `FC_*` hints for suggestion, vote and veto failures).
