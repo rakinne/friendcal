@@ -16,6 +16,7 @@ struct LockedInviteView: View {
     @State private var showEdit = false
     @State private var lockAck = 0
     @State private var joinError: UserFacingError?
+    @State private var placesToast = ToastCenter()
     @State private var minuteTick = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -32,6 +33,7 @@ struct LockedInviteView: View {
             .padding(.vertical, 12)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .toast(placesToast)
         .background(DesignTokens.Colors.background.ignoresSafeArea())
         .navigationTitle(session.lockState?.navTitle ?? "Locked Invite")
         .navigationBarTitleDisplayMode(.inline)
@@ -122,8 +124,11 @@ struct LockedInviteView: View {
                 .textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("invite.progress")
+
+            PlacesSection(session: session) { msg in placesToast.show(msg) }
         }
     }
+
 
     private func cardLabel(_ p: Proposal, _ state: LockState, _ caption: String?) -> String {
         if case .locked(let window, _, _) = state {

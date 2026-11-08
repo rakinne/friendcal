@@ -28,6 +28,7 @@
 		28C9E584BE77456841D02A2F /* ProposalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3ECA81E4D7508EF76A61E9E /* ProposalTests.swift */; };
 		2EDC96EA0DEDBED5E24E53BC /* CommitmentStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ABABC4198284D89A60D131A /* CommitmentStoreTests.swift */; };
 		3697D67319EC5C3A9BEEF19B /* CreateProposalSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AFBF8D940A5E4A65C79B4A4 /* CreateProposalSheet.swift */; };
+		36BE9511B7C44AB1DF093C96 /* PlacesSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F1C8060C62CCE46D7F2E50F /* PlacesSection.swift */; };
 		36C70A05A7EB233244194810 /* JetBrainsMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FC76E4E75EEF60D17005ABB4 /* JetBrainsMono-Medium.ttf */; };
 		395158854B17FD3E092893C7 /* CommitmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 371BB804604D46031757B35E /* CommitmentTests.swift */; };
 		3B3F595C307D45DC24113F9E /* OFL-JetBrainsMono.txt in Resources */ = {isa = PBXBuildFile; fileRef = 23CCCAE2347F48B7A13C06D3 /* OFL-JetBrainsMono.txt */; };
@@ -47,6 +48,7 @@
 		613088FF4F85533866A79325 /* OFL-SourceSans3.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5282CFED12EA1EA792E64264 /* OFL-SourceSans3.txt */; };
 		62BEA39CFCB4353507BE322D /* ContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9BA938BCB1180A13A0CFE95 /* ContrastTests.swift */; };
 		631FAD599C4612FC363ECC9A /* FriendCalCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0226C13541AFD16AB5A51C1 /* FriendCalCore.framework */; };
+		6561A866A68645D30C81E1D2 /* OutlinePill.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB8B45BD146F8E9AEAEA4D2 /* OutlinePill.swift */; };
 		666E7128531D0282300CC32B /* AvailabilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60658B91E1F1634C70D9DB96 /* AvailabilityService.swift */; };
 		68A8C70A1523CE870E513637 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEFB7D7881A26617F09C477 /* DesignTokens.swift */; };
 		6B687BDA72A1C0EA139CD0AC /* DateRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57799F8A2115B96A2AB2A5D /* DateRange.swift */; };
@@ -206,6 +208,7 @@
 		5D536B487DCE8B3597CECD58 /* LockSheetModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockSheetModelTests.swift; sourceTree = "<group>"; };
 		5ED93A675240B2ADDD5072AF /* MapKitPlaceSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapKitPlaceSearch.swift; sourceTree = "<group>"; };
 		5EE701D6BFF148DAC0B029FE /* DebugSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSheet.swift; sourceTree = "<group>"; };
+		5F1C8060C62CCE46D7F2E50F /* PlacesSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesSection.swift; sourceTree = "<group>"; };
 		6021ED8F5A528AA5763FA18B /* StealthRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StealthRow.swift; sourceTree = "<group>"; };
 		60658B91E1F1634C70D9DB96 /* AvailabilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilityService.swift; sourceTree = "<group>"; };
 		63381E240634399487C1F225 /* InvitesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvitesView.swift; sourceTree = "<group>"; };
@@ -260,6 +263,7 @@
 		F57799F8A2115B96A2AB2A5D /* DateRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateRange.swift; sourceTree = "<group>"; };
 		F6A61DF12FD513C64CFC1996 /* CabinetGrotesk-Extrabold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CabinetGrotesk-Extrabold.otf"; sourceTree = "<group>"; };
 		FB9E7BEA95560492591E0E6E /* FriendsWheel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsWheel.swift; sourceTree = "<group>"; };
+		FBB8B45BD146F8E9AEAEA4D2 /* OutlinePill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlinePill.swift; sourceTree = "<group>"; };
 		FC76E4E75EEF60D17005ABB4 /* JetBrainsMono-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Medium.ttf"; sourceTree = "<group>"; };
 		FD67EF405AB65AC359B9DA43 /* ProposalDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalDraft.swift; sourceTree = "<group>"; };
 		FF5E6475C89176421BA513A0 /* BrandWordmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandWordmark.swift; sourceTree = "<group>"; };
@@ -404,6 +408,7 @@
 			isa = PBXGroup;
 			children = (
 				5ED93A675240B2ADDD5072AF /* MapKitPlaceSearch.swift */,
+				5F1C8060C62CCE46D7F2E50F /* PlacesSection.swift */,
 			);
 			path = Places;
 			sourceTree = "<group>";
@@ -441,6 +446,7 @@
 			isa = PBXGroup;
 			children = (
 				CCEFB7D7881A26617F09C477 /* DesignTokens.swift */,
+				FBB8B45BD146F8E9AEAEA4D2 /* OutlinePill.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -796,6 +802,7 @@
 				DCC893523A21352DA6F6E047 /* MeView.swift in Sources */,
 				49338FCBE07DF5B007BE2A4E /* MembersDrawer.swift in Sources */,
 				FDB9E832075B0EBE7747BA8B /* MyCommitmentsView.swift in Sources */,
+				36BE9511B7C44AB1DF093C96 /* PlacesSection.swift in Sources */,
 				8C48729986BE711DB7607CB1 /* ProposalSession.swift in Sources */,
 				DC6BC89DFBCDEB2A25C6B396 /* StealthRow.swift in Sources */,
 				5766E1A4EB58F547E2096230 /* Toast.swift in Sources */,
@@ -859,6 +866,7 @@
 				15727D146F6773B7772112DB /* HeatmapSelection.swift in Sources */,
 				19B0E3DF79BB505BBBC8C806 /* InMemoryProposalStore.swift in Sources */,
 				FB382B95900167BC81639002 /* LockState.swift in Sources */,
+				6561A866A68645D30C81E1D2 /* OutlinePill.swift in Sources */,
 				4716C3A4911724F7C4806F66 /* Place.swift in Sources */,
 				B4484D40C98AE42F99192BD6 /* PlaceBoard.swift in Sources */,
 				49122A22FD01B04804484D24 /* PlaceSearching.swift in Sources */,
