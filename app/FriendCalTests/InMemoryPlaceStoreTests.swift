@@ -447,4 +447,27 @@ final class InMemoryPlaceStoreTests: XCTestCase {
         s.failNext[.removePlace] = boom
         do { try await s.removePlace(placeID: saved.id); XCTFail() } catch { XCTAssertEqual(error as? ProposalStoreError, boom) }
     }
+
+    /// protects=a deleted account is refused FC_ACCOUNT_DELETED by every place call, even from a stale
+    /// session that still holds its id (the guard's is-active step); fails_when=a tombstone can still
+    /// suggest, vote, pass on or withdraw a place; why_new=the delete tests only check that votes go;
+    /// no_claim=the SQL guard, covered by places_test.sql section 13.
+    func testPlaceCallsAreRefusedForADeletedAccount() async throws {
+        let (s, p) = makeStore()
+        act(s, as: leo)
+        let theirs = try await s.suggestPlace(proposalID: p.id, place("Leo's"))
+        act(s, as: maya)
+        _ = try await s.deleteAccount()
+        act(s, as: maya)   // a stale session still holding the deleted id
+        let gone = Refusal(code: "42501", hint: "FC_ACCOUNT_DELETED", message: "this account has been deleted")
+        let suggested = await refusal { _ = try await s.suggestPlace(proposalID: p.id, place("Late")) }
+        XCTAssertEqual(suggested, gone, "suggest")
+        let voted = await refusal { try await s.votePlace(proposalID: p.id, placeID: theirs.id) }
+        XCTAssertEqual(voted, gone, "vote")
+        let vetoed = await refusal { _ = try await s.vetoPlace(placeID: theirs.id, vetoed: true) }
+        XCTAssertEqual(vetoed, gone, "veto")
+        let removed = await refusal { try await s.removePlace(placeID: theirs.id) }
+        XCTAssertEqual(removed, gone, "remove")
+        XCTAssertEqual(s.places.count, 1, "nothing was written")
+    }
 }

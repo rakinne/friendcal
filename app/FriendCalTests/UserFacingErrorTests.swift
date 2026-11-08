@@ -130,6 +130,7 @@ final class UserFacingErrorTests: XCTestCase {
         XCTAssertEqual(sentence("P0001", "FC_NO_AREA", .suggestPlace, host: nil), "The host hasn't picked a city yet.")
         XCTAssertEqual(sentence("54000", "FC_PLACE_LIMIT", .suggestPlace), "You've suggested 2 places. Withdraw one to add another.")
         XCTAssertEqual(sentence("54000", "FC_PLACE_LIMIT", .bringBack, subject: "Maya"), "Can't bring this back: Maya already has 2 places.")
+        XCTAssertEqual(sentence("54000", "FC_PLACE_LIMIT", .bringBack), "Can't bring this back: that friend already has 2 places.", "no subject name falls back to 'that friend'")
         XCTAssertEqual(sentence("54000", "FC_PLAN_FULL", .suggestPlace), "This plan already has 10 places.")
         XCTAssertEqual(sentence("54000", "FC_PLAN_FULL", .bringBack), "Can't bring this back: the plan already has 10 places.")
         XCTAssertEqual(sentence("42501", "FC_OWN_PLACE", .votePlace), "You can't vote for your own suggestion.")
