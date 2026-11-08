@@ -363,7 +363,8 @@ final class ProposalSessionTests: XCTestCase {
         let s = session(.placesVoting)
         XCTAssertNotNil(s.board)
         XCTAssertEqual(s.board?.active.count, 4)
-        XCTAssertEqual(s.board?.myVotePlaceID, s.places.first(where: { $0.name == "Juniper Table" })?.id)
+        // The viewer (Cleo) voted for Eastside Taqueria in this fixture; her vote is not for the leader.
+        XCTAssertEqual(s.board?.myVotePlaceID, s.places.first(where: { $0.name == "Eastside Taqueria" })?.id)
         XCTAssertNil(s.winner, "requesting: no frozen winner")
         guard case .winner(let place, let votes) = s.lockProjection else { return XCTFail("expected winner projection") }
         XCTAssertEqual(place.name, "Cafe Lola")
@@ -371,7 +372,11 @@ final class ProposalSessionTests: XCTestCase {
 
         let locked = session(.placesLocked)
         XCTAssertEqual(locked.winner?.name, "Cafe Lola")
-        XCTAssertEqual(locked.lockProjection, .none, "locked with nil winner still projects none while requesting semantics: use winner instead")
+        // lockProjection answers "what would locking now freeze" from the current votes, whatever the
+        // status; after lock the stored winner above is the authority, never this projection.
+        guard case .winner(let projected, let projectedVotes) = locked.lockProjection else { return XCTFail("expected winner projection") }
+        XCTAssertEqual(projected.name, "Cafe Lola")
+        XCTAssertEqual(projectedVotes, 4)
 
         let noWinner = session(.placesLockedNoWinner)
         XCTAssertNil(noWinner.winner)
@@ -417,7 +422,6 @@ final class ProposalSessionTests: XCTestCase {
 
         // Vote, veto, withdraw round-trip through the same path.
         let host = session(.placesVetoed)
-        let hostStore = try XCTUnwrap(host.store as? InMemoryProposalStore)
         // host vetoes one place
         let target = try XCTUnwrap(host.places.first)
         try await host.setVeto(target.id, vetoed: true)
@@ -430,16 +434,27 @@ final class ProposalSessionTests: XCTestCase {
         XCTAssertEqual(host.board?.myVotePlaceID, placeID)
         try await host.vote(nil)
         XCTAssertNil(host.board?.myVotePlaceID)
-        // withdraw own place
-        let mine = try XCTUnwrap(host.places.first(where: { $0.suggestedBy == host.currentUserID }))
-        try await host.withdraw(mine.id)
-        XCTAssertNil(host.places.first(where: { $0.id == mine.id }))
-        _ = hostStore // keep alive
+        // withdraw own place: only the suggester can (the host cannot withdraw a friend's), and it frees a
+        // slot under the personal cap. Cleo owns two places in this fixture, so Suggest starts capped.
+        let friend = session(.placesCapped)
+        XCTAssertEqual(friend.suggestAvailability, .personalCap)
+        let mine = try XCTUnwrap(friend.places.first(where: { $0.suggestedBy == friend.currentUserID }))
+        try await friend.withdraw(mine.id)
+        XCTAssertNil(friend.places.first(where: { $0.id == mine.id }))
+        XCTAssertEqual(friend.suggestAvailability, .available)
     }
 
     /// protects=edit carries the city (area) with the rest of the draft, so a title-only edit does not drop it; fails_when=the session copies only title/window/headcount and the store blanks the city; no_claim=the city picker UI.
     func testEditCarriesTheCity() async throws {
-        let s = session(.placesEmpty)
+        // Edit is the host's call (FC_NOT_CREATOR otherwise), so use a fixture that views as the host.
+        let s = session(.placesVetoed)
+        // Clear friends' holds first, as testEditAppliesTitleFloorsCountAndMapsFrozenDates does: a draft
+        // day-snaps the fixture's window, which reads as a date change while holds exist. Whether the city
+        // may change with the dates frozen is pinned at the store (InMemoryPlaceStoreTests).
+        let store = try XCTUnwrap(s.store as? InMemoryProposalStore)
+        store.seed(users: store.users, proposals: store.proposals, slots: [], busyBlocks: store.busyBlocks,
+                   places: store.places, votes: store.votes, currentUserID: store.currentUserID)
+        s.apply(try store.snapshot(of: try XCTUnwrap(s.proposal).id))
         let before = try XCTUnwrap(s.proposal?.area)
         var draft = ProposalDraft(editing: try XCTUnwrap(s.proposal))
         draft.title = "Brunch 2"
@@ -452,6 +467,17 @@ final class ProposalSessionTests: XCTestCase {
         draft.area = newCity
         try await s.edit(draft)
         XCTAssertEqual(s.proposal?.area, newCity)
+    }
+
+    /// protects=a departed friend is named "A friend", never the tombstone's "Deleted account", while a
+    /// living member keeps their name; fails_when=the tombstone name leaks into the screen or a living
+    /// friend loses theirs; no_claim=the avatar glyph (#14).
+    func testDepartedFriendReadsAsAFriend() async throws {
+        let s = session(.placesDeparted)
+        let departed = try XCTUnwrap(s.places.first(where: { $0.name == "Juniper Table" })).suggestedBy
+        let living = try XCTUnwrap(s.places.first(where: { $0.name == "Cafe Lola" })).suggestedBy
+        XCTAssertEqual(s.name(of: departed), "A friend")
+        XCTAssertEqual(s.name(of: living), "Maya")
     }
 
 }
