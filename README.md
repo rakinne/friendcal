@@ -18,8 +18,12 @@ open app/FriendCal.xcodeproj
 
 Tests: see `## Testing` in CLAUDE.md (core, sql and ios lanes). The sql lane needs Postgres 15+.
 
-Backend: run `supabase/schema.sql`, `supabase/rls.sql`, then `supabase/lock_proposal.sql` in the
-Supabase SQL editor. On an existing project, run only `lock_proposal.sql` (it is idempotent).
+Backend: in the Supabase SQL editor run `supabase/schema.sql`, then these in order:
+`schema_additions.sql`, `lock_proposal.sql`, `rls.sql`, `users_auth.sql`, `join_proposal.sql`,
+`commitments.sql` and `places.sql`. Every file after `schema.sql` is idempotent, so on an existing
+project re-run the ones that changed. Apply `places.sql` before anyone locks a plan: `lock_proposal()`
+calls its winner rule. `scripts/test-sql.sh` loads the same order. A full runbook, including recovery
+from a failed run, is tracked in `TODOS.md`.
 
 ## Structure
 
@@ -34,8 +38,8 @@ friendcal/
 ├── app/               # iOS SwiftUI app; FriendCalCore SwiftPM package (Package.swift);
 │                      #   FriendCal.xcodeproj generated from project.yml by XcodeGen
 ├── scripts/           # fetch-fonts.sh (SHA-256 pinned fonts), test-sql.sh (SQL test lane)
-└── supabase/          # schema.sql, rls.sql, lock_proposal.sql (run after schema.sql,
-                       #   or alone to upgrade), tests/
+└── supabase/          # schema.sql plus the idempotent wave files (schema_additions, lock_proposal,
+                       #   rls, users_auth, join_proposal, commitments, places), tests/
 ```
 
 ## Workflow
