@@ -2,6 +2,19 @@
 
 All notable changes to FriendCal are listed here, newest first. The version lives in `VERSION`.
 
+## [0.2.0.0] - 2026-11-08
+
+### Added
+- Suggest places on a plan — add a place with a name and optional address, vote for your favorites, and veto one you can't do. The winner is picked when the plan locks, with deterministic tie-breaking.
+- Search for places nearby — MapKit-backed search with debounced queries, recent-place memory, and a 25 km search area guard that mirrors the server check.
+- Server rules for place voting — new `places.sql` guard (`friendcal_places_plan`), four client-callable functions (suggest, vote, veto, withdraw), and winner selection wired into `lock_proposal()`.
+- Place board in the session — `PlaceBoard` model tracks suggestions, votes and vetoes per plan, with in-memory and Supabase-backed stores.
+- Proposal session now carries places — fixtures, drafts and the session layer include place state so previews and tests can exercise the full flow.
+
+### Changed
+- Place-related error messages now surface as user-facing copy via `UserFacingError` (new `FC_*` hints for suggestion, vote and veto failures).
+- `ProposalDraft` and `Proposal` carry place context; `TODOS.md` and `DESIGN.md` updated to reflect the places design.
+
 ## [0.1.1.0] - 2026-11-07
 
 ### Added
