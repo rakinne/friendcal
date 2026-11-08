@@ -1,0 +1,134 @@
+{
+  "comment": "The six winner cases (#11 P1 to P6) in ONE file. supabase/tests/places_test.sql reads it with a psql backtick read and checks friendcal_place_winner(); app/FriendCalTests/PlaceBoardTests.swift reads the same file and checks PlaceBoard.winner. Neither side keeps a copy, so there is nothing to sync by hand. Rule (R7): non-vetoed places with at least one vote; most votes; ties go to the earliest createdAt, then the lowest id (uuid byte order, which is lowercase-hex string order). `votes` maps a place key to how many distinct voters voted for it. `vetoed` places keep their votes here on purpose (P4): the rule must ignore them anyway. Place ids are unique per case (so a SQL test can insert every case into one database) and A's id is always below B's, which is what P6 depends on.",
+  "cases": [
+    {
+      "name": "P1 clear leader",
+      "places": [
+        {
+          "key": "A",
+          "id": "a0000000-0000-0000-0000-000000000101",
+          "createdAt": "2026-11-10T10:00:00Z",
+          "vetoed": false
+        },
+        {
+          "key": "B",
+          "id": "b0000000-0000-0000-0000-000000000102",
+          "createdAt": "2026-11-10T10:05:00Z",
+          "vetoed": false
+        }
+      ],
+      "votes": {
+        "A": 2,
+        "B": 1
+      },
+      "winner": "A"
+    },
+    {
+      "name": "P2 tie, earliest wins",
+      "places": [
+        {
+          "key": "A",
+          "id": "a0000000-0000-0000-0000-000000000201",
+          "createdAt": "2026-11-10T10:00:00Z",
+          "vetoed": false
+        },
+        {
+          "key": "B",
+          "id": "b0000000-0000-0000-0000-000000000202",
+          "createdAt": "2026-11-10T10:05:00Z",
+          "vetoed": false
+        }
+      ],
+      "votes": {
+        "A": 1,
+        "B": 1
+      },
+      "winner": "A"
+    },
+    {
+      "name": "P3 no votes",
+      "places": [
+        {
+          "key": "A",
+          "id": "a0000000-0000-0000-0000-000000000301",
+          "createdAt": "2026-11-10T10:00:00Z",
+          "vetoed": false
+        },
+        {
+          "key": "B",
+          "id": "b0000000-0000-0000-0000-000000000302",
+          "createdAt": "2026-11-10T10:05:00Z",
+          "vetoed": false
+        }
+      ],
+      "votes": {},
+      "winner": null
+    },
+    {
+      "name": "P4 vetoed place ignored even if it still holds a vote",
+      "places": [
+        {
+          "key": "A",
+          "id": "a0000000-0000-0000-0000-000000000401",
+          "createdAt": "2026-11-10T10:00:00Z",
+          "vetoed": true
+        },
+        {
+          "key": "B",
+          "id": "b0000000-0000-0000-0000-000000000402",
+          "createdAt": "2026-11-10T10:05:00Z",
+          "vetoed": false
+        }
+      ],
+      "votes": {
+        "A": 1,
+        "B": 1
+      },
+      "winner": "B"
+    },
+    {
+      "name": "P5 tie where the later-listed place is older",
+      "places": [
+        {
+          "key": "A",
+          "id": "a0000000-0000-0000-0000-000000000501",
+          "createdAt": "2026-11-10T10:05:00Z",
+          "vetoed": false
+        },
+        {
+          "key": "B",
+          "id": "b0000000-0000-0000-0000-000000000502",
+          "createdAt": "2026-11-10T10:00:00Z",
+          "vetoed": false
+        }
+      ],
+      "votes": {
+        "A": 1,
+        "B": 1
+      },
+      "winner": "B"
+    },
+    {
+      "name": "P6 identical creation time, lowest id wins",
+      "places": [
+        {
+          "key": "A",
+          "id": "a0000000-0000-0000-0000-000000000601",
+          "createdAt": "2026-11-10T10:00:00Z",
+          "vetoed": false
+        },
+        {
+          "key": "B",
+          "id": "b0000000-0000-0000-0000-000000000602",
+          "createdAt": "2026-11-10T10:00:00Z",
+          "vetoed": false
+        }
+      ],
+      "votes": {
+        "A": 1,
+        "B": 1
+      },
+      "winner": "A"
+    }
+  ]
+}

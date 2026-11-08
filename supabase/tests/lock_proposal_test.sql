@@ -185,4 +185,72 @@ select t.ok('no function takes pg_advisory_xact_lock outside the shared helper',
                  and p.proname <> 'friendcal_lock_users'
                  and p.prosrc like '%pg_advisory_xact_lock%'));
 
+-- 9. #11: the lock stores the winner chosen by friendcal_place_winner() in the same statement that
+--    sets the status. protects=the stored winner is what the winner rule returns, and a refused lock
+--    stores none; fails_when=the winner is written separately from the status, or a refusal leaves one
+--    behind; no_claim=the six winner cases themselves, which places_test.sql runs from the shared file.
+select t.seed('10000000-0000-0000-0000-0000000000b1');
+select t.seed('10000000-0000-0000-0000-0000000000b2');
+select t.seed('10000000-0000-0000-0000-0000000000b3');
+select t.seed('10000000-0000-0000-0000-0000000000b4');
+-- Each plan gets its own day with every recipient covering it: an earlier test in this file already
+-- made u1 to u4 Busy on Nov 14, which would make them not free here.
+delete from availability_slots where source_proposal_id in
+  ('10000000-0000-0000-0000-0000000000b1', '10000000-0000-0000-0000-0000000000b2',
+   '10000000-0000-0000-0000-0000000000b3', '10000000-0000-0000-0000-0000000000b4');
+insert into availability_slots(user_id, range, source_proposal_id, state, expires_at)
+select t.u(n), format('[2026-11-%s 18:00Z,2026-11-%s 20:00Z)', v.day, v.day)::tstzrange, v.pid::uuid, 'softHold', now() + interval '30 days'
+  from generate_series(1, 5) n,
+       (values ('10000000-0000-0000-0000-0000000000b1', '16'), ('10000000-0000-0000-0000-0000000000b2', '17'),
+               ('10000000-0000-0000-0000-0000000000b3', '18'), ('10000000-0000-0000-0000-0000000000b4', '19')) v(pid, day);
+update proposals set area_name = 'Austin, TX', area_lat = 30.2672, area_lon = -97.7431
+ where id in ('10000000-0000-0000-0000-0000000000b1', '10000000-0000-0000-0000-0000000000b2',
+              '10000000-0000-0000-0000-0000000000b3', '10000000-0000-0000-0000-0000000000b4');
+insert into proposal_places(id, proposal_id, suggested_by, name, lat, lon, created_at, vetoed_at) values
+  -- b1: A leads with two votes, B has one.
+  ('c0000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-0000000000b1', t.u(2), 'A', 30.2, -97.7, '2026-11-10 10:00Z', null),
+  ('c0000000-0000-0000-0000-0000000000a2', '10000000-0000-0000-0000-0000000000b1', t.u(3), 'B', 30.3, -97.7, '2026-11-10 10:05Z', null),
+  -- b2: places but no votes.
+  ('c0000000-0000-0000-0000-0000000000b1', '10000000-0000-0000-0000-0000000000b2', t.u(2), 'A', 30.2, -97.7, '2026-11-10 10:00Z', null),
+  -- b3: a lock that will be refused on quorum.
+  ('c0000000-0000-0000-0000-0000000000c1', '10000000-0000-0000-0000-0000000000b3', t.u(2), 'A', 30.2, -97.7, '2026-11-10 10:00Z', null),
+  -- b4: the leader was vetoed but still holds its votes; the other place wins.
+  ('c0000000-0000-0000-0000-0000000000d1', '10000000-0000-0000-0000-0000000000b4', t.u(2), 'A', 30.2, -97.7, '2026-11-10 10:00Z', '2026-11-10 11:00Z'),
+  ('c0000000-0000-0000-0000-0000000000d2', '10000000-0000-0000-0000-0000000000b4', t.u(3), 'B', 30.3, -97.7, '2026-11-10 10:05Z', null);
+insert into place_votes(proposal_id, voter_id, place_id) values
+  ('10000000-0000-0000-0000-0000000000b1', t.u(4), 'c0000000-0000-0000-0000-0000000000a1'),
+  ('10000000-0000-0000-0000-0000000000b1', t.u(5), 'c0000000-0000-0000-0000-0000000000a1'),
+  ('10000000-0000-0000-0000-0000000000b1', t.u(1), 'c0000000-0000-0000-0000-0000000000a2'),
+  ('10000000-0000-0000-0000-0000000000b3', t.u(4), 'c0000000-0000-0000-0000-0000000000c1'),
+  ('10000000-0000-0000-0000-0000000000b4', t.u(4), 'c0000000-0000-0000-0000-0000000000d1'),
+  ('10000000-0000-0000-0000-0000000000b4', t.u(5), 'c0000000-0000-0000-0000-0000000000d1'),
+  ('10000000-0000-0000-0000-0000000000b4', t.u(1), 'c0000000-0000-0000-0000-0000000000d2');
+
+select t.eq('the winner function sees the leader before the lock',
+  friendcal_place_winner('10000000-0000-0000-0000-0000000000b1'), 'c0000000-0000-0000-0000-0000000000a1'::uuid);
+select t.ok('locking a plan with votes succeeds', t.lock('10000000-0000-0000-0000-0000000000b1', '2026-11-16 18:00Z', '2026-11-16 19:30Z', t.u(1)) = 'locked:5');
+select t.eq('the lock stored the winner', (select locked_place_id from proposals where id = '10000000-0000-0000-0000-0000000000b1'),
+  'c0000000-0000-0000-0000-0000000000a1'::uuid);
+select t.ok('the stored winner is exactly what the winner function returns',
+  (select locked_place_id is not distinct from friendcal_place_winner(id) from proposals where id = '10000000-0000-0000-0000-0000000000b1'));
+select t.ok('the winner and the status were written together',
+  (select status = 'locked' and locked_place_id is not null from proposals where id = '10000000-0000-0000-0000-0000000000b1'));
+select t.ok('a plan with places but no votes locks with no winner',
+  t.lock('10000000-0000-0000-0000-0000000000b2', '2026-11-17 18:00Z', '2026-11-17 19:30Z', t.u(1)) = 'locked:5');
+select t.ok('...and stores null',
+  (select status = 'locked' and locked_place_id is null from proposals where id = '10000000-0000-0000-0000-0000000000b2'));
+select t.ok('a refused lock is refused (below quorum)',
+  t.lock('10000000-0000-0000-0000-0000000000b3', '2026-11-18 20:00Z', '2026-11-18 21:00Z', t.u(1)) = '22023');
+select t.ok('a refused lock leaves the plan open and the winner null',
+  (select status = 'requesting' and locked_place_id is null from proposals where id = '10000000-0000-0000-0000-0000000000b3'));
+select t.ok('a vetoed leader is not stored even when it still holds votes',
+  t.lock('10000000-0000-0000-0000-0000000000b4', '2026-11-19 18:00Z', '2026-11-19 19:30Z', t.u(1)) = 'locked:5');
+select t.eq('the other place wins',
+  (select locked_place_id from proposals where id = '10000000-0000-0000-0000-0000000000b4'), 'c0000000-0000-0000-0000-0000000000d2'::uuid);
+select t.ok('lock_proposal stores the winner through the winner function, not an inline copy',
+  (select prosrc like '%friendcal_place_winner%' from pg_proc where proname = 'lock_proposal'));
+select t.ok('the plan-lock helper exists and sits beside the user-lock helper',
+  exists (select 1 from pg_proc where proname = 'friendcal_lock_plans'));
+
 \echo 'lock_proposal tests: all passed'
+

@@ -110,12 +110,24 @@ declare
   v_released_others int := 0;
   v_released_own int := 0;
   v_locked int;
+  v_open uuid[];
 begin
   if v_uid is null then
     raise exception 'not signed in' using errcode = '42501', hint = 'FC_NOT_SIGNED_IN';
   end if;
 
-  select u.deleted_at into v_deleted_at from users u where u.id = v_uid for update;
+  -- `for no key update`, not `for update` (#11, review R5). lock_proposal() inserts busy_blocks rows
+  -- whose user_id references users(id), and that insert takes a key-share lock on this very row. A
+  -- `for update` lock conflicts with key share, so this call (holding the row, waiting for a plan or
+  -- an advisory lock) and a lock_proposal() (holding the plan and the advisory locks, inserting the
+  -- Busy block) could wait on each other. `for no key update` allows key share, and still conflicts
+  -- with another no-key-update and with the `for share` the place functions take, so deletions,
+  -- votes and renames for one user still serialize.
+  -- This stays correct only while the tombstone update below touches no column of a unique index on
+  -- users: it sets display_name, avatar_url and deleted_at, and users has only its primary key. Add a
+  -- unique index on one of those and the update escalates to a full `for update`, and the cycle
+  -- returns without any test failing.
+  select u.deleted_at into v_deleted_at from users u where u.id = v_uid for no key update;
   if not found then
     raise exception 'no such account' using errcode = 'P0002', hint = 'FC_NOT_FOUND';
   end if;
@@ -131,13 +143,22 @@ begin
       'locked_plans_kept', v_locked);
   end if;
 
-  -- The caller's still-open plans. Row-locked first, then collected: `for update` cannot appear in
-  -- the same query as an aggregate (0A000), so this is two statements -- the same shape
-  -- lock_proposal() uses for the holds it is about to count. The lock is what stops a concurrent
-  -- lock_proposal() from locking a plan this call is about to cancel.
-  perform 1 from proposals p
-   where p.created_by = v_uid and p.status = 'requesting'
-     for update;
+  -- The open plans this call must hold still: every one the caller created (they are about to be
+  -- cancelled) and every one they voted on (their votes are about to be removed). Row-locked first,
+  -- through the shared helper in id order, then collected: `for update` cannot appear in the same
+  -- query as an aggregate (0A000), so this is separate statements -- the same shape lock_proposal()
+  -- uses for the holds it is about to count. The lock is what stops a concurrent lock_proposal()
+  -- from locking a plan this call is about to cancel, or tallying a vote this call is about to
+  -- remove. It is taken before any advisory lock below: lock_proposal() takes the plan row first
+  -- and the advisory locks second, and the opposite order deadlocks under concurrency.
+  select coalesce(array_agg(distinct x.id), '{}') into v_open
+    from (select p.id from proposals p
+           where p.created_by = v_uid and p.status = 'requesting'
+          union
+          select p.id from proposals p join place_votes v on v.proposal_id = p.id
+           where v.voter_id = v_uid and p.status = 'requesting') x;
+  perform friendcal_lock_plans(v_open);
+  -- A plan can change state while that lock was being waited for, so read the cancel list after it.
   select coalesce(array_agg(p.id), '{}') into v_cancelled
     from proposals p where p.created_by = v_uid and p.status = 'requesting';
 
@@ -150,6 +171,14 @@ begin
   perform friendcal_lock_users(v_affected);
 
   update proposals set status = 'cancelled' where id = any (v_cancelled);
+
+  -- The leaver's votes on plans that are still collecting: a departed person must not decide a
+  -- winner. Plans this call just cancelled are no longer requesting, so their votes stay as history,
+  -- as do the votes on locked plans. Suggestions are untouched; the tombstone row survives, so
+  -- suggested_by stays valid and the app can show "A friend".
+  delete from place_votes v
+   using proposals p
+   where v.voter_id = v_uid and p.id = v.proposal_id and p.status = 'requesting';
 
   -- E12 / outside voice F8: EVERY softHold on the cancelled plans, whoever placed it. This is the
   -- half that completes D13 -- cancelling the plan without releasing other people's holds leaves

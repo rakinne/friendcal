@@ -18,6 +18,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Test files read shared fixtures (the place winner cases) from here with a psql backtick read.
+export FC_FIXTURES="$ROOT/supabase/tests/fixtures"
 PG_BIN="${PG_BIN:-}"
 if [[ -z "$PG_BIN" ]]; then
   for d in /opt/homebrew/opt/postgresql@17/bin /opt/homebrew/opt/postgresql@16/bin /opt/homebrew/opt/postgresql@15/bin \
@@ -58,7 +60,7 @@ newdb() { psql_db postgres -c "create database $1" >/dev/null; }
 # Every .sql file this wave adds, in application order, after schema.sql. Each must be idempotent.
 # schema_additions.sql comes first: every policy, view and function after it may assume its columns.
 WAVE_SQL=(schema_additions.sql lock_proposal.sql rls.sql)
-for f in users_auth.sql join_proposal.sql commitments.sql; do
+for f in users_auth.sql join_proposal.sql commitments.sql places.sql; do
   [[ -f "$ROOT/supabase/$f" ]] && WAVE_SQL+=("$f")
 done
 
@@ -169,6 +171,10 @@ if git -C "$ROOT" cat-file -e origin/main:supabase/schema.sql 2>/dev/null; then
   load_wave upgrade_check loose
   # The wave must install completely on a populated existing database, not only on an empty one.
   assert_schema_shape upgrade_check "upgrade"
+  # Every wave file must be safe to apply again: strict mode, so a statement that is not idempotent
+  # (a bare `create`, a constraint without its duplicate guard) stops the run here.
+  load_wave upgrade_check strict
+  assert_schema_shape upgrade_check "upgrade, wave applied a second time"
   psql_db upgrade_check -tAc "select count(*) from pg_proc where proname = 'lock_proposal'" | grep -qx 1 \
     || fail "lock_proposal is absent after the upgrade"
   after="$(psql_db upgrade_check -tAc "select count(*) from users" | tr -d ' ')"
@@ -271,4 +277,142 @@ if [[ "$B_OUT" == "22023" ]]; then
 else
   echo "  not ok - hold edited during a lock: B=$B_OUT (want 22023)"; exit 1
 fi
+# ---------------------------------------------------------------------------
+# 6. Place voting concurrency (#11). Same shape as section 5: session A holds a transaction open
+#    while session B races it. Fixtures use their own users because deleting an account is permanent.
+#    6a vote versus lock         the vote must not land after the winner is counted
+#    6b delete versus lock       the interleaving that deadlocked before the user row was locked
+#                                `for no key update`: A holds the plan row, B holds the user row
+#    6c delete versus delete     two voters on one plan both finish, neither deadlocks
+#    6d vote versus delete       a vote and a deletion for one user serialize in either order
+#    6e arrival order            created_at follows arrival, not transaction start
+# ---------------------------------------------------------------------------
+echo "# place voting concurrency"
+H=00000000-0000-0000-0000-0000000e0001;  W=00000000-0000-0000-0000-0000000e0002
+V1=00000000-0000-0000-0000-0000000e0003; V2=00000000-0000-0000-0000-0000000e0004; V3=00000000-0000-0000-0000-0000000e0005
+D2=00000000-0000-0000-0000-0000000e0006; D3A=00000000-0000-0000-0000-0000000e0007; D3B=00000000-0000-0000-0000-0000000e0008
+D4A=00000000-0000-0000-0000-0000000e0009; D4B=00000000-0000-0000-0000-0000000e000a
+CP1=20000000-0000-0000-0000-0000000e0101; CP2=20000000-0000-0000-0000-0000000e0102; CP3=20000000-0000-0000-0000-0000000e0103
+CP4=20000000-0000-0000-0000-0000000e0104; CP5=20000000-0000-0000-0000-0000000e0105
+PL1A=30000000-0000-0000-0000-0000000e0111; PL1B=30000000-0000-0000-0000-0000000e0112; PL2=30000000-0000-0000-0000-0000000e0121
+PL3=30000000-0000-0000-0000-0000000e0131; PL4=30000000-0000-0000-0000-0000000e0141
+psql_db "$CDB" -o /dev/null <<SQL
+insert into users(id, display_name) select u, 'race ' || u from unnest(array['$H','$W','$V1','$V2','$V3','$D2','$D3A','$D3B','$D4A','$D4B']::uuid[]) u;
+insert into auth.users(id, email) select u, u || '@example.com' from unnest(array['$H','$W','$V1','$V2','$V3','$D2','$D3A','$D3B','$D4A','$D4B']::uuid[]) u;
+create or replace function t.cplan(pid uuid, day text, recips uuid[]) returns void language plpgsql as \$\$
+begin
+  insert into proposals(id, title, window_start, window_end, created_by, distribution, area_name, area_lat, area_lon)
+  values (pid, 'Race', '2026-12-01 00:00Z', '2026-12-20 00:00Z', recips[1],
+          jsonb_build_object('mode', 'newGroup', 'recipientIDs', to_jsonb(recips)), 'Austin, TX', 30.2672, -97.7431);
+  insert into availability_slots(user_id, range, source_proposal_id, state, expires_at)
+  select r, format('[2026-12-%s 18:00Z,2026-12-%s 20:00Z)', day, day)::tstzrange, pid, 'softHold', now() + interval '30 days'
+    from unnest(recips) r;
+end \$\$;
+select t.cplan('$CP1', '05', array['$H','$V1','$V2','$V3','$W']::uuid[]);
+select t.cplan('$CP2', '06', array['$H','$V1','$V2','$V3','$D2']::uuid[]);
+select t.cplan('$CP3', '07', array['$H','$V1','$D3A','$D3B']::uuid[]);
+select t.cplan('$CP4', '08', array['$H','$V1','$D4A','$D4B']::uuid[]);
+select t.cplan('$CP5', '09', array['$H','$V1','$V2']::uuid[]);
+insert into proposal_places(id, proposal_id, suggested_by, name, lat, lon, created_at) values
+  ('$PL1A', '$CP1', '$V1', 'A', 30.1, -97.7, now() - interval '2 hours'),
+  ('$PL1B', '$CP1', '$V2', 'B', 30.2, -97.7, now() - interval '1 hour'),
+  ('$PL2',  '$CP2', '$V1', 'A', 30.1, -97.7, now()),
+  ('$PL3',  '$CP3', '$V1', 'A', 30.1, -97.7, now()),
+  ('$PL4',  '$CP4', '$V1', 'A', 30.1, -97.7, now());
+insert into place_votes(proposal_id, voter_id, place_id) values
+  ('$CP1', '$V3', '$PL1A'), ('$CP2', '$D2', '$PL2'), ('$CP3', '$D3A', '$PL3'), ('$CP3', '$D3B', '$PL3');
+SQL
+# Outcome of a place call as text, for sessions that run it: "sqlstate/hint".
+call_sql() { echo "select (c).sqlstate || '/' || (c).hint from (select t.call(\$q\$$1\$q\$, '$2'::uuid) as c) x"; }
+
+# 6a. A locks CP1 and holds its transaction; B votes meanwhile. After A commits the plan is locked, so
+#     B is refused FC_LOCKED and its vote never lands; the stored winner is the one counted at lock.
+psql_db "$CDB" -tA -c "begin; select t.become('authenticated', '$H'); select count(*) from lock_proposal('$CP1', '2026-12-05 18:00Z', '2026-12-05 19:30Z'); select pg_sleep(1.5); commit;" >"$TMP/c1.out" 2>&1 &
+A=$!
+# gstack-timing-ok: B only needs to start while A holds the plan row lock (A sleeps 1.5s); a slower B still finds the plan locked and gets the same answer.
+sleep 0.4
+B_OUT="$(psql_db "$CDB" -tA -c "$(call_sql "select vote_place('$CP1', '$PL1B')" "$W")" 2>&1)" || true
+wait $A || true
+A_OUT="$(grep -E '^[0-9]+$' "$TMP/c1.out" | head -1)"
+FINAL="$(psql_db "$CDB" -tAc "select status || ':' || coalesce(locked_place_id::text, 'null') || ':' || (select count(*) from place_votes where proposal_id = p.id and voter_id = '$W') from proposals p where id = '$CP1'")"
+if [[ "$A_OUT" == "5" && "$B_OUT" == "55000/FC_LOCKED" && "$FINAL" == "locked:$PL1A:0" ]]; then
+  echo "  ok - a vote racing a lock is refused after the lock, and the stored winner is the one counted"
+else
+  echo "  not ok - vote versus lock: A=$A_OUT B=$B_OUT final=$FINAL (want 5, 55000/FC_LOCKED, locked:$PL1A:0)"; exit 1
+fi
+
+# 6b. The deadlock interleaving. A holds the PLAN row (as lock_proposal does first) and pauses; B,
+#     a covered recipient who voted, runs delete_account -- it takes the user row, then waits for the
+#     plan. A resumes and inserts the Busy block, which key-shares B's user row. With `for update` on
+#     that row A would wait for B while B waits for A (40P01). With `for no key update` both finish.
+psql_db "$CDB" -tA -c "begin; select 1 from proposals where id = '$CP2' for update; select pg_sleep(1.5); select t.become('authenticated', '$H'); select count(*) from lock_proposal('$CP2', '2026-12-06 18:00Z', '2026-12-06 19:30Z'); commit;" >"$TMP/c2.out" 2>&1 &
+A=$!
+# gstack-timing-ok: B must take the user row while A still holds only the plan row (A sleeps 1.5s first).
+sleep 0.4
+B_OUT="$(psql_db "$CDB" -tA -c "begin; select t.become('authenticated', '$D2'); select delete_account(); commit;" 2>&1)" || true
+wait $A || true
+A_OUT="$(grep -E '^[0-9]+$' "$TMP/c2.out" | tail -1)"
+FINAL="$(psql_db "$CDB" -tAc "select status || ':' || (select count(*) from place_votes where proposal_id = p.id and voter_id = '$D2') from proposals p where id = '$CP2'")"
+if [[ "$A_OUT" == "5" && "$B_OUT" == *'"already_deleted": false'* && "$B_OUT" != *deadlock* && "$FINAL" == "locked:1" ]]; then
+  echo "  ok - delete_account against lock_proposal for a covered voter: no deadlock, the vote on the locked plan stays"
+else
+  echo "  not ok - delete versus lock: A=$A_OUT B=$B_OUT final=$FINAL"; echo "$(cat "$TMP/c2.out")"; exit 1
+fi
+
+# 6c. Two voters on one plan delete their accounts at once. B waits for A's plan lock, then finishes.
+psql_db "$CDB" -tA -c "begin; select t.become('authenticated', '$D3A'); select delete_account(); select pg_sleep(1.5); commit;" >"$TMP/c3.out" 2>&1 &
+A=$!
+# gstack-timing-ok: B must start while A holds the plan lock it took during delete_account.
+sleep 0.4
+B_OUT="$(psql_db "$CDB" -tA -c "begin; select t.become('authenticated', '$D3B'); select delete_account(); commit;" 2>&1)" || true
+wait $A || true
+FINAL="$(psql_db "$CDB" -tAc "select count(*) from place_votes where proposal_id = '$CP3'")"
+if [[ "$B_OUT" == *'"already_deleted": false'* && "$B_OUT" != *deadlock* && "$(cat "$TMP/c3.out")" != *deadlock* && "$(cat "$TMP/c3.out")" == *'"already_deleted": false'* && "$FINAL" == "0" ]]; then
+  echo "  ok - two delete_account calls on a shared voted plan both finish and both votes are removed"
+else
+  echo "  not ok - delete versus delete: B=$B_OUT final=$FINAL"; cat "$TMP/c3.out"; exit 1
+fi
+
+# 6d. A vote and the same user's deletion serialize, in either order.
+#     First: deletion in flight, vote arrives -> the vote waits, then is refused because the account is gone.
+psql_db "$CDB" -tA -c "begin; select t.become('authenticated', '$D4A'); select delete_account(); select pg_sleep(1.5); commit;" >"$TMP/c4a.out" 2>&1 &
+A=$!
+# gstack-timing-ok: B must arrive while A's deletion transaction is still open.
+sleep 0.4
+B_OUT="$(psql_db "$CDB" -tA -c "$(call_sql "select vote_place('$CP4', '$PL4')" "$D4A")" 2>&1)" || true
+wait $A || true
+FINAL_A="$(psql_db "$CDB" -tAc "select count(*) from place_votes where voter_id = '$D4A'")"
+#     Second: vote in flight, deletion arrives -> the deletion waits, then removes the vote.
+psql_db "$CDB" -tA -c "begin; select t.become('authenticated', '$D4B'); select vote_place('$CP4', '$PL4'); select pg_sleep(1.5); commit;" >"$TMP/c4b.out" 2>&1 &
+A=$!
+# gstack-timing-ok: B must arrive while A's vote transaction is still open.
+sleep 0.4
+B2_OUT="$(psql_db "$CDB" -tA -c "begin; select t.become('authenticated', '$D4B'); select delete_account(); commit;" 2>&1)" || true
+wait $A || true
+FINAL_B="$(psql_db "$CDB" -tAc "select count(*) from place_votes where voter_id = '$D4B'")"
+if [[ "$B_OUT" == "42501/FC_ACCOUNT_DELETED" && "$FINAL_A" == "0" && "$B2_OUT" == *'"already_deleted": false'* && "$FINAL_B" == "0" ]]; then
+  echo "  ok - a vote racing the same user's deletion leaves no vote, whichever arrives first"
+else
+  echo "  not ok - vote versus delete: B=$B_OUT votes=$FINAL_A / B2=$B2_OUT votes=$FINAL_B"; exit 1
+fi
+
+# 6e. created_at follows arrival. B opens its transaction FIRST (so now() would be earliest), then
+#     waits; A suggests and commits; then B suggests. B's place must still sort after A's.
+psql_db "$CDB" -tA -c "begin; select 1; select pg_sleep(1.2); select t.become('authenticated', '$V2'); select suggest_place('$CP5', 'Second', null, 30.3, -97.7, null); commit;" >"$TMP/c5.out" 2>&1 &
+A=$!
+# gstack-timing-ok: A must complete while B's transaction (opened first) is still waiting to suggest.
+sleep 0.4
+psql_db "$CDB" -tA -c "$(call_sql "select suggest_place('$CP5', 'First', null, 30.1, -97.7, null)" "$V1")" >"$TMP/c5a.out" 2>&1 || true
+wait $A || true
+ORDERED="$(psql_db "$CDB" -tAc "select (select created_at from proposal_places where proposal_id = '$CP5' and name = 'Second') > (select created_at from proposal_places where proposal_id = '$CP5' and name = 'First')")"
+if [[ "$ORDERED" == "t" ]]; then
+  echo "  ok - a suggestion's created_at follows arrival, not the start of its transaction"
+else
+  echo "  not ok - arrival order: ordered=$ORDERED A=$(cat "$TMP/c5a.out") B=$(cat "$TMP/c5.out")"; exit 1
+fi
+
+# 6f. Structural checks that keep one copy of each rule.
+grep -q 'proposal_is_readable' "$ROOT/supabase/places.sql" && ! grep -q 'recipientIDs' "$ROOT/supabase/places.sql" \
+  && echo "  ok - places.sql reuses proposal_is_readable and has no second copy of the membership test" \
+  || { echo "  not ok - places.sql re-derives plan membership instead of calling proposal_is_readable"; exit 1; }
 echo "sql tests: all passed"
