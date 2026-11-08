@@ -5,11 +5,18 @@ public struct ProposalSnapshot: Equatable {
     public var proposal: Proposal
     public var members: [User]
     public var slots: [AvailabilitySlot]
+    public var places: [Place]
+    public var votes: [PlaceVote]
 
-    public init(proposal: Proposal, members: [User], slots: [AvailabilitySlot]) {
+    /// `places` and `votes` have NO default, on purpose. A default of `[]` would let any caller that
+    /// builds a snapshot by hand (the session's lock and edit paths did) silently blank the board;
+    /// without one, the compiler finds every call site that has to say what it holds.
+    public init(proposal: Proposal, members: [User], slots: [AvailabilitySlot], places: [Place], votes: [PlaceVote]) {
         self.proposal = proposal
         self.members = members
         self.slots = slots
+        self.places = places
+        self.votes = votes
     }
 }
 
@@ -146,7 +153,9 @@ public protocol ProposalStore: AnyObject {
     /// Creates a requesting proposal with the creator as its first recipient (D4).
     func create(_ plan: NewProposal) async throws -> Proposal
     /// Creator edits (design 5.4A): title and expected count while requesting; the window only while
-    /// no hold exists; nothing once locked. Server-owned fields on `proposal` are ignored.
+    /// no hold exists; nothing once locked. The city (`area`) can be replaced while requesting, even
+    /// when the dates are frozen, but never cleared (FC_AREA_REQUIRED). Server-owned fields on
+    /// `proposal` are ignored.
     func update(_ proposal: Proposal) async throws -> Proposal
     /// Appends the current user to the recipients, idempotently, on a requesting or locked plan (D3, D13).
     func join(_ id: UUID) async throws -> Proposal
@@ -165,6 +174,19 @@ public protocol ProposalStore: AnyObject {
     /// `from` is an OVERLAP horizon, not a start filter: a commitment that began before it and is
     /// still running is included.
     func myCommitments(from: Date) async throws -> [Commitment]
+    // MARK: Places (#10, #11). Server-first and without optimistic updates: the caller awaits the store
+    // and applies the snapshot. Refusals carry the SQLSTATE and FC_* hint #11's error contract names.
+
+    /// Adds a place to a plan. Idempotent for a duplicate of an ACTIVE place: returns the existing row.
+    /// A duplicate of a vetoed place is refused (FC_VETOED).
+    func suggestPlace(proposalID: UUID, _ place: NewPlace) async throws -> Place
+    /// Casts, moves or (with nil) clears the caller's one vote on this plan.
+    func votePlace(proposalID: UUID, placeID: UUID?) async throws
+    /// Host only: passes on a place (clearing its votes) or brings it back with zero votes.
+    func vetoPlace(placeID: UUID, vetoed: Bool) async throws -> Place
+    /// Suggester only: withdraws their own place; its votes go with it.
+    func removePlace(placeID: UUID) async throws
+
     func tapFree(proposalID: UUID, range: DateRange, expiresAt: Date?) async throws -> AvailabilitySlot
     /// Removes one of the current user's own holds (C3).
     func release(slotID: UUID) async throws

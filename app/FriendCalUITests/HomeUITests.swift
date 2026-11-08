@@ -142,14 +142,18 @@ final class HomeUITests: XCTestCase {
 
     /// protects=stub tabs are reachable from the native tab bar (D34); fails_when=a tab is
     /// missing or doesn't switch; no_claim=tab content (out of scope). Issue #5 D10: Invites left
-    /// the stub list (testInvitesTabListsThePlan covers it).
+    /// the stub list (testInvitesTabListsThePlan covers it). Me is a real screen since the auth work
+    /// (MeView), so it is reached by its navigation title instead of a `stub.` identifier.
     func testStubTabs() {
         let app = Self.launch()
-        for tab in ["Groups", "Pokes", "Me"] {
+        for tab in ["Groups", "Pokes"] {
             app.tabBars.buttons[tab].tap()
             XCTAssertTrue(app.descendants(matching: .any)["stub.\(tab.lowercased())"].waitForExistence(timeout: 3), tab)
             attach(app, "tab-\(tab.lowercased())")
         }
+        app.tabBars.buttons["Me"].tap()
+        XCTAssertTrue(app.navigationBars["Me"].waitForExistence(timeout: 3), "Me")
+        attach(app, "tab-me")
         app.tabBars.buttons["Home"].tap()
         XCTAssertTrue(app.buttons["home.poke"].waitForExistence(timeout: 3))
     }

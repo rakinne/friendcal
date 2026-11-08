@@ -221,6 +221,7 @@ create policy "proposals_insert_own"
     and status = 'requesting'
     and locked_date is null
     and locked_end is null
+    and locked_place_id is null
     and hidden_from = '{}'::uuid[]
     and window_end > window_start
   );
@@ -305,12 +306,30 @@ begin
      or new.locked_date    is distinct from old.locked_date
      or new.locked_end     is distinct from old.locked_end
      or new.hidden_from    is distinct from old.hidden_from
+     or new.locked_place_id is distinct from old.locked_place_id
      or new.distribution   is distinct from old.distribution
      or new.window_start   is distinct from old.window_start
      or new.window_end     is distinct from old.window_end
      or new.created_at     is distinct from old.created_at then
     raise exception 'this field is set by the server, not the client'
       using errcode = '42501', hint = 'FC_SERVER_OWNED_FIELD';
+  end if;
+
+  -- The host's city (#10 R1). It anchors place search, and place search closes at lock, so the city
+  -- is frozen once the plan stops requesting. While requesting it can be replaced but never cleared:
+  -- the all-or-none check takes the other two columns to null with the name, so testing the name
+  -- is enough. The status rule runs first, so a locked plan answers FC_LOCKED.
+  if new.area_name is distinct from old.area_name
+     or new.area_lat is distinct from old.area_lat
+     or new.area_lon is distinct from old.area_lon then
+    if old.status <> 'requesting' then
+      raise exception 'the city is frozen once the plan is no longer requesting'
+        using errcode = '55000', hint = 'FC_LOCKED';
+    end if;
+    if old.area_name is not null and new.area_name is null then
+      raise exception 'a plan keeps its city; replace it instead of clearing it'
+        using errcode = '22023', hint = 'FC_AREA_REQUIRED';
+    end if;
   end if;
   return new;
 end $$;
@@ -356,15 +375,20 @@ grant delete on busy_blocks to authenticated;  -- scoped to own rows by busy_del
 -- have to release holds and keep locked plans coherent. A bare DELETE would skip all of that.
 revoke all on proposals from authenticated, anon;
 grant select (id, title, window_start, window_end, created_by, distribution, status,
-              locked_date, locked_end, created_at) on proposals to authenticated;
+              locked_date, locked_end, created_at,
+              area_name, area_lat, area_lon, locked_place_id) on proposals to authenticated;
+-- The city can be set at creation. `locked_place_id` is deliberately absent from the insert and update
+-- grants: the winner is written by lock_proposal() alone, and a direct write fails on the column
+-- privilege before any policy or the edit guard runs.
 grant insert (id, title, window_start, window_end, created_by, distribution, status,
-              locked_date, locked_end, created_at) on proposals to authenticated;
+              locked_date, locked_end, created_at,
+              area_name, area_lat, area_lon) on proposals to authenticated;
 -- `distribution` is INSERTable but not UPDATEable, and the two lists must stay that way. A client
 -- composes the recipient list when it creates the plan; changing it afterwards means admitting
 -- someone, which has to consult hidden_from -- so it goes through join_proposal() and nothing else.
 -- Granting UPDATE on it here would also contradict proposals_edit_guard, which lists distribution as
 -- server-owned: the guard would win, leaving a grant that advertises a write that always fails.
-grant update (title, window_start, window_end) on proposals to authenticated;
+grant update (title, window_start, window_end, area_name, area_lat, area_lon) on proposals to authenticated;
 
 -- availability_slots and events hold no column-level secrets -- a hold is wholly yours, and an
 -- event's attendee list is known to the people who can read the event at all -- so these are
@@ -389,6 +413,28 @@ revoke all on all tables in schema public from anon;
 alter default privileges in schema public revoke all on tables from anon;
 
 -- ---------------------------------------------------------------------------
+-- 8b) Place voting tables (#11). Readable by exactly the people who can read the plan, writable by
+--     nobody directly: every write goes through the functions in places.sql, which enforce the caps,
+--     the one-vote rule and the host-only veto. There is no insert, update or delete grant at all.
+--
+--     The `exists` subquery reads `proposals` AS THE CALLER, so proposals_read_involved and its
+--     hidden_from test apply -- the same technique as the users policy in users_auth.sql. A plan
+--     hidden from someone therefore hides its places and votes from them too.
+-- ---------------------------------------------------------------------------
+alter table proposal_places enable row level security;
+alter table place_votes enable row level security;
+revoke all on proposal_places, place_votes from authenticated, anon;
+grant select on proposal_places, place_votes to authenticated;
+
+drop policy if exists "places_read_involved" on proposal_places;
+create policy "places_read_involved" on proposal_places for select to authenticated
+  using (exists (select 1 from proposals p where p.id = proposal_places.proposal_id));
+
+drop policy if exists "votes_read_involved" on place_votes;
+create policy "votes_read_involved" on place_votes for select to authenticated
+  using (exists (select 1 from proposals p where p.id = place_votes.proposal_id));
+
+-- ---------------------------------------------------------------------------
 -- 9) Self-check. In single-transaction mode a failure here rolls the whole file back rather than
 --    leaving a half-installed policy set; statement-by-statement it prints the mismatch.
 -- ---------------------------------------------------------------------------
@@ -408,7 +454,8 @@ begin
   select string_agg(c.relname, ', ') into v_tables
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public' and c.relkind = 'r'
-     and c.relname in ('busy_blocks', 'events', 'availability_slots', 'proposals', 'circles', 'circle_members')
+     and c.relname in ('busy_blocks', 'events', 'availability_slots', 'proposals', 'circles', 'circle_members',
+                       'proposal_places', 'place_votes')
      and not c.relrowsecurity;
   if v_tables is not null then
     raise exception 'rls.sql: row level security is off on %', v_tables;

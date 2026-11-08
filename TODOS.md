@@ -66,9 +66,14 @@
 
 ### Runbook for applying this wave's SQL to a real Supabase project
 
-**What:** A short, ordered procedure for applying `schema.sql`, `rls.sql`, `lock_proposal.sql`,
-`users_auth.sql`, `join_proposal.sql`, `proposals_edit_guard.sql` and `my_commitments.sql` to a real
-project, including what to do when it errors mid-file.
+**What:** A short, ordered procedure for applying `schema.sql`, `schema_additions.sql`,
+`lock_proposal.sql`, `rls.sql`, `users_auth.sql`, `join_proposal.sql`, `commitments.sql` and the
+places file (`places.sql`, issue #11) to a real project, including what to do when it errors
+mid-file. The edit guard lives in `rls.sql` and the commitments RPC in `commitments.sql`; the
+earlier names `proposals_edit_guard.sql` and `my_commitments.sql` do not exist. The load order is
+`WAVE_SQL` at `scripts/test-sql.sh:60-63`, with `places.sql` after it. State one deploy-order rule:
+`lock_proposal` reads the places tables when it runs, so `places.sql` must be applied before anyone
+locks a plan on that project (2026-11-08 `/plan-eng-review` of #11 and #12, C-6, D7).
 
 **Why:** The 2026-11-07 CEO review's live Postgres probe found that under `--single-transaction` —
 the mode `schema.sql:2` tells you to use — `rls.sql` errors at `:49` and aborts eight follow-on
@@ -91,7 +96,9 @@ which is task E21's moment.
 
 **What:** The `realtime.sql` publication from issue #5 PR2 §4 — adding the tables `changes(for:)`
 subscribes to into the Supabase Realtime publication, plus an assertion of publication membership
-once there is a Realtime service to assert against.
+once there is a Realtime service to assert against. The list includes the two place-voting tables,
+`proposal_places` and `place_votes` (issue #11), or a friend's new suggestion or vote appears only
+after a manual refresh, with no error (2026-11-08 `/plan-eng-review` of #11 and #12, D8).
 
 **Why:** Accepted into Lane 1 by CEO D2 (which incorporates PR2 §4 wholesale) and carried by the
 2026-11-07 CEO review's own task T7, but **absent from the live 43-task engineering list with no
@@ -188,6 +195,24 @@ reference anywhere; decide whether it survives when this is picked up.
 **Priority:** P3
 **Depends on:** Issue #5 PR2 landing; a decision on whether a group or `expected_count` owns the
 quorum denominator (reopens D13).
+
+## Places
+
+### Show the winning place on the Invites list and My commitments rows
+
+**What:** Add the winning place name to a locked plan's row on the Invites list ("Locked · Sat, Nov 14 · 10:00–12:00") and to its My commitments row, with a truncation rule for long names.
+
+**Why:** People check the Invites tab to remember a plan, and the place is part of the answer to "where". Issue #10's rule R8 stops at the locked card and the share text, so the list rows say only when.
+
+**Pros:** Completes the story for friends who never reopen the invite; it is a small text change once the winner is on the proposal.
+
+**Cons:** It goes past what R8 says, adds a row-width and truncation decision on a dense list, and needs fixture and UI-test updates.
+
+**Context:** Raised by the 2026-11-08 `/plan-design-review` of place voting (#13) and deferred by the owner (TODO decision D30, option A). Start at the status line in `app/FriendCal/Views/Invites/InvitesView.swift` and at `CommitmentRow` in `app/FriendCal/Views/Me/MyCommitmentsView.swift`. R8 and decision 1.4A in `docs/designs/friendcal-places.md` define what is in scope today. When the lock morph TODO above is built, the winner row should join it.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Issue #12 (the winner on the proposal) and issue #14 shipped.
 
 ## Poke
 

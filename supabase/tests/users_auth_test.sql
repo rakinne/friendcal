@@ -160,4 +160,29 @@ select t.eq('anon is refused on users',
 select t.ok('authenticated cannot select a users column that does not exist in the grant',
   t.can_select('users', 'display_name') and t.can_select('users', 'deleted_at'));
 
+-- ===========================================================================
+-- 5. #11 lock order. protects=delete_account takes locks in the one order the other functions use, and
+--    its user-row lock cannot collide with the Busy-block insert in lock_proposal; fails_when=the
+--    plan locks move after the advisory locks, the row lock is strengthened, or the helper loses its
+--    ordering; no_claim=the interleavings themselves, which the two-session checks in
+--    scripts/test-sql.sh run against a real second connection.
+-- ===========================================================================
+select t.ok('delete_account takes its plan locks through the shared helper',
+  (select prosrc like '%friendcal_lock_plans%' from pg_proc where proname = 'delete_account'));
+select t.ok('...before it takes any advisory lock',
+  (select position('friendcal_lock_plans' in prosrc) > 0
+      and position('friendcal_lock_plans' in prosrc) < position('friendcal_lock_users' in prosrc)
+     from pg_proc where proname = 'delete_account'));
+select t.ok('delete_account locks the user row for no key update, not for update',
+  (select prosrc like '%u.id = v_uid for no key update%' and prosrc not like '%u.id = v_uid for update%'
+     from pg_proc where proname = 'delete_account'));
+select t.ok('the plan-lock helper locks in id order',
+  (select prosrc like '%order by id%for update%' from pg_proc where proname = 'friendcal_lock_plans'));
+select t.ok('the plan-lock helper is not callable by a client',
+  not has_function_privilege('authenticated', 'friendcal_lock_plans(uuid[])', 'EXECUTE')
+  and not has_function_privilege('anon', 'friendcal_lock_plans(uuid[])', 'EXECUTE'));
+select t.ok('users still has only its primary key as a unique index, so the tombstone update stays no-key',
+  (select count(*) = 1 from pg_index i where i.indrelid = 'public.users'::regclass and i.indisunique));
+
 \echo 'users_auth tests: all passed'
+

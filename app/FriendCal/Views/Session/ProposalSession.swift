@@ -53,6 +53,12 @@ final class ProposalSession {
     var members: [HomeMember]
     var proposal: Proposal?
     var slots: [AvailabilitySlot]
+    /// Place voting (#10): the plan's places and votes, and the board derived from them. Server-first:
+    /// they change only when the store's snapshot is applied, never optimistically.
+    private(set) var places: [Place] = []
+    private(set) var votes: [PlaceVote] = []
+    /// nil until a proposal is loaded.
+    private(set) var board: PlaceBoard?
     var lastUpdated: Date
     private(set) var proposalID: UUID?
     private(set) var screen: Screen = .ready
@@ -88,6 +94,8 @@ final class ProposalSession {
         isLoading = fixture.isLoading
         proposal = fixture.proposal
         slots = fixture.slots
+        places = fixture.places
+        votes = fixture.votes
         lastUpdated = fixture.lastUpdated
         needsLoad = false
         refresh(now: now())
@@ -116,7 +124,11 @@ final class ProposalSession {
     var isCreator: Bool { proposal?.isCreator(currentUserID) ?? false }
     var isRecipient: Bool { proposal?.isRecipient(currentUserID) ?? false }
     var creatorName: String? { proposal.flatMap { p in members.first { $0.id == p.createdBy }?.name } }
-    func name(of id: UUID) -> String { members.first { $0.id == id }?.name ?? "A friend" }
+    /// A departed friend is "A friend" (design: Departed friend), not the tombstone's "Deleted account".
+    func name(of id: UUID) -> String {
+        guard let name = members.first(where: { $0.id == id })?.name, name != User.deletedDisplayName else { return "A friend" }
+        return name
+    }
 
     // MARK: Lifecycle
 
@@ -167,6 +179,9 @@ final class ProposalSession {
         needsLoad = true
         proposal = nil
         slots = []
+        places = []
+        votes = []
+        board = nil
         screen = .loading
     }
 
@@ -176,8 +191,11 @@ final class ProposalSession {
     func apply(_ snapshot: ProposalSnapshot) {
         let wasRequesting = proposal?.status == .requesting
         let changed = snapshot.proposal != proposal || snapshot.slots != slots
+            || snapshot.places != places || snapshot.votes != votes
         proposal = snapshot.proposal
         slots = snapshot.slots
+        places = snapshot.places
+        votes = snapshot.votes
         members = snapshot.members.map { user in
             let known = members.first { $0.id == user.id }
             return HomeMember(id: user.id, name: user.displayName, isOnline: known?.isOnline ?? false, isActive: known?.isActive ?? false)
@@ -202,9 +220,10 @@ final class ProposalSession {
     /// changes, not recounts.
     func refresh(now: Date) {
         guard let p = proposal else {
-            weeks = []; visibleWeekID = nil; selectedCellID = nil; markFocusCellID = nil; lockState = nil
+            weeks = []; visibleWeekID = nil; selectedCellID = nil; markFocusCellID = nil; lockState = nil; board = nil
             return
         }
+        board = PlaceBoard.make(places: places, votes: votes, viewer: currentUserID)
         weeks = HeatmapBuilder.weeks(slots: slots, window: p.window, recipientIDs: p.distribution.recipientIDs, expectedCount: p.expectedCount,
                                      proposalID: p.id, now: now, calendar: calendar)
         if !weeks.contains(where: { $0.id == visibleWeekID }) { visibleWeekID = weeks.first?.id }
@@ -384,10 +403,94 @@ final class ProposalSession {
         do {
             let window = try ProposalService().validateLock(cell: cell, duration: duration)
             let locked = try await store.lock(p.id, window: window)
-            apply(ProposalSnapshot(proposal: locked, members: members.map { User(id: $0.id, displayName: $0.name) }, slots: slots.filter { $0.sourceProposalID != p.id }))
+            // Carry the places and votes this session holds: a snapshot built without them would blank
+            // the board, and `winner` could not resolve `lockedPlaceID` until a later stream delivery.
+            apply(ProposalSnapshot(proposal: locked, members: members.map { User(id: $0.id, displayName: $0.name) },
+                                   slots: slots.filter { $0.sourceProposalID != p.id }, places: places, votes: votes))
         } catch {
             throw UserFacingError.map(error, action: .lock, creatorName: creatorName)
         }
+    }
+
+    // MARK: Places (#10)
+
+    var hasArea: Bool { proposal?.area != nil }
+
+    /// Why Suggest is, or is not, offered (design 7.5A): the screen picks its muted line, or its no-city
+    /// row, from this one value.
+    var suggestAvailability: SuggestAvailability {
+        PlaceBoard.suggestAvailability(proposal: proposal, places: places, viewer: currentUserID)
+    }
+    var canSuggest: Bool { suggestAvailability == .available }
+
+    /// The place frozen at lock: the row `proposal.lockedPlaceID` names, on a locked plan only. Never
+    /// recomputed from votes, so it is nil when the plan locked with no winner even if `board.leaderID` is not.
+    var winner: Place? {
+        guard let p = proposal, p.isLocked, let id = p.lockedPlaceID else { return nil }
+        return places.first { $0.id == id }
+    }
+
+    /// What locking now would freeze, for the lock sheet.
+    var lockProjection: LockProjection { PlaceBoard.projection(places: places, votes: votes) }
+
+    /// The stored row, which may be an existing duplicate.
+    @discardableResult
+    func suggest(_ place: NewPlace) async throws -> Place {
+        let id = try placePlanID()
+        do {
+            let saved = try await store.suggestPlace(proposalID: id, place)
+            await adoptStoreState()
+            return saved
+        } catch {
+            throw UserFacingError.map(error, action: .suggestPlace, creatorName: creatorName)
+        }
+    }
+
+    /// nil clears the caller's vote.
+    func vote(_ placeID: UUID?) async throws {
+        let id = try placePlanID()
+        do {
+            try await store.votePlace(proposalID: id, placeID: placeID)
+            await adoptStoreState()
+        } catch {
+            throw UserFacingError.map(error, action: .votePlace, creatorName: creatorName)
+        }
+    }
+
+    /// Host only. `vetoed: false` is "Bring back".
+    func setVeto(_ placeID: UUID, vetoed: Bool) async throws {
+        _ = try placePlanID()
+        do {
+            _ = try await store.vetoPlace(placeID: placeID, vetoed: vetoed)
+            await adoptStoreState()
+        } catch {
+            let subject = places.first { $0.id == placeID }.map { name(of: $0.suggestedBy) }
+            throw UserFacingError.map(error, action: vetoed ? .vetoPlace : .bringBack, creatorName: creatorName, subjectName: subject)
+        }
+    }
+
+    /// The suggester withdraws their own place.
+    func withdraw(_ placeID: UUID) async throws {
+        _ = try placePlanID()
+        do {
+            try await store.removePlace(placeID: placeID)
+            await adoptStoreState()
+        } catch {
+            throw UserFacingError.map(error, action: .removePlace, creatorName: creatorName)
+        }
+    }
+
+    private func placePlanID() throws -> UUID {
+        guard let id = proposalID, proposal != nil else { throw UserFacingError(message: "This plan is gone.") }
+        return id
+    }
+
+    /// Mutations are server-first: after one succeeds, take the store's state rather than waiting for
+    /// the stream, so the result does not depend on delivery timing. The stream delivers the same
+    /// snapshot later, which changes nothing.
+    private func adoptStoreState() async {
+        guard let id = proposalID, let snapshot = try? await store.load(id) else { return }
+        apply(snapshot)
     }
 
     // MARK: Join / create / edit
@@ -410,8 +513,12 @@ final class ProposalSession {
             p.title = plan.title
             p.window = plan.window
             p.expectedCount = max(plan.expectedCount, p.joinedCount)
+            // The city travels with the rest of the edit. Copying only title, window and headcount would
+            // drop a city change while the dates are frozen.
+            p.area = plan.area
             let saved = try await store.update(p)
-            apply(ProposalSnapshot(proposal: saved, members: members.map { User(id: $0.id, displayName: $0.name) }, slots: slots))
+            apply(ProposalSnapshot(proposal: saved, members: members.map { User(id: $0.id, displayName: $0.name) },
+                                   slots: slots, places: places, votes: votes))
         } catch {
             throw UserFacingError.map(error, action: .edit, creatorName: creatorName)
         }

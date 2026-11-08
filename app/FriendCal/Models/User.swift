@@ -1,6 +1,10 @@
 import Foundation
 
 public struct User: Identifiable, Codable, Equatable {
+    /// What delete_account() leaves in display_name (supabase/users_auth.sql): the tombstone's name.
+    public static let deletedDisplayName = "Deleted account"
+    public var isDeleted: Bool { displayName == Self.deletedDisplayName }
+
     public var id: UUID
     public var displayName: String
     public var avatarURL: URL?

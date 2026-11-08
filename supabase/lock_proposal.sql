@@ -39,6 +39,27 @@ begin
 end $$;
 revoke all on function friendcal_lock_users(uuid[]) from public, anon, authenticated;
 
+-- ---------------------------------------------------------------------------
+-- THE PLAN-LOCK HELPER (#11, review R3). The same rule for plan rows: a function that locks several
+-- plans locks them here, `for update`, ordered by id. delete_account() is the caller that needs it,
+-- because it must lock every open plan the leaver created or voted on, and two deletions that share
+-- a voted plan would deadlock if each locked the plans in its own order. The order lives in this
+-- function and nowhere else, as it does for friendcal_lock_users.
+--
+-- Revoked from `authenticated` as well as public and anon: Supabase's default privileges grant
+-- EXECUTE on new functions to authenticated, so the shorter revoke would leave this callable.
+-- ---------------------------------------------------------------------------
+create or replace function friendcal_lock_plans(p_ids uuid[]) returns void
+language plpgsql
+as $$
+begin
+  perform 1 from proposals
+   where id = any (coalesce(p_ids, '{}'::uuid[]))
+   order by id
+     for update;
+end $$;
+revoke all on function friendcal_lock_plans(uuid[]) from public, anon, authenticated;
+
 -- Lock a proposal atomically (D3, D12; review D5). The creator picks the common window; the server
 -- re-derives who is free instead of trusting the client: a recipient counts when the union of their
 -- unexpired softHolds for this proposal covers the window (range_agg merges touching ranges, like
@@ -68,6 +89,7 @@ declare
   v_total int;
   v_free int;
   v_covering uuid[];
+  v_winner uuid;
 begin
   select * into v_prop from proposals where id = p_id for update;
   if not found then
@@ -119,7 +141,14 @@ begin
       using errcode = '22023', hint = 'FC_QUORUM';
   end if;
 
-  update proposals set status = 'locked', locked_date = p_start, locked_end = p_end where id = p_id;
+  -- The winning place is chosen by its own function (places.sql) and stored in the same statement
+  -- that sets the status, under the plan row lock taken at the top, so no vote can land between the
+  -- count and the update. It stays null when no non-vetoed place has a vote. places.sql must be
+  -- applied before any plan is locked on a database.
+  v_winner := friendcal_place_winner(p_id);
+  update proposals
+     set status = 'locked', locked_date = p_start, locked_end = p_end, locked_place_id = v_winner
+   where id = p_id;
   delete from availability_slots where source_proposal_id = p_id and state = 'softHold';
   begin
     return query

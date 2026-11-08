@@ -11,12 +11,15 @@ import Foundation
 public final class InMemoryProposalStore: ProposalStore {
     public enum Operation: Hashable, CaseIterable {
         case proposals, load, create, update, join, tapFree, release, lock, myCommitments, signIn, deleteAccount
+        case suggestPlace, votePlace, vetoPlace, removePlace
     }
 
     public private(set) var users: [User]
     public private(set) var proposals: [Proposal]
     public private(set) var slots: [AvailabilitySlot]
     public var busyBlocks: [BusyBlock]
+    public private(set) var places: [Place]
+    public private(set) var votes: [PlaceVote]
     public private(set) var currentUserID: UUID?
     public private(set) var authState: AuthState = .signedOut
     public private(set) var identityGeneration: Int = 0
@@ -36,11 +39,13 @@ public final class InMemoryProposalStore: ProposalStore {
     nonisolated(unsafe) private var continuations: [UUID: [UUID: AsyncStream<ProposalChange>.Continuation]] = [:]
     private let lock = NSLock()
 
-    public init(users: [User] = [], proposals: [Proposal] = [], slots: [AvailabilitySlot] = [], busyBlocks: [BusyBlock] = [], currentUserID: UUID? = nil, now: @escaping () -> Date = { .now }) {
+    public init(users: [User] = [], proposals: [Proposal] = [], slots: [AvailabilitySlot] = [], busyBlocks: [BusyBlock] = [], places: [Place] = [], votes: [PlaceVote] = [], currentUserID: UUID? = nil, now: @escaping () -> Date = { .now }) {
         self.users = users
         self.proposals = proposals
         self.slots = slots
         self.busyBlocks = busyBlocks
+        self.places = places
+        self.votes = votes
         self.currentUserID = currentUserID
         self.now = now
         self.authState = currentUserID.map(AuthState.signedIn) ?? .signedOut
@@ -104,14 +109,21 @@ public final class InMemoryProposalStore: ProposalStore {
         // it is unresolved -- CEO review C7 -- and is a policy question, not a code one.)
         let kept = proposals.filter { $0.createdBy == me && $0.status == .locked }.count
 
+        // The leaver's votes on plans that are still collecting: a departed person must not decide a
+        // winner. Plans cancelled just above are no longer requesting, so their votes stay as history,
+        // as do votes on locked plans. Suggestions stay: the tombstone survives, so they stay valid.
+        let collecting = Set(proposals.filter { $0.status == .requesting }.map(\.id))
+        let votedOn = Set(votes.filter { $0.voterID == me && collecting.contains($0.proposalID) }.map(\.proposalID))
+        votes.removeAll { $0.voterID == me && collecting.contains($0.proposalID) }
+
         // The tombstone. The row stays; the identifying content goes.
         if let index = users.firstIndex(where: { $0.id == me }) {
-            users[index].displayName = "Deleted account"
+            users[index].displayName = User.deletedDisplayName
             users[index].avatarURL = nil
         }
         deletedUserIDs.insert(me)
 
-        for id in cancelled { emit(id) }
+        for id in Set(cancelled).union(votedOn) { emit(id) }
         currentUserID = nil
         setAuth(.signedOut, bumpGeneration: true)
         return AccountDeletionReceipt(alreadyDeleted: false, cancelledPlans: cancelled.count,
@@ -145,9 +157,11 @@ public final class InMemoryProposalStore: ProposalStore {
     public func create(_ plan: NewProposal) async throws -> Proposal {
         let me = try await authorize(.create)
         ensureUser(me)
+        // The SQL check `proposals_area_all_or_none`: a city that is set must be valid.
+        if let area = plan.area, !area.isValid { throw Self.badCity() }
         let proposal = Proposal(id: UUID(), title: plan.title, window: plan.window, createdBy: me,
                                 distribution: Distribution(mode: .newGroup, recipientIDs: [me]),
-                                status: .requesting, createdAt: now(), expectedCount: plan.expectedCount)
+                                status: .requesting, createdAt: now(), area: plan.area, expectedCount: plan.expectedCount)
         proposals.append(proposal)
         return proposal
     }
@@ -165,10 +179,16 @@ public final class InMemoryProposalStore: ProposalStore {
         if edited.window != current.window, slots.contains(where: { $0.sourceProposalID == current.id && $0.state == .softHold }) {
             throw ProposalStoreError.server(code: "22023", message: "dates are locked once friends have marked times", hint: "FC_DATES_FROZEN")
         }
+        // The city (#10 R1): replaced while requesting, even with the dates frozen, but never cleared.
+        // Mirrors the edit guard in rls.sql; the status rule above already answered FC_LOCKED.
+        if current.area != nil, edited.area == nil {
+            throw ProposalStoreError.server(code: "22023", message: "a plan keeps its city; replace it instead of clearing it", hint: "FC_AREA_REQUIRED")
+        }
+        if let area = edited.area, !area.isValid { throw Self.badCity() }
         current.title = edited.title
         current.window = edited.window
         current.expectedCount = edited.expectedCount
-        current.venueHint = edited.venueHint
+        current.area = edited.area
         proposals[index] = current
         emit(current.id)
         return current
@@ -194,6 +214,139 @@ public final class InMemoryProposalStore: ProposalStore {
     public func myCommitments(from: Date) async throws -> [Commitment] {
         let me = try await authorize(.myCommitments)
         return Commitment.live(commitments(of: me), from: from, now: now())
+    }
+
+    // MARK: Places (#11's contract, check for check)
+
+    /// Mirrors `friendcal_places_plan` in places.sql, in the same order. The excluded caller and the
+    /// missing plan share ONE raise, and the exclusion is tested against `hiddenFrom` directly, never
+    /// through `isReadable(by:)`: that is also false for a non-member, and a non-member who is not
+    /// excluded must get FC_NOT_MEMBER, exactly as the SQL guard does.
+    private func placePlan(_ id: UUID?, as me: UUID) throws -> (index: Int, plan: Proposal) {
+        guard let id, let index = proposals.firstIndex(where: { $0.id == id }), !proposals[index].hiddenFrom.contains(me) else {
+            throw Self.refusal("P0002", "no such plan", "FC_NOT_FOUND")
+        }
+        let plan = proposals[index]
+        if deletedUserIDs.contains(me) { throw Self.refusal("42501", "this account has been deleted", "FC_ACCOUNT_DELETED") }
+        guard plan.isCreator(me) || plan.isRecipient(me) else { throw Self.refusal("42501", "you are not part of this plan", "FC_NOT_MEMBER") }
+        if plan.status == .locked { throw Self.refusal("55000", "this plan is locked", "FC_LOCKED") }
+        if plan.status != .requesting { throw Self.refusal("55000", "this plan is \(plan.status.rawValue)", "FC_CLOSED") }
+        return (index, plan)
+    }
+
+    private static func refusal(_ code: String, _ message: String, _ hint: String) -> ProposalStoreError {
+        .server(code: code, message: message, hint: hint)
+    }
+
+    private static func badCity() -> ProposalStoreError {
+        .server(code: "23514", message: "the city violates proposals_area_all_or_none", hint: nil)
+    }
+
+    private func activePlaces(on plan: UUID) -> [Place] { places.filter { $0.proposalID == plan && !$0.isVetoed } }
+
+    /// The personal cap before the plan cap, because it is the more actionable message.
+    private func checkCaps(plan: UUID, suggester: UUID) throws {
+        if activePlaces(on: plan).filter({ $0.suggestedBy == suggester }).count >= PlaceBoard.perPersonLimit {
+            throw Self.refusal("54000", "you have suggested \(PlaceBoard.perPersonLimit) places already", "FC_PLACE_LIMIT")
+        }
+        if activePlaces(on: plan).count >= PlaceBoard.planLimit {
+            throw Self.refusal("54000", "this plan already has \(PlaceBoard.planLimit) places", "FC_PLAN_FULL")
+        }
+    }
+
+    public func suggestPlace(proposalID: UUID, _ place: NewPlace) async throws -> Place {
+        let me = try await authorize(.suggestPlace)
+        let (_, plan) = try placePlan(proposalID, as: me)
+        guard plan.area != nil else { throw Self.refusal("P0001", "the host has not picked a city yet", "FC_NO_AREA") }
+
+        // Field shape only, with the SQL's trimming: `btrim` removes spaces, `char_length` counts code points.
+        let normalized = NewPlace(name: PlaceText.trim(place.name), address: PlaceText.trimmedOrNil(place.address),
+                                  latitude: place.latitude, longitude: place.longitude, mapRef: PlaceText.trimmedOrNil(place.mapRef))
+        guard !normalized.name.isEmpty, normalized.name.unicodeScalars.count <= 120,
+              (normalized.address?.unicodeScalars.count ?? 0) <= 240,
+              (normalized.mapRef?.unicodeScalars.count ?? 0) <= 200,
+              normalized.latitude.isFinite, normalized.longitude.isFinite,
+              (-90.0...90.0).contains(normalized.latitude), (-180.0...180.0).contains(normalized.longitude) else {
+            throw Self.refusal("22023", "invalid place", "FC_BAD_PLACE")
+        }
+
+        // An active duplicate returns the existing row; a duplicate of only a vetoed place is refused.
+        if let match = PlaceBoard.existing(matching: normalized, in: places.filter { $0.proposalID == proposalID }) {
+            if match.isVetoed { throw Self.refusal("P0001", "the host passed on that place", "FC_VETOED") }
+            return match
+        }
+        try checkCaps(plan: proposalID, suggester: me)
+
+        let saved = Place(id: UUID(), proposalID: proposalID, suggestedBy: me, name: normalized.name, address: normalized.address,
+                          latitude: normalized.latitude, longitude: normalized.longitude, mapRef: normalized.mapRef,
+                          vetoedAt: nil, createdAt: now())
+        places.append(saved)
+        emit(proposalID)
+        return saved
+    }
+
+    public func votePlace(proposalID: UUID, placeID: UUID?) async throws {
+        let me = try await authorize(.votePlace)
+        _ = try placePlan(proposalID, as: me)
+        guard let placeID else {
+            votes.removeAll { $0.proposalID == proposalID && $0.voterID == me }
+            emit(proposalID)
+            return
+        }
+        guard let place = places.first(where: { $0.id == placeID && $0.proposalID == proposalID }) else {
+            throw Self.refusal("P0002", "that place is not on this plan", "FC_PLACE_NOT_FOUND")
+        }
+        if place.isVetoed { throw Self.refusal("P0001", "the host passed on that place", "FC_VETOED") }
+        if place.suggestedBy == me { throw Self.refusal("42501", "you cannot vote for your own suggestion", "FC_OWN_PLACE") }
+        // Moving a vote rewrites its time; repeating the same vote changes nothing, because the order of
+        // voters on a row depends on it.
+        if let index = votes.firstIndex(where: { $0.proposalID == proposalID && $0.voterID == me }) {
+            guard votes[index].placeID != placeID else { return }
+            votes[index].placeID = placeID
+            votes[index].createdAt = now()
+        } else {
+            votes.append(PlaceVote(proposalID: proposalID, voterID: me, placeID: placeID, createdAt: now()))
+        }
+        emit(proposalID)
+    }
+
+    public func vetoPlace(placeID: UUID, vetoed: Bool) async throws -> Place {
+        let me = try await authorize(.vetoPlace)
+        // An unknown place id becomes a nil plan id, which raises the same FC_NOT_FOUND as an excluded
+        // caller: a distinct "place not found" would let an excluded caller tell a real id from a fake one.
+        let planID = places.first { $0.id == placeID }?.proposalID
+        let (_, plan) = try placePlan(planID, as: me)
+        guard let index = places.firstIndex(where: { $0.id == placeID }) else { throw Self.refusal("P0002", "no such plan", "FC_NOT_FOUND") }
+        guard plan.createdBy == me else { throw Self.refusal("42501", "only the host can pass on a place", "FC_NOT_CREATOR") }
+        if vetoed {
+            if places[index].vetoedAt == nil {
+                places[index].vetoedAt = now()
+                votes.removeAll { $0.placeID == placeID }
+            }
+        } else if places[index].vetoedAt != nil {
+            // Bring it back as if it were being added now: the caps count active places only.
+            try checkCaps(plan: places[index].proposalID, suggester: places[index].suggestedBy)
+            places[index].vetoedAt = nil
+        }
+        emit(places[index].proposalID)
+        return places[index]
+    }
+
+    public func removePlace(placeID: UUID) async throws {
+        let me = try await authorize(.removePlace)
+        let planID = places.first { $0.id == placeID }?.proposalID
+        _ = try placePlan(planID, as: me)
+        guard let index = places.firstIndex(where: { $0.id == placeID }) else { throw Self.refusal("P0002", "no such plan", "FC_NOT_FOUND") }
+        guard places[index].suggestedBy == me else {
+            throw Self.refusal("42501", "only the person who suggested a place can remove it", "FC_NOT_YOUR_PLACE")
+        }
+        // A place the host passed on stays: the vetoed row is what refuses a re-suggestion, so
+        // deleting it would let the same place come back as an active one.
+        guard places[index].vetoedAt == nil else { throw Self.refusal("P0001", "the host passed on that place", "FC_VETOED") }
+        let plan = places[index].proposalID
+        places.remove(at: index)
+        votes.removeAll { $0.placeID == placeID }
+        emit(plan)
     }
 
     public func tapFree(proposalID: UUID, range: DateRange, expiresAt: Date?) async throws -> AvailabilitySlot {
@@ -264,6 +417,9 @@ public final class InMemoryProposalStore: ProposalStore {
             throw ProposalStoreError.server(code: "22023", message: "need \(need) percent free, only \(have) percent", hint: "FC_QUORUM")
         }
         ProposalService.apply(window: window, to: &p, attendees: promoted.map(\.userID), at: at)
+        // The winner is chosen by the one rule and stored in the same mutation as the status
+        // (friendcal_place_winner in places.sql); nil when no non-vetoed place has a vote.
+        p.lockedPlaceID = PlaceBoard.winner(places: places.filter { $0.proposalID == id }, votes: votes.filter { $0.proposalID == id })
         proposals[index] = p
         slots.removeAll { cleared.contains($0.id) }
         busyBlocks.append(contentsOf: promoted)
@@ -296,11 +452,13 @@ public final class InMemoryProposalStore: ProposalStore {
     // MARK: Seeding
 
     /// Replaces the seeded rows (fixtures, previews).
-    public func seed(users: [User], proposals: [Proposal], slots: [AvailabilitySlot], busyBlocks: [BusyBlock] = [], currentUserID: UUID?) {
+    public func seed(users: [User], proposals: [Proposal], slots: [AvailabilitySlot], busyBlocks: [BusyBlock] = [], places: [Place] = [], votes: [PlaceVote] = [], currentUserID: UUID?) {
         self.users = users
         self.proposals = proposals
         self.slots = slots
         self.busyBlocks = busyBlocks
+        self.places = places
+        self.votes = votes
         self.currentUserID = currentUserID
     }
 
@@ -308,6 +466,8 @@ public final class InMemoryProposalStore: ProposalStore {
     public func remove(proposalID: UUID) {
         proposals.removeAll { $0.id == proposalID }
         slots.removeAll { $0.sourceProposalID == proposalID }
+        places.removeAll { $0.proposalID == proposalID }
+        votes.removeAll { $0.proposalID == proposalID }
         emit(proposalID)
     }
 
@@ -315,7 +475,8 @@ public final class InMemoryProposalStore: ProposalStore {
     public func snapshot(of id: UUID) throws -> ProposalSnapshot {
         guard let p = proposals.first(where: { $0.id == id }) else { throw ProposalStoreError.notFound(id) }
         let members = p.joinedIDs.map { uid in users.first { $0.id == uid } ?? User(id: uid, displayName: "Friend") }
-        return ProposalSnapshot(proposal: p, members: members, slots: slots.filter { $0.sourceProposalID == id })
+        return ProposalSnapshot(proposal: p, members: members, slots: slots.filter { $0.sourceProposalID == id },
+                                places: places.filter { $0.proposalID == id }, votes: votes.filter { $0.proposalID == id })
     }
 
     // MARK: Private

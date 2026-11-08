@@ -84,4 +84,44 @@ final class ProposalDraftTests: XCTestCase {
         XCTAssertEqual(draft.expectedCount, 6)
         XCTAssertEqual(draft.window(calendar: cal), p.window)
     }
+
+
+    // MARK: city (#10, places)
+
+    private let austin = SearchArea(name: "Austin, TX", latitude: 30.2672, longitude: -97.7431)
+
+    /// protects=Create can require a city and the draft reports .noArea only then; the validated plan
+    /// carries the city; fails_when=a missing city passes while required, or is demanded while not (the
+    /// shipped New plan flow has no city field until #14); no_claim=the city field itself, built in #14.
+    func testNoAreaOnlyWhenRequired() throws {
+        var draft = ProposalDraft(from: d(11, 9), to: d(11, 22))
+        XCTAssertFalse(draft.requiresArea, "false by default so the shipped create flow still works")
+        XCTAssertEqual(draft.errors(calendar: cal), [])
+        XCTAssertNil(try draft.validate(calendar: cal).area)
+        draft.requiresArea = true
+        XCTAssertEqual(draft.errors(calendar: cal), [.noArea])
+        XCTAssertThrowsError(try draft.validate(calendar: cal)) { XCTAssertEqual($0 as? ProposalDraft.ValidationError, .noArea) }
+        draft.area = austin
+        XCTAssertEqual(draft.errors(calendar: cal), [])
+        XCTAssertEqual(try draft.validate(calendar: cal).area, austin)
+    }
+
+    /// protects=editing seeds the plan's current city and never requires one, so a title-only edit saves
+    /// the city back unchanged and a plan from before places can still be renamed; fails_when=the city
+    /// is dropped on edit (the bug the outside review found), or a legacy plan is blocked; no_claim=the
+    /// session and store paths, which ProposalSessionTests and InMemoryPlaceStoreTests cover.
+    func testEditingSeedsTheCityAndNeverRequiresIt() throws {
+        let window = DateRange(lower: d(11, 9), upper: d(11, 22))
+        let withCity = Proposal(id: UUID(), title: "Brunch", window: window, createdBy: UUID(),
+                                distribution: Distribution(mode: .newGroup, recipientIDs: []), area: austin, expectedCount: 4)
+        let seeded = ProposalDraft(editing: withCity)
+        XCTAssertEqual(seeded.area, austin)
+        XCTAssertFalse(seeded.requiresArea)
+        XCTAssertEqual(try seeded.validate(calendar: cal).area, austin)
+        var legacy = withCity; legacy.area = nil
+        let old = ProposalDraft(editing: legacy)
+        XCTAssertNil(old.area)
+        XCTAssertFalse(old.requiresArea)
+        XCTAssertEqual(old.errors(calendar: cal), [])
+    }
 }

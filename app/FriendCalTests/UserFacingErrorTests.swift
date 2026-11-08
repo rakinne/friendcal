@@ -115,6 +115,57 @@ final class UserFacingErrorTests: XCTestCase {
         XCTAssertTrue(unmapped.isEmpty,
                       "SQL raises these with no sentence in UserFacingError: \(unmapped.sorted())")
     }
+    // MARK: place voting (#10, #11). Sentences are the design document's Copy section.
+
+    private func sentence(_ code: String, _ hint: String?, _ action: UserFacingError.Action, host: String? = "Sam", subject: String? = nil) -> String {
+        UserFacingError.map(server(code, hint), action: action, creatorName: host, subjectName: subject).message
+    }
+
+    /// protects=every place hint reads its sentence, and the hints whose meaning depends on the action
+    /// (caps on a bring-back, a vetoed place on a vote, a lock on a place action, not-a-member) read
+    /// differently; fails_when=a place failure shows "marking times", "lock", or the generic sentence;
+    /// no_claim=final copy for the rows the design document marks Proposed.
+    func testPlaceHints() {
+        XCTAssertEqual(sentence("P0001", "FC_NO_AREA", .suggestPlace), "Sam hasn't picked a city yet.")
+        XCTAssertEqual(sentence("P0001", "FC_NO_AREA", .suggestPlace, host: nil), "The host hasn't picked a city yet.")
+        XCTAssertEqual(sentence("54000", "FC_PLACE_LIMIT", .suggestPlace), "You've suggested 2 places. Withdraw one to add another.")
+        XCTAssertEqual(sentence("54000", "FC_PLACE_LIMIT", .bringBack, subject: "Maya"), "Can't bring this back: Maya already has 2 places.")
+        XCTAssertEqual(sentence("54000", "FC_PLACE_LIMIT", .bringBack), "Can't bring this back: that friend already has 2 places.", "no subject name falls back to 'that friend'")
+        XCTAssertEqual(sentence("54000", "FC_PLAN_FULL", .suggestPlace), "This plan already has 10 places.")
+        XCTAssertEqual(sentence("54000", "FC_PLAN_FULL", .bringBack), "Can't bring this back: the plan already has 10 places.")
+        XCTAssertEqual(sentence("42501", "FC_OWN_PLACE", .votePlace), "You can't vote for your own suggestion.")
+        XCTAssertEqual(sentence("P0001", "FC_VETOED", .votePlace), "The host passed on this place.")
+        XCTAssertEqual(sentence("P0001", "FC_VETOED", .suggestPlace), "The host passed on that place.")
+        XCTAssertEqual(sentence("22023", "FC_BAD_PLACE", .suggestPlace), "Couldn't save that place. Try another.")
+        XCTAssertEqual(sentence("P0002", "FC_PLACE_NOT_FOUND", .votePlace), "That place is gone.")
+        XCTAssertEqual(sentence("42501", "FC_NOT_YOUR_PLACE", .removePlace), "Only the person who suggested a place can withdraw it.")
+        XCTAssertEqual(sentence("22023", "FC_AREA_REQUIRED", .edit), "Every plan keeps a city. Choose a different one instead.")
+        // Existing hints that read differently for a place action.
+        XCTAssertEqual(sentence("42501", "FC_NOT_MEMBER", .suggestPlace), "Join this plan to suggest or vote.")
+        XCTAssertEqual(sentence("42501", "FC_NOT_MEMBER", .mark), "Join this plan before marking times.", "unchanged for marking times")
+        XCTAssertEqual(sentence("55000", "FC_LOCKED", .votePlace), "This plan just locked. Voting is closed.")
+        XCTAssertEqual(sentence("55000", "FC_LOCKED", .lock), "This plan is already locked.", "unchanged for locking")
+        XCTAssertEqual(sentence("42501", "FC_NOT_CREATOR", .vetoPlace), "Only Sam can pass on a place.")
+        XCTAssertEqual(sentence("42501", nil, .bringBack), "Only Sam can pass on a place.")
+        XCTAssertEqual(sentence("42501", nil, .suggestPlace), "Join this plan to suggest or vote.")
+    }
+
+    /// protects=network failures and unknown codes on a place action read the action's fallback, never
+    /// the lock wording an unhinted 22023 or 55000 would give; fails_when=a place failure says "Not
+    /// enough friends are free"; no_claim=live error shapes.
+    func testPlaceFallbacks() {
+        let rows: [(UserFacingError.Action, String)] = [
+            (.suggestPlace, "Couldn't add that place. Retry."), (.votePlace, "Couldn't save your vote. Retry."),
+            (.vetoPlace, "Couldn't update that place. Retry."), (.bringBack, "Couldn't update that place. Retry."),
+            (.removePlace, "Couldn't remove that place. Retry."),
+        ]
+        for (action, text) in rows {
+            XCTAssertEqual(UserFacingError.map(ProposalStoreError.network("offline"), action: action).message, text)
+            XCTAssertEqual(sentence("XX000", nil, action), text)
+            XCTAssertEqual(sentence("22023", nil, action), text, "an unhinted 22023 is not a quorum failure here")
+            XCTAssertEqual(sentence("55000", nil, action), text)
+        }
+    }
 }
 
 private extension String {
@@ -128,4 +179,6 @@ private extension String {
         }
         return result
     }
+
+
 }
