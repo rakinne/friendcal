@@ -1,0 +1,47 @@
+# The SQL lane in CI (eng review D18, mechanism corrected by outside-voice F10a).
+#
+# Deliberately NO `services: postgres:` block. A service container gives a *server* on TCP, but
+# scripts/test-sql.sh does not want a server -- it runs `initdb` and `pg_ctl` itself to spin a
+# throwaway cluster on a private Unix socket, and it needs those binaries on the host. Ubuntu
+# runners ship them under /usr/lib/postgresql/<major>/bin, so PG_BIN points there.
+#
+# Postgres 15 is the floor: `security_invoker` views, which the stealth boundary depends on, do not
+# exist on 14. The step below picks the newest installed major and fails loudly below 15 rather than
+# silently testing something the approved scope cannot run on.
+name: sql
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The harness compares against origin/main's schema.sql to test the upgrade path on a
+          # populated database, so it needs more than a shallow clone of the PR head.
+          fetch-depth: 0
+
+      - name: Locate Postgres server binaries (15+)
+        run: |
+          set -euo pipefail
+          for v in 18 17 16 15; do
+            if [ -x "/usr/lib/postgresql/$v/bin/initdb" ]; then
+              echo "PG_BIN=/usr/lib/postgresql/$v/bin" >> "$GITHUB_ENV"
+              echo "Using Postgres $v"
+              exit 0
+            fi
+          done
+          echo "No Postgres 15+ server binaries on the runner; installing postgresql-15" >&2
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-15
+          test -x /usr/lib/postgresql/15/bin/initdb
+          echo "PG_BIN=/usr/lib/postgresql/15/bin" >> "$GITHUB_ENV"
+
+      - name: Make origin/main available for the upgrade check
+        run: git fetch --no-tags origin main:refs/remotes/origin/main || true
+
+      - name: scripts/test-sql.sh
+        run: ./scripts/test-sql.sh

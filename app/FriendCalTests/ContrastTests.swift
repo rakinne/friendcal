@@ -58,6 +58,36 @@ final class ContrastTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(Self.ratio(C.onPrimary, C.primary), 3.0, "Poke label (17pt semibold)")
     }
 
+    /// protects=the destructive label on Me and on the deletion screen meets AA on both canvases,
+    /// and records WHY a second red token exists; fails_when=`errorText` lightens, or someone points
+    /// a destructive label at `error` again; no_claim=non-text uses of `error` as a fill or icon,
+    /// which are held to the 3:1 bar below.
+    ///
+    /// "Delete account" is the only irreversible action in the app. The design review quoted 4.62:1
+    /// for it, which does not reproduce: re-deriving `error` on `background` through the same
+    /// formula this file uses gives 3.79:1 -- below AA -- and it is still only 4.01:1 on `surface`,
+    /// so the shortfall was not a canvas mix-up. Hence `errorText`.
+    func testDestructiveLabelMeetsAA() {
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.errorText, C.background), 4.5, "Delete account on canvas")
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.errorText, C.surface), 4.5, "Delete account on a card")
+
+        // The regression this pair of tokens exists to prevent. If `error` ever passes, the palette
+        // changed and the two tokens should be reconsidered -- but silently reverting to `error` for
+        // a label must fail here first.
+        XCTAssertLessThan(Self.ratio(C.error, C.background), 4.5,
+                          "`error` is a fill token; if it now passes as text, revisit DesignTokens")
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.error, C.background), 3.0,
+                                    "`error` as a non-text fill still meets 1.4.11")
+    }
+
+    /// protects=the chevron on Me's commitments row meets the 3:1 non-text bar (WCAG 1.4.11), which
+    /// is why it is `accentHover` and not `accent`; fails_when=either teal token lightens or the
+    /// chevron is pointed back at `accent`; no_claim=text contrast, covered above.
+    func testNonTextAffordancesMeet3to1() {
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.accentHover, C.surface), 3.0, "commitments chevron on a card")
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.accentHover, C.background), 3.0, "chevron on canvas")
+    }
+
     /// `top` at `alpha` composited over `base` in sRGB space, as a SwiftUI opacity overlay draws it.
     private static func blend(_ top: Color, over base: Color, alpha: Double) -> Color {
         let t = top.resolve(in: EnvironmentValues()), b = base.resolve(in: EnvironmentValues())

@@ -83,8 +83,15 @@ final class InMemoryProposalStoreTests: XCTestCase {
         guard case .snapshot(let snap)? = await first.value else { return XCTFail("no snapshot") }
         XCTAssertEqual(snap.slots, [slot])
         XCTAssertEqual(snap.members.map(\.displayName), ["Sam", "Maya", "Leo"])
-        let commitments = try await s.myCommitments()
-        XCTAssertEqual(commitments, [slot])
+        // The seam now returns Commitment, not AvailabilitySlot: the hold comes back as `held`, with
+        // the plan it is for and that plan's name, which a slot had nowhere to carry.
+        let commitments = try await s.myCommitments(from: range.lowerBound)
+        XCTAssertEqual(commitments.map(\.id), [slot.id])
+        XCTAssertEqual(commitments.first?.kind, .held)
+        XCTAssertEqual(commitments.first?.range, range)
+        XCTAssertEqual(commitments.first?.sourceProposalID, p.id)
+        XCTAssertEqual(commitments.first?.planTitle, p.displayTitle, "Maya is a recipient, so she may know the name")
+        XCTAssertEqual(commitments.first?.expiresAt, slot.expiresAt)
     }
 
     /// protects=hold writes are refused for a non-member, on a locked plan, outside the window and

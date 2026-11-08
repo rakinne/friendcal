@@ -21,6 +21,8 @@ enum FixtureScenario: String, CaseIterable {
     case lockedPlan            // locked Sat Nov 14 12:00-14:00; you (Maya) are in
     case lockedWithoutYou      // locked; you (Cleo) weren't free then
     case lockedLateJoiner      // locked; you (Pia) joined after the lock
+    case signedOut             // populated roster but no signed-in identity (gate test)
+    case expiringHold          // one hold expired, one expiring in 2h (G18)
     case invites               // several plans for the Invites list order
 
     /// `-FriendCalFixture <name>` on the launch arguments (UI tests); populated otherwise.
@@ -138,6 +140,12 @@ enum FixtureData {
             return locked(group: group, you: member("Cleo"), now: now, calendar: calendar)
         case .lockedLateJoiner:
             return locked(group: group, you: member("Pia"), lateJoiner: true, now: now, calendar: calendar)
+        case .signedOut:
+            var f = populated(group: group, members: members, weeks: 2, now: now, calendar: calendar)
+            f.currentUserID = nil
+            return f
+        case .expiringHold:
+            return expiringHold(group: group, now: now, calendar: calendar)
         case .invites:
             var f = invite(group: group, you: member("Sam"), now: now, calendar: calendar)
             f.extraProposals = invitesList(calendar: calendar)
@@ -160,6 +168,16 @@ enum FixtureData {
         let proposals = [fixture.proposal].compactMap { $0 } + fixture.extraProposals
         let current = fixture.currentUserID ?? fixture.proposal?.createdBy ?? fixture.members.first?.id
         return InMemoryProposalStore(users: users, proposals: proposals, slots: fixture.slots, busyBlocks: fixture.busyBlocks, currentUserID: current, now: clock)
+    }
+
+    private static func expiringHold(group: String, now: Date, calendar: Calendar) -> HomeFixture {
+        var f = populated(group: group, members: members, weeks: 2, now: now, calendar: calendar)
+        guard let proposal = f.proposal else { return f }
+        let expired = AvailabilitySlot(id: fixtureID(8100), userID: members[0].id, range: DateRange(lower: now.addingTimeInterval(3600), upper: now.addingTimeInterval(7200)), sourceProposalID: proposal.id, state: .softHold, createdAt: now.addingTimeInterval(-3600), expiresAt: now.addingTimeInterval(-60))
+        let expiring = AvailabilitySlot(id: fixtureID(8101), userID: members[0].id, range: DateRange(lower: now.addingTimeInterval(7200), upper: now.addingTimeInterval(10800)), sourceProposalID: proposal.id, state: .softHold, createdAt: now, expiresAt: now.addingTimeInterval(7200))
+        f.slots = [expired, expiring] + f.slots
+        f.currentUserID = members[0].id
+        return f
     }
 
     // MARK: Builders

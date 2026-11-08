@@ -16,7 +16,7 @@ scripts/fetch-fonts.sh
 open app/FriendCal.xcodeproj
 ```
 
-Tests: see `## Testing` in CLAUDE.md (core, sql and ios lanes). The sql lane needs Postgres 14+.
+Tests: see `## Testing` in CLAUDE.md (core, sql and ios lanes). The sql lane needs Postgres 15+.
 
 Backend: run `supabase/schema.sql`, `supabase/rls.sql`, then `supabase/lock_proposal.sql` in the
 Supabase SQL editor. On an existing project, run only `lock_proposal.sql` (it is idempotent).

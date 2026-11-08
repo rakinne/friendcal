@@ -7,25 +7,18 @@ public final class StealthService {
 
     public init() {}
 
-    public struct SanitizedBusy: Codable, Equatable {
-        public var id: UUID
-        public var userID: UUID
-        public var range: DateRange
-        public init(id: UUID, userID: UUID, range: DateRange) {
-            self.id = id
-            self.userID = userID
-            self.range = range
-        }
-        // No title, no location, no host avatar, no attendee list
-        // Render as identical grey "Busy" — same component as manual Busy
-    }
+    /// `SanitizedBusy` now lives beside `BusyBlock` in Models, next to the blanking that produces it,
+    /// so there is one definition of "what is safe to show" rather than one per service. This alias
+    /// keeps existing call sites compiling.
+    public typealias SanitizedBusy = FriendCalCore.SanitizedBusy
 
-    /// Server-side read transform: what viewer is allowed to see for a BusyBlock.
-    /// If viewer is in hiddenFrom → return sanitized Busy with no correlation metadata.
+    /// What any viewer is allowed to see for a BusyBlock.
+    ///
+    /// Delegates to `BusyBlock.sanitizedBusy`, the one named blanking site, rather than listing the
+    /// safe fields again here. The result is deliberately the same for every viewer: a payload whose
+    /// shape varied by viewer would let an excluded one detect that they were excluded.
     func sanitize(_ block: BusyBlock, for viewer: UUID) -> SanitizedBusy {
-        // Enforce: if block.hiddenFrom.contains(viewer) → strip everything except range+user
-        // Applies to Event-backed blocks (Mica->Jalen Surprise Brunch Nov 7) and any stealth block
-        return SanitizedBusy(id: block.id, userID: block.userID, range: block.range)
+        block.sanitizedBusy
     }
 
     /// For included viewers, return full Event-backed context (invite art, etc.)

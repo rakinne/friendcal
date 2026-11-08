@@ -64,6 +64,76 @@
 **Priority:** P1
 **Depends on:** None
 
+### Runbook for applying this wave's SQL to a real Supabase project
+
+**What:** A short, ordered procedure for applying `schema.sql`, `rls.sql`, `lock_proposal.sql`,
+`users_auth.sql`, `join_proposal.sql`, `proposals_edit_guard.sql` and `my_commitments.sql` to a real
+project, including what to do when it errors mid-file.
+
+**Why:** The 2026-11-07 CEO review's live Postgres probe found that under `--single-transaction` —
+the mode `schema.sql:2` tells you to use — `rls.sql` errors at `:49` and aborts eight follow-on
+statements, leaving **zero policies and all four tables denying everything**. That fails closed,
+which is the right direction, but the operator sees one error message and has no stated recovery.
+
+**Context:** Found by the 2026-11-07 `/plan-ceo-review` re-cost (Section 9 CRITICAL GAP, decision
+D5). `scripts/test-sql.sh:38-62` already encodes the working order for the test harness and is the
+source to transcribe from; what it does not encode is recovery from the single-transaction abort,
+which is the failure the probe actually found. E9 raises the Postgres floor to 15, which the runbook
+should state, because `security_invoker` does not exist in 14 and `test-sql.sh:16` would silently
+select it if 15 were absent.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Lane 1's SQL existing. Trigger: before the first real Supabase project is created,
+which is task E21's moment.
+
+### Realtime publication for the tables the client subscribes to
+
+**What:** The `realtime.sql` publication from issue #5 PR2 §4 — adding the tables `changes(for:)`
+subscribes to into the Supabase Realtime publication, plus an assertion of publication membership
+once there is a Realtime service to assert against.
+
+**Why:** Accepted into Lane 1 by CEO D2 (which incorporates PR2 §4 wholesale) and carried by the
+2026-11-07 CEO review's own task T7, but **absent from the live 43-task engineering list with no
+decision moving it** — found by the 2026-11-07 re-cost while reconciling prior task lists. Without
+it, the next wave's `changes(for:)` subscribes to tables that publish nothing and live updates
+silently never arrive.
+
+**Context:** Deferred out of Lane 1 by decision D7 on 2026-11-07, because `changes(for:)` inside
+`SupabaseProposalStore` is its only consumer and that is next-wave work (CEO D7), so publication
+membership cannot be meaningfully verified this wave. One `alter publication` statement plus a test
+row; roughly 20 CC-minutes. The scope document's Lane 1 line now names this as its one exception to
+"PR2 §4" so the plan and the task list agree.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** `SupabaseProposalStore` (task E20), which is what consumes it.
+
+### A decision record in the repository
+
+**What:** Two steps. (1) Commit `docs/designs/friendcal-blocked-day-scope.md`, which is **untracked**
+today. (2) Add the engineering decisions and their one-line rationales to `docs/DECISIONS.md` — the
+eng delta review's D1-D9 and the CEO re-cost's D2-D7 — so the reasoning behind the privacy boundary
+lives in the repo rather than only in review transcripts.
+
+**Why:** Verified on 2026-11-07: a fresh clone at `30f9261` carries **none** of the five review
+artifacts. The scope document is untracked and `TODOS.md`'s additions are uncommitted, so the
+reasoning for revoking three columns from `busy_blocks`, for `my_commitments()` existing as a definer
+function at all, and for what "deleted" means is reachable only from one machine's home directory.
+This is the second occurrence of a failure the design review already diagnosed for its own half:
+design 1.3A was approved and then lived only inside a review file until a later review found five
+surfaces with no DESIGN.md entry.
+
+**Context:** Found by the 2026-11-07 `/plan-ceo-review` re-cost (Section 10 CRITICAL GAP, sharpened
+by the Codex outside voice, decision D6). The requirement is the decisions and their rationale, not
+the ~450 KB of transcripts. `docs/DECISIONS.md` already exists as Lane 4's artifact destination, so
+there is a file to extend rather than invent. Task G12 covers the design half by writing five
+Components entries into DESIGN.md; nothing covered the engineering half.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None. The decisions already exist in writing — just not in the repository.
+
 ## Invites
 
 ### Next step for a friend who wasn't free
@@ -91,6 +161,129 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** Issue #5 PR2 (Team ID, entitlements); owning friendcal.app; a public TestFlight link.
+
+## Groups
+
+### Groups as a real entity (saved crew as proposal recipients)
+
+**What:** Wire the existing `circles` and `circle_members` tables (`supabase/schema.sql:73,78`) with
+RLS, add a Groups screen on the Groups tab (`app/FriendCal/Views/Shell/AppTabView.swift:45` is a
+stub), and let a saved group be the recipients of a new plan from `CreateProposalSheet`.
+
+**Why:** today the only distribution path is re-sharing a link to ten people. Picking
+"Friendsgivemas crew" is the design doc's Circle/Group entity (`docs/designs/friendcal-hub.md:44`).
+It would also close the `gstack-shortcut(R1)` at `supabase/rls.sql:58`, which names `circle_members`
+as its own upgrade trigger — though issue #5 D6's proposal-scoped RLS supersedes that marker, so
+Groups is no longer required for the privacy boundary.
+
+**Context:** Deferred by the 2026-11-07 /plan-ceo-review (decision D4). **Deferral reason:** a saved
+group wants to be the quorum denominator, which reopens issue #5 D13 (`total = max(expected_count,
+joined)`, chosen deliberately because join-by-link makes the joined set the wrong denominator — the
+creator alone would reach 80% with one tap). It also adds a second membership model beside proposal
+recipients, before a single plan has been locked across two phones. Revisit once one real group has
+used the loop twice. `struct Circle` (`app/FriendCal/Models/User.swift:20`) is declared and has no
+reference anywhere; decide whether it survives when this is picked up.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Issue #5 PR2 landing; a decision on whether a group or `expected_count` owns the
+quorum denominator (reopens D13).
+
+## Poke
+
+### Poke's build: pokes table, Edge Function, APNs, inbox
+
+**What:** A `pokes` table, an Edge Function that sends the sanitized push, APNs configuration,
+device-token registration, and a Pokes inbox on the Pokes tab
+(`app/FriendCal/Views/Shell/AppTabView.swift:46` is a stub). Home's Poke button is an honest stub
+today: impact haptic plus a toast (`app/FriendCal/Views/Home/ActionRow.swift:5`). Note: that comment
+cites "(D20)", but issue #5's D20 is the heatmap-vs-busy TODO above (see `TODOS.md` "Heatmap vs. Busy
+blocks"). Two decisions share the ID; the code comment's number is the stale one. Fix the comment
+when this is picked up.
+
+**Why:** design doc premise 6 — a lightweight nudge replacing "@ them and tag three times" in the
+iMessage thread (`docs/designs/friendcal-hub.md:27`). Rate limit and mute are already decided:
+1 per (from, to, proposal) per 24h, mute per user (`docs/DECISIONS.md:7`), and `PokeService`
+(`app/FriendCal/Services/PokeService.swift`) already implements both, with `ProposalTests.swift:185`
+as its only caller.
+
+**Context:** Deferred by the 2026-11-07 /plan-ceo-review (decision D5), which approved **only**
+Poke's design session. **Deferral reason:** the delivery half needs APNs, which needs the Apple
+Developer Program membership that was pending verification on 2026-11-07 — the same blocker that
+gates Sign in with Apple. Building the in-app half alone ships a feature whose entire value is
+out-of-app. Issue #5 D17 deleted `recordPoke` from the service layer, so that is a deliberate
+re-add when this is picked up.
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** An active Apple Developer Program membership (APNs key); **Poke's UX design session**
+(approved separately on 2026-11-07, resolving the Hold on who can poke whom, what the recipient
+sees, where mute and the rate limit surface, and what a poke looks like with notifications off).
+
+## Sign-in
+
+### Apple server-to-server notifications for revoked credentials
+
+**What:** Register a notification endpoint on the Services ID and handle Apple's server-to-server
+events, at minimum `consent-revoked` and `account-delete`, so the backend learns when someone
+removes FriendCal from their Apple ID or deletes their Apple ID entirely. On receipt, mark the
+local identity inactive so the next launch returns to the sign-in gate instead of presenting a
+signed-in app backed by a dead credential.
+
+**Why:** Apple's 5.1.1(v) reference tells Sign in with Apple apps to revoke user tokens on account
+deletion *and* to use server-to-server notification endpoints to handle changes to those accounts
+(`developer.apple.com/support/offering-account-deletion-in-your-app/`). Without the endpoint, a
+person who revokes access in Settings stays signed in on-device and the backend never finds out.
+
+**Context:** Found by the 2026-11-07 /plan-design-review while verifying Codex's finding that the
+deletion flow owes Apple more than a row delete. Design review issue 7A writes the revocation call
+itself this wave (unexercised, Apple-blocked) and shows a Settings fallback line on the deletion
+receipt whenever revocation cannot run; this TODO is the other half. Issue 2J already persists the
+authorization code at sign-in, which is the prerequisite the revocation call needs.
+
+**Amended 2026-11-07 (CEO re-cost, decision D2).** This entry now owns the **whole** revocation
+chain, not just the notification endpoint: the `/auth/token` exchange, refresh-token custody,
+`/auth/revoke`, and this endpoint. Design review 7A's plan to write the call this wave was withdrawn
+by the eng delta's D7 — Apple's authorization code is single-use and expires in five minutes, so
+issue 2J's persisted code cannot reach deletion time, and the exchange needs a team-signed client
+secret that must never ship in the app. Nothing is persisted for revocation this wave and the
+deletion receipt's Settings line renders unconditionally.
+
+**Also resolve here, before submission:** whether CEO D8's retention of the departing person's
+**holds and attendee membership** is compatible with 5.1.1(v)'s coverage of the account "along with
+their personal data", or whether only the display name may survive. Raised by the Codex outside voice
+on 2026-11-07 and folded into this entry; the deletion semantics were reviewed for identity removal
+and token revocation, never for retention. Re-read the current guideline wording first — the sources
+on file date from the 2022 rollout.
+
+**Effort:** M
+**Priority:** P2
+**Trigger: blocks first App Store submission.** (Changed 2026-11-07 from "when the membership lands";
+a membership arriving is not an event that makes anyone open TODOS.md, whereas a submission gate is.)
+**Depends on:** An active Apple Developer Program membership (Services ID + team key); a reachable
+HTTPS endpoint, so it also depends on having any server-side deployment at all.
+
+## Me
+
+### Release a hold from My commitments
+
+**What:** A swipe action on a commitment row that calls `release(slotID:)`
+(`app/FriendCal/Services/ProposalStore.swift:88`), with a confirmation naming the plan the hold
+belongs to, plus its in-flight and failure states.
+
+**Why:** The store method already exists, and My commitments is where a person notices a hold they
+want to drop. Today the screen sends them elsewhere: design review issue 1F added the line "Change
+a hold on its plan." precisely because the row refuses the gesture.
+
+**Context:** Deferred by the 2026-11-07 /plan-design-review (issue 1F) under CEO D6, which scoped
+Lane 3 read-only. Read-only was a deliberate scope call, not an oversight — recorded here so the
+next person to touch the screen knows that. Issue 1F also forbids chevrons, swipe actions and
+button traits on commitment rows, so picking this up means amending that prohibition, not working
+around it. The row ordering rule (issue 1D) must survive a release without the list jumping.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None.
 
 ## Completed
 

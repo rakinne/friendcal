@@ -10,7 +10,7 @@ import Foundation
 @MainActor
 public final class InMemoryProposalStore: ProposalStore {
     public enum Operation: Hashable, CaseIterable {
-        case proposals, load, create, update, join, tapFree, release, lock
+        case proposals, load, create, update, join, tapFree, release, lock, myCommitments, signIn, deleteAccount
     }
 
     public private(set) var users: [User]
@@ -18,6 +18,12 @@ public final class InMemoryProposalStore: ProposalStore {
     public private(set) var slots: [AvailabilitySlot]
     public var busyBlocks: [BusyBlock]
     public private(set) var currentUserID: UUID?
+    public private(set) var authState: AuthState = .signedOut
+    public private(set) var identityGeneration: Int = 0
+    /// Ids whose account has been deleted. A tombstone, like users.deleted_at: the row survives so a
+    /// locked plan can still name its attendee.
+    public private(set) var deletedUserIDs: Set<UUID> = []
+    nonisolated(unsafe) private var authContinuations: [UUID: AsyncStream<AuthState>.Continuation] = [:]
     /// Injected clock (C2): expiry, createdAt and lockedAt read it.
     public var now: () -> Date
     /// Test hook (design 2.3A): the next call of a listed operation throws its error instead of
@@ -37,21 +43,95 @@ public final class InMemoryProposalStore: ProposalStore {
         self.busyBlocks = busyBlocks
         self.currentUserID = currentUserID
         self.now = now
+        self.authState = currentUserID.map(AuthState.signedIn) ?? .signedOut
     }
 
     // MARK: ProposalStore
 
     public func signIn(displayName: String?) async throws -> UUID {
         if let id = currentUserID { return id }
+        setAuth(.signingIn, bumpGeneration: false)
+        do {
+            try await gate(.signIn)
+        } catch {
+            // A refused sign-in leaves the gate showing why, not a signed-out shell that looks the
+            // same as never having tried.
+            setAuth(.failed(UserFacingError.map(error, action: .signIn)), bumpGeneration: false)
+            throw error
+        }
         let user = User(id: UUID(), displayName: displayName ?? "You")
         users.append(user)
         currentUserID = user.id
+        setAuth(.signedIn(user.id), bumpGeneration: true)
         return user.id
     }
 
+    public func signOut() async {
+        currentUserID = nil
+        setAuth(.signedOut, bumpGeneration: true)
+    }
+
+    public func deleteAccount() async throws -> AccountDeletionReceipt {
+        let me = try await authorize(.deleteAccount)
+
+        // Already a tombstone: report the terminal state rather than refusing, so a deletion the app
+        // was killed in the middle of converges on relaunch (C3).
+        if deletedUserIDs.contains(me) {
+            let kept = proposals.filter { $0.createdBy == me && $0.status == .locked }.count
+            currentUserID = nil
+            setAuth(.signedOut, bumpGeneration: true)
+            return AccountDeletionReceipt(alreadyDeleted: true, cancelledPlans: 0,
+                                          releasedHolds: 0, lockedPlansKept: kept)
+        }
+
+        let cancelled = proposals.filter { $0.createdBy == me && $0.status == .requesting }.map(\.id)
+        for id in cancelled {
+            guard let index = proposals.firstIndex(where: { $0.id == id }) else { continue }
+            proposals[index].status = .cancelled
+        }
+
+        // EVERY softHold on the cancelled plans, whoever placed it -- not only the departing user's.
+        // A hold on a plan that no longer exists would go on blocking its owner's own choices, and a
+        // hold with no expiry never lapses on its own (outside voice F8).
+        let before = slots.count
+        slots.removeAll { $0.state == .softHold && $0.sourceProposalID.map(cancelled.contains) == true }
+        // And their own holds on everyone else's plans.
+        slots.removeAll { $0.state == .softHold && $0.userID == me }
+        let released = before - slots.count
+
+        // Locked plans keep their Busy blocks and this person's attendee membership: that time is
+        // something other people have already arranged around. (Whether 5.1.1(v) permits retaining
+        // it is unresolved -- CEO review C7 -- and is a policy question, not a code one.)
+        let kept = proposals.filter { $0.createdBy == me && $0.status == .locked }.count
+
+        // The tombstone. The row stays; the identifying content goes.
+        if let index = users.firstIndex(where: { $0.id == me }) {
+            users[index].displayName = "Deleted account"
+            users[index].avatarURL = nil
+        }
+        deletedUserIDs.insert(me)
+
+        for id in cancelled { emit(id) }
+        currentUserID = nil
+        setAuth(.signedOut, bumpGeneration: true)
+        return AccountDeletionReceipt(alreadyDeleted: false, cancelledPlans: cancelled.count,
+                                      releasedHolds: released, lockedPlansKept: kept)
+    }
+
+    public var authChanges: AsyncStream<AuthState> {
+        AsyncStream { continuation in
+            let token = UUID()
+            continuation.yield(authState)
+            lock.withLock { authContinuations[token] = continuation }
+            continuation.onTermination = { [weak self] _ in
+                guard let self else { return }
+                self.lock.withLock { _ = self.authContinuations.removeValue(forKey: token) }
+            }
+        }
+    }
+
     public func proposals() async throws -> [ProposalSummary] {
-        try await gate(.proposals)
-        guard let me = currentUserID else { throw ProposalStoreError.notSignedIn }
+        let me = try await authorize(.proposals)
         return proposals
             .filter { $0.createdBy == me || $0.isRecipient(me) }
             .map { ProposalSummary(proposal: $0, joinedCount: $0.joinedCount, isHosting: $0.createdBy == me) }
@@ -63,8 +143,7 @@ public final class InMemoryProposalStore: ProposalStore {
     }
 
     public func create(_ plan: NewProposal) async throws -> Proposal {
-        try await gate(.create)
-        guard let me = currentUserID else { throw ProposalStoreError.notSignedIn }
+        let me = try await authorize(.create)
         ensureUser(me)
         let proposal = Proposal(id: UUID(), title: plan.title, window: plan.window, createdBy: me,
                                 distribution: Distribution(mode: .newGroup, recipientIDs: [me]),
@@ -74,8 +153,7 @@ public final class InMemoryProposalStore: ProposalStore {
     }
 
     public func update(_ edited: Proposal) async throws -> Proposal {
-        try await gate(.update)
-        guard let me = currentUserID else { throw ProposalStoreError.notSignedIn }
+        let me = try await authorize(.update)
         guard let index = proposals.firstIndex(where: { $0.id == edited.id }) else { throw ProposalStoreError.notFound(edited.id) }
         var current = proposals[index]
         guard current.createdBy == me else {
@@ -97,8 +175,7 @@ public final class InMemoryProposalStore: ProposalStore {
     }
 
     public func join(_ id: UUID) async throws -> Proposal {
-        try await gate(.join)
-        guard let me = currentUserID else { throw ProposalStoreError.notSignedIn }
+        let me = try await authorize(.join)
         guard let index = proposals.firstIndex(where: { $0.id == id }) else { throw ProposalStoreError.notFound(id) }
         var p = proposals[index]
         guard p.status == .requesting || p.status == .locked else {
@@ -114,14 +191,13 @@ public final class InMemoryProposalStore: ProposalStore {
         return p
     }
 
-    public func myCommitments() async throws -> [AvailabilitySlot] {
-        guard let me = currentUserID else { throw ProposalStoreError.notSignedIn }
-        return commitments(of: me)
+    public func myCommitments(from: Date) async throws -> [Commitment] {
+        let me = try await authorize(.myCommitments)
+        return Commitment.live(commitments(of: me), from: from, now: now())
     }
 
     public func tapFree(proposalID: UUID, range: DateRange, expiresAt: Date?) async throws -> AvailabilitySlot {
-        try await gate(.tapFree)
-        guard let me = currentUserID else { throw ProposalStoreError.notSignedIn }
+        let me = try await authorize(.tapFree)
         guard let p = proposals.first(where: { $0.id == proposalID }) else { throw ProposalStoreError.notFound(proposalID) }
         // D15: a hold needs a recipient, an open plan and a range inside its window.
         guard p.isRecipient(me) else {
@@ -133,7 +209,7 @@ public final class InMemoryProposalStore: ProposalStore {
         guard p.window.lowerBound <= range.lowerBound, range.upperBound <= p.window.upperBound, range.lowerBound < range.upperBound else {
             throw ProposalStoreError.server(code: "22023", message: "hold must sit inside the proposal window", hint: "FC_WINDOW")
         }
-        switch availability.tapFreeSlot(userID: me, range: range, proposalID: proposalID, expiresAt: expiresAt, existingSlots: commitments(of: me), now: now()) {
+        switch availability.tapFreeSlot(userID: me, range: range, proposalID: proposalID, expiresAt: expiresAt, existingSlots: ownSlots(of: me), now: now()) {
         case .alreadyHeld:
             throw ProposalStoreError.heldElsewhere
         case .softHold(var slot):
@@ -145,8 +221,7 @@ public final class InMemoryProposalStore: ProposalStore {
     }
 
     public func release(slotID: UUID) async throws {
-        try await gate(.release)
-        guard let me = currentUserID else { throw ProposalStoreError.notSignedIn }
+        let me = try await authorize(.release)
         guard let index = slots.firstIndex(where: { $0.id == slotID }) else { throw ProposalStoreError.notFound(slotID) }
         let slot = slots[index]
         guard slot.userID == me else {
@@ -161,8 +236,7 @@ public final class InMemoryProposalStore: ProposalStore {
     /// merged unexpired holds cover the window and no Busy block of theirs overlaps it; then one
     /// transaction: status + both ends + attendees, Busy blocks, holds cleared.
     public func lock(_ id: UUID, window: DateRange) async throws -> Proposal {
-        try await gate(.lock)
-        guard let me = currentUserID else { throw ProposalStoreError.notSignedIn }
+        let me = try await authorize(.lock)
         guard let index = proposals.firstIndex(where: { $0.id == id }) else { throw ProposalStoreError.notFound(id) }
         var p = proposals[index]
         guard p.createdBy == me else {
@@ -212,12 +286,11 @@ public final class InMemoryProposalStore: ProposalStore {
 
     /// The sanitized read: an excluded viewer gets a plain Busy block with `hiddenFrom` stripped.
     public func fetchBusyBlocks(for viewerID: UUID, in range: DateRange) async throws -> [BusyBlock] {
-        busyBlocks.filter { $0.range.overlaps(range) }.map { block in
-            if block.hiddenFrom.contains(viewerID) {
-                return BusyBlock(id: block.id, userID: block.userID, range: block.range, visibility: .public, hiddenFrom: [], createdAt: block.createdAt)
-            }
-            return block
-        }
+        // Blanked unconditionally, through the one named site. Blanking only for the excluded viewer
+        // would leave the shape viewer-dependent, which is itself the correlation signal, and would
+        // be a third hand-maintained field list. `BusyBlock.sanitized` is the only place that knows
+        // which fields are safe.
+        busyBlocks.filter { $0.range.overlaps(range) }.map(\.sanitized)
     }
 
     // MARK: Seeding
@@ -247,19 +320,101 @@ public final class InMemoryProposalStore: ProposalStore {
 
     // MARK: Private
 
+    /// `try await`, not `try?`. Swallowing the sleep's error swallows `CancellationError`, so an
+    /// operation whose task was cancelled -- a screen dismissed, a sign-out mid-flight -- would carry
+    /// on and commit its write anyway. Cancellation has to propagate out of here for the identity
+    /// generation check in the callers to ever matter (outside voice F6).
     private func gate(_ op: Operation) async throws {
-        if latency > .zero { try? await Task.sleep(for: latency) }
+        if latency > .zero { try await Task.sleep(for: latency) }
+        try Task.checkCancellation()
         if let error = failNext.removeValue(forKey: op) { throw error }
+    }
+
+    /// Publishes a new auth state, bumping the identity generation when the IDENTITY changed.
+    ///
+    /// `.signingIn` and `.failed` do not bump: they are the same identity (none) in a different
+    /// presentation, and bumping on them would cancel in-flight work that has nothing to do with
+    /// them. Only a sign-in, a sign-out or a deletion moves the generation.
+    private func setAuth(_ state: AuthState, bumpGeneration: Bool) {
+        if bumpGeneration { identityGeneration += 1 }
+        authState = state
+        let targets = lock.withLock { Array(authContinuations.values) }
+        for continuation in targets { continuation.yield(state) }
+    }
+
+    /// Capture the identity, suspend, then re-check it. Every operation goes through here.
+    ///
+    /// The ordering is the whole point and it is easy to get wrong: read the identity BEFORE the
+    /// await, and compare it again AFTER. An operation that reads `currentUserID` only after
+    /// suspending silently adopts whoever is signed in when it resumes, so a tap made by A that
+    /// suspends across a sign-out and a sign-in as B commits as B. Checking both the generation and
+    /// the id covers the case where the same person signs back in: the generation moved even though
+    /// the id matches, and work begun in the previous session should still not land.
+    private func authorize(_ op: Operation) async throws -> UUID {
+        guard let me = currentUserID else { throw ProposalStoreError.notSignedIn }
+        let generation = identityGeneration
+        try await gate(op)
+        guard identityGeneration == generation, currentUserID == me else {
+            throw ProposalStoreError.identityChanged
+        }
+        return me
     }
 
     private func ensureUser(_ id: UUID) {
         if !users.contains(where: { $0.id == id }) { users.append(User(id: id, displayName: "You")) }
     }
 
-    private func commitments(of user: UUID) -> [AvailabilitySlot] {
+    /// The caller's own time as SLOTS, for the tap-free collision check.
+    ///
+    /// Deliberately separate from `commitments(of:)`, which answers a different question. This one
+    /// feeds `AvailabilityService.tapFreeSlot`, a UX guard that asks "does this clash with anything I
+    /// already hold?" and needs `AvailabilityState` to tell a hard Busy from a soft hold. It includes
+    /// `.free` rows and carries no titles, because neither matters to a clash. Collapsing the two
+    /// into one function would mean either the guard loses the state it switches on, or the screen
+    /// gains rows it must not show.
+    private func ownSlots(of user: UUID) -> [AvailabilitySlot] {
         slots.filter { $0.userID == user } + busyBlocks.filter { $0.userID == user }.map {
             AvailabilitySlot(id: $0.id, userID: $0.userID, range: $0.range, sourceProposalID: nil, state: .busy, createdAt: $0.createdAt)
         }
+    }
+
+    /// The caller's commitments, with provenance preserved and titles authorized per row.
+    ///
+    /// Provenance used to be thrown away here -- Busy blocks were mapped to slots with
+    /// `sourceProposalID: nil` -- which made it impossible for any screen to say WHICH plan had taken
+    /// the time. That is the whole content of the commitments screen, so the nil was the feature's
+    /// absence rather than a detail.
+    ///
+    /// The title goes through `isReadable(by:)`, the Swift mirror of the SQL predicate, so the
+    /// in-memory store withholds exactly the names the server would withhold. A block from a plan the
+    /// viewer may not read still appears -- their time really is taken -- with `planTitle` nil.
+    private func commitments(of user: UUID) -> [Commitment] {
+        func title(forPlan id: UUID?) -> String? {
+            guard let id, let plan = proposals.first(where: { $0.id == id }) else { return nil }
+            return plan.isReadable(by: user) ? plan.displayTitle : nil
+        }
+
+        let holds = slots
+            .filter { $0.userID == user && $0.state == .softHold }
+            .map { slot in
+                Commitment(id: slot.id, kind: .held, range: slot.range,
+                           sourceProposalID: slot.sourceProposalID,
+                           planTitle: title(forPlan: slot.sourceProposalID),
+                           expiresAt: slot.expiresAt)
+            }
+
+        let blocks = busyBlocks
+            .filter { $0.userID == user }
+            .map { block in
+                Commitment(id: block.id,
+                           kind: block.sourceProposalID == nil ? .busy : .locked,
+                           range: block.range,
+                           sourceProposalID: block.sourceProposalID,
+                           planTitle: title(forPlan: block.sourceProposalID),
+                           expiresAt: nil)
+            }
+
+        return holds + blocks
     }
 
     private func emit(_ id: UUID) {

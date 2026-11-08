@@ -194,17 +194,21 @@ struct InvitesView: View {
 
     private func errorState(_ error: UserFacingError) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            Text("Couldn't load your invites").textStyle(.title).foregroundStyle(DesignTokens.Colors.text)
+            Text(error.message).textStyle(.body).foregroundStyle(DesignTokens.Colors.text)
                 .accessibilityIdentifier("invites.error")
+            if let details = error.details {
+                DisclosureGroup("Details") {
+                    Text(details).textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
+                        .accessibilityIdentifier("invites.errorDetails")
+                }
+                .tint(DesignTokens.Colors.textMuted)
+            }
             Button { Task { await list.load() } } label: {
                 Text("Retry").textStyle(.button).foregroundStyle(DesignTokens.Colors.onPrimary)
                     .padding(.horizontal, 20).frame(minHeight: 44)
                     .background(Capsule().fill(DesignTokens.Colors.accentHover))
             }
             .accessibilityIdentifier("invites.retry")
-            if let details = error.details {
-                Text(details).textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
-            }
         }
     }
 }
