@@ -181,12 +181,19 @@ enum FixtureData {
 
     /// Seeds the in-memory store from a fixture (issue #5 D2, D7). Users come from the members
     /// (any other recipient id reads "Friend"); the current user is the fixture's, else the creator,
-    /// else the first member.
+    /// else the first member. A fixture with none of those ("loading", "no friends yet") is still
+    /// someone's phone, so it is signed in as "You": without an identity the app opens on the sign-in
+    /// screen and Home never renders.
     @MainActor
     static func store(_ fixture: HomeFixture, clock: @escaping () -> Date) -> InMemoryProposalStore {
-        let users = fixture.members.map { User(id: $0.id, displayName: $0.name) }
+        var users = fixture.members.map { User(id: $0.id, displayName: $0.name) }
         let proposals = [fixture.proposal].compactMap { $0 } + fixture.extraProposals
-        let current = fixture.currentUserID ?? fixture.proposal?.createdBy ?? fixture.members.first?.id
+        var current = fixture.currentUserID ?? fixture.proposal?.createdBy ?? fixture.members.first?.id
+        if current == nil {
+            let you = fixtureID(9_000)
+            users.append(User(id: you, displayName: "You"))
+            current = you
+        }
         return InMemoryProposalStore(users: users, proposals: proposals, slots: fixture.slots, busyBlocks: fixture.busyBlocks,
                                      places: fixture.places, votes: fixture.votes, currentUserID: current, now: clock)
     }
