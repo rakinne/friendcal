@@ -6,12 +6,12 @@ Source: `/plan-design-review` of issue #13 on 2026-11-08, read against epic #10 
 
 | Screen | Path | Direction | Notes |
 |---|---|---|---|
-| Layout choice | `/Users/rakinnefoote/.gstack/projects/friendcal/designs/invite-places-requesting-20261107/m-b/responsive-mobile.png` | Layout B, leader first | Chosen from three. Superseded in detail by the main-screen picture below. |
-| Main screen, friend who voted for a non-leader | `/Users/rakinnefoote/.gstack/projects/friendcal/designs/places-states-20261107/main/responsive-mobile.png` | Decisions 1.1A, 1.2A, 1.5A, 1.6B applied | Generator artifact: card text is centered. The real card left-aligns it. |
-| Host view at quorum | `/Users/rakinnefoote/.gstack/projects/friendcal/designs/places-states-20261107/host/responsive-mobile.png` | One coral Lock pill, ellipsis on the leader card | Generator artifact: card shows a food photo. The real card uses the illustration asset. |
-| Tie | `/Users/rakinnefoote/.gstack/projects/friendcal/designs/places-states-20261107/tie/responsive-mobile.png` | TIED badge, tie-break line, tied place named | The picture adds the line "Cafe Lola was suggested first, so it wins a tie" (Proposed copy). |
-| Places list, host, with a passed place | `/Users/rakinnefoote/.gstack/projects/friendcal/designs/places-states-20261107/list/responsive-mobile.png` | Voted, Vote, YOURS rows and a Passed by host section | Generator artifacts: the plus is drawn as a filled tile and the screen behind the sheet is invented. The spec is an unfilled deep teal plus icon. |
-| Locked, winner row | `/Users/rakinnefoote/.gstack/projects/friendcal/designs/places-states-20261107/locked/responsive-mobile.png` | Winner row attached under the card | |
+| Layout choice | `~/.gstack/projects/friendcal/designs/invite-places-requesting-20261107/m-b/responsive-mobile.png` | Layout B, leader first | Chosen from three. Superseded in detail by the main-screen picture below. |
+| Main screen, friend who voted for a non-leader | `~/.gstack/projects/friendcal/designs/places-states-20261107/main/responsive-mobile.png` | Decisions 1.1A, 1.2A, 1.5A, 1.6B applied | Generator artifact: card text is centered. The real card left-aligns it. |
+| Host view at quorum | `~/.gstack/projects/friendcal/designs/places-states-20261107/host/responsive-mobile.png` | One coral Lock pill, ellipsis on the leader card | Generator artifact: card shows a food photo. The real card uses the illustration asset. |
+| Tie | `~/.gstack/projects/friendcal/designs/places-states-20261107/tie/responsive-mobile.png` | TIED badge, tie-break line, tied place named | The picture adds the line "Cafe Lola was suggested first, so it wins a tie" (Proposed copy). |
+| Places list, host, with a passed place | `~/.gstack/projects/friendcal/designs/places-states-20261107/list/responsive-mobile.png` | Voted, Vote, YOURS rows and a Passed by host section | Generator artifacts: the plus is drawn as a filled tile and the screen behind the sheet is invented. The spec is an unfilled deep teal plus icon. |
+| Locked, winner row | `~/.gstack/projects/friendcal/designs/places-states-20261107/locked/responsive-mobile.png` | Winner row attached under the card | |
 
 ## How R8 is read
 
