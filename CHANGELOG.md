@@ -5,16 +5,20 @@ All notable changes to FriendCal are listed here, newest first. The version live
 ## [0.2.0.0] - 2026-11-08
 
 ### Added
-- Suggest places on a plan — add a place with a name and optional address, vote for your favorites, and veto one you can't do. The winner is picked when the plan locks, with deterministic tie-breaking.
-- Search for places nearby — MapKit-backed search with debounced queries, recent-place memory, and a 25 km search area guard that mirrors the server check.
-- Server rules for place voting — new `places.sql` guard (`friendcal_places_plan`), four client-callable functions (suggest, vote, veto, withdraw), and winner selection wired into `lock_proposal()`.
-- Place board in the session — `PlaceBoard` model tracks suggestions, votes and vetoes per plan, with in-memory and Supabase-backed stores.
-- Proposal session now carries places — fixtures, drafts and the session layer include place state so previews and tests can exercise the full flow.
-- Kinetic Welcome login screen — refreshed `AuthGateView` (Variant E, board b-20261108-095026-gciflg): coral sun + teal foliage illustration, invited pill, hide-until-true trust footer and `DESIGN.md` token compliance.
+- A new welcome screen when you open the app. It asks only for your name and, if you came from an invite link, tells you which plan you were invited to.
+- Groundwork for choosing a place together on a plan. Screens for it come next. The server now keeps each plan's city and the places friends suggest, with one vote per person, a host veto, up to 2 places per friend and 10 per plan, and a winner that is picked and frozen when the plan locks: most votes first, then the earliest suggestion.
+- Place search near the host's city with Apple Maps, kept to places within 25 km of the city. The 25 km limit is enforced in the app only.
+- Suggesting, voting, passing on and withdrawing places work in the app's plan session with the same rules as the server, so previews and tests can walk through the whole flow. For now everything stays on this phone.
 
 ### Changed
-- Place-related error messages now surface as user-facing copy via `UserFacingError` (new `FC_*` hints for suggestion, vote and veto failures).
-- `ProposalDraft` and `Proposal` carry place context; `TODOS.md` and `DESIGN.md` updated to reflect the places design.
+- A plan can carry a city. The host can change it while the plan is collecting times but can't clear it, and it freezes once the plan locks.
+- Deleting your account now removes your votes on plans that are still collecting, so a friend who left can't decide a winner. Your suggestions and your votes on locked plans stay.
+- Errors on place actions, such as a full plan or a place the host passed on, now read as plain sentences.
+
+### Fixed
+- Someone who isn't on a plan can no longer add or vote on its places, even when the plan has no recipient list.
+- When the host passes on a place, the friend who suggested it can no longer withdraw it to bring the same place back.
+- Place names are compared exactly as the server compares them, so two spellings that only look alike are treated as different places in both.
 
 ## [0.1.1.0] - 2026-11-07
 
