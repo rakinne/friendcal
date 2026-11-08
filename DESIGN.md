@@ -20,6 +20,7 @@ colors:
   success: "#1A9E5C"
   warning: "#E8A317"
   error: "#E23D3D"
+  error-text: "#C92A2A"
 typography:
   display:
     fontFamily: "Cabinet Grotesk"
@@ -66,6 +67,11 @@ components:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.on-primary}"
     rounded: "{rounded.pill}"
+  button-outline:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.accent-hover}"
+    borderColor: "{colors.accent-hover}"
+    rounded: "{rounded.pill}"
   card:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.lg}"
@@ -101,7 +107,7 @@ components:
 
 Light mode only — use scene is daytime social planning on phone in varied lighting; light preserves warmth and heatmap legibility. Dark would mute the coral pulse and force inverted heat intensity.
 
-Teal *text* ("online-ish", "LIVE") and the Share fill use accent-hover #0E6F68: teal #18A99A text is 2.6:1 on cream and 2.8:1 on ivory, so #18A99A stays for dots and non-text fills (D25). Muted text #7A6C5F is 4.55:1 on the cream canvas and 4.82:1 on ivory cards, so it's for captions and labels only, never on peach fills.
+Teal *text* ("online-ish", "LIVE") and the Share fill use accent-hover #0E6F68: teal #18A99A text is 2.6:1 on cream and 2.8:1 on ivory, so #18A99A stays for dots and non-text fills (D25). Muted text #7A6C5F is 4.55:1 on the cream canvas and 4.82:1 on ivory cards, so it's for captions and labels only, never on peach fills. Error text uses error-text #C92A2A (4.89:1 on cream, 5.18:1 on ivory); error #E23D3D is 3.79:1 on cream and 4.01:1 on ivory, so it is for fills and icons only, never a label.
 
 Interaction signals: primary = coral fill + white text; secondary = teal; disabled = peach-light #FBE1C8; success/warning/error are semantic tints only. Hairline borders #EADCCB separate cards from the cream ground; soft warm shadow #C9A98A (8% opacity) lifts phones/cards without glow halos. Never use purple/violet gradients; never halo a dark surface.
 
@@ -143,6 +149,10 @@ Radius hierarchy: inner heatmap cells sm 6px, cards lg 20px, pills/toggles full 
 
 **Invites rows:** "Invites" in display on the cream canvas (no system large title); ivory cards at 20px with the hairline border, 20px side margins, 12px gaps, >= 64px tall: title, status line in muted caption ("3 of 10 joined · Nov 9–22"; "Locked · Sat, Nov 14 · 10:00–12:00" after a 6px primary dot), a "HOSTING" outline badge on plans the user created; order locked-upcoming, requesting, past (dimmed 60%); "+" (accent-hover, 44px) in the bar; empty state "No invites yet" + "Start a plan" (#5 1.6A, 1.7A, 7.2A).
 
+**Outlined pill:** ivory surface fill, 1.5pt accent-hover border, accent-hover label (label 13 semibold, or button 17 when full-width), pill radius, 44px minimum height. It is the quieter sibling of the filled pills, used where a screen has no coral control or already has its one. Voted state: accent-hover fill with an on-primary label "Voted" and a check, so the state is text plus a glyph, never color alone. A limit replaces the control with a muted line; there is no disabled variant (#13 7.5A).
+
+**Places section (invite):** "Where?" in display on the cream canvas after a 24px gap, a muted line under it ("Near Austin, TX · Voting closes when Sam locks the date"), one ivory leader card, then a full-width outlined "Suggest a place" pill. The card holds an outline badge (LEADING, TIED or YOURS, badge style), the place name in title with the Vote pill trailing, address and "Suggested by" in muted caption, up to 4 overlapping 28px faces plus +N with the voters' names in caption and the count in mono as one 44px control, a "Your vote" line, a hairline divider and a 44px "View all N places" row. No coral anywhere in the section. The full list is a large sheet: one ivory row card per place (at least 64px, 12px gaps), order frozen while open, a "Passed by host" section on surface-2 with a lasting accent-hover "Bring back" button, and a 44px ellipsis menu on rows the viewer can act on. A departed friend is a neutral person glyph in text-muted on surface-2. After the lock the section collapses to a winner row attached under the card (pin, name, address, "Open in Maps") and a "How the vote went" row. The invite card itself is unchanged (#13, docs/designs/friendcal-places.md).
+
 **DEMO badge:** inside the group pill on the in-memory store: "DEMO" in badge style, text color, 1px warning outline, 20px tall (warning text on ivory is 2.05:1, so only the outline carries the hue); VoiceOver "demo data, not synced" (#5 D7). The sign-in gate and name prompt (#5 1.3A) arrive with the network store.
 
 **Bottom nav:** iOS uses the native Liquid Glass `TabView` (Home `house`, Groups `person.2`, Pokes `hand.wave`, Invites `envelope`, Me `person.crop.circle`), active coral via tint; inactive items keep system glass styling instead of muted brown (D34). 44px min target.
@@ -170,6 +180,7 @@ Radius hierarchy: inner heatmap cells sm 6px, cards lg 20px, pills/toggles full 
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-11-08 | Place voting design review (#13): Places on the Invite screen | Layout B, a leader-first card with a View all list; Vote and Suggest as outlined pills with no coral in the section; voter names visible with faces capped at 4; voting closes at the date lock and the lock sheet names the place; the winner is a row under the card, not inside the scrim; a veto confirms its vote cost and undo is a lasting Bring back; a host-set city row in New plan; error-text for every error label with 44px Retry and Details; 26 decisions in docs/designs/friendcal-places.md |
 | 2026-11-06 | Issue #5 design review: the Locked Invite as a live state | Role/state contract with one coral control per screen and the Lock control on the invite (1.1A); the card is one artifact, no page dots (1.2A); availability marking is a sheet with my-hold rings + checks, quiet past cells and row labels above rows for 44px cells (1.4A, 5.1A, 5.2A, 6.1A); "?" appended to the title while requesting (2.1A); every store failure maps to plain copy inline with Retry and Details (2.3A); a 60% scrim over the bottom 40% keeps on-primary text >= 4.5:1 over white art (4.1A, delta O4); 32px lock badge (5.5A); inclusive headcount "counting you" (3.3A); lock durations disabled past the span with an "All" segment (D22) |
 | 2026-11-06 | iOS Home amendments from /plan-design-review and eng review run 2 | Share fill and teal text use accent-hover for AA (D25); iOS type table with body 15 (D27); chip "stealth" becomes "busy" = no slot marked (D35, X1); native glass tab bar, inactive system styling (D34); one continuous pulse, the active arc (D23); share copy names the date and common window (X9); wheel and avatar initials cap their text size (approved 2026-11-06) |
 | 2026-11-05 | Initial design system created (Kinetic Warmth) | Created by /design-consultation from FriendCal brief: pulsing heatmap/wheel as signature, interconnectedness + minimal fuss, iOS SwiftUI + Supabase Realtime; approved mockup variant A extracted for tokens |
