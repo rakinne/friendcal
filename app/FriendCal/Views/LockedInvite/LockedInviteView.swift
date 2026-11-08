@@ -212,15 +212,17 @@ struct LockedInviteView: View {
 struct PrimaryPill: View {
     let title: String
     var isBusy = false
+    var fill: Color = DesignTokens.Colors.primary
+    var foreground: Color = DesignTokens.Colors.onPrimary
 
     var body: some View {
         HStack(spacing: 8) {
-            if isBusy { ProgressView().tint(DesignTokens.Colors.onPrimary) }
+            if isBusy { ProgressView().tint(foreground) }
             Text(title).textStyle(.button).lineLimit(1).minimumScaleFactor(0.7)
         }
-        .foregroundStyle(DesignTokens.Colors.onPrimary)
+        .foregroundStyle(foreground)
         .frame(maxWidth: .infinity, minHeight: 52)
-        .background(Capsule().fill(DesignTokens.Colors.primary))
+        .background(Capsule().fill(fill))
         .contentShape(Capsule())
     }
 }

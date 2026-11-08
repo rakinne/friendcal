@@ -41,8 +41,17 @@ public struct Proposal: Identifiable, Codable, Equatable {
     /// Recipients who opened the link after the lock (viewers, delta O1); also in recipientIDs.
     public var postLockRecipientIDs: [UUID]
     public var lockedAt: Date?
+    /// Who must never learn this plan exists (D12), persisted as proposals.hidden_from.
+    ///
+    /// Exclusion OUTRANKS membership: an id listed here reads nothing even when it also appears in
+    /// recipientIDs, which is what makes a forwarded link safe. No client may read or write this --
+    /// `authenticated` holds no SELECT, INSERT or UPDATE privilege on the column -- so it is empty on
+    /// anything that came from a client read and is set server-side only. It is modelled here because
+    /// the in-memory store is the only store this wave has, and `isReadable(by:)` has to be able to
+    /// mirror the server's predicate for the screens to behave the way they will in production.
+    public var hiddenFrom: [UUID]
 
-    public init(id: UUID, title: String, window: DateRange, createdBy: UUID, distribution: Distribution, status: ProposalStatus = .requesting, createdAt: Date = Date(), lockedDate: Date? = nil, lockedEnd: Date? = nil, venueHint: String? = nil, expectedCount: Int = 1, lockedAttendeeIDs: [UUID] = [], postLockRecipientIDs: [UUID] = [], lockedAt: Date? = nil) {
+    public init(id: UUID, title: String, window: DateRange, createdBy: UUID, distribution: Distribution, status: ProposalStatus = .requesting, createdAt: Date = Date(), lockedDate: Date? = nil, lockedEnd: Date? = nil, venueHint: String? = nil, expectedCount: Int = 1, lockedAttendeeIDs: [UUID] = [], postLockRecipientIDs: [UUID] = [], lockedAt: Date? = nil, hiddenFrom: [UUID] = []) {
         self.id = id
         self.title = title
         self.window = window
@@ -57,6 +66,7 @@ public struct Proposal: Identifiable, Codable, Equatable {
         self.lockedAttendeeIDs = lockedAttendeeIDs
         self.postLockRecipientIDs = postLockRecipientIDs
         self.lockedAt = lockedAt
+        self.hiddenFrom = hiddenFrom
     }
 }
 
@@ -76,6 +86,23 @@ extension Proposal {
     public func isCreator(_ userID: UUID?) -> Bool { userID == createdBy }
     public func isRecipient(_ userID: UUID?) -> Bool { userID.map(distribution.recipientIDs.contains) ?? false }
     public func isAttendee(_ userID: UUID?) -> Bool { userID.map(lockedAttendeeIDs.contains) ?? false }
+
+    /// May this viewer read this plan at all?
+    ///
+    /// The Swift mirror of `proposal_is_readable(hidden_from, created_by, distribution)` in
+    /// supabase/rls.sql, which is both the `proposals` select policy and the title authorization
+    /// inside `my_commitments()`. The two live in different languages and MUST agree: the SQL copy is
+    /// the one that actually protects data, and this copy is what makes the in-memory store behave
+    /// the same way, so a screen built against fixtures is not built against a more permissive world
+    /// than production. Changing one without the other is the hand-synced-list failure the eng review
+    /// named this wave's worst structural risk -- if you edit this, edit `proposal_is_readable` too.
+    ///
+    /// Exclusion is tested FIRST and independently of membership, so it cannot be out-voted.
+    public func isReadable(by userID: UUID?) -> Bool {
+        guard let userID else { return false }
+        if hiddenFrom.contains(userID) { return false }
+        return isCreator(userID) || isRecipient(userID)
+    }
 
     /// The title as the app shows it (design 2.1A): "Brunch?" while requesting, "Brunch" once locked.
     public var displayTitle: String { Self.displayTitle(title, isLocked: isLocked) }

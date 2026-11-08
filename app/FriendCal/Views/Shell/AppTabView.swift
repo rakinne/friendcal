@@ -47,7 +47,7 @@ struct AppTabView: View {
             Tab("Invites", systemImage: "envelope", value: .invites) {
                 InvitesView(store: store, path: $invitesPath, members: fixture.members, clock: FixtureClock.now)
             }
-            Tab("Me", systemImage: "person.crop.circle", value: .me) { StubTabView(title: "Me") }
+            Tab("Me", systemImage: "person.crop.circle", value: .me) { NavigationStack { MeView(store: store) } }
         }
         .tint(DesignTokens.Colors.primary)
         .toast(toast)
@@ -69,7 +69,7 @@ struct AppTabView: View {
             return
         }
         switch link {
-        case .proposal(let id):
+        case .proposal(let id, _):
             tab = .invites
             invitesPath = [id]
         }

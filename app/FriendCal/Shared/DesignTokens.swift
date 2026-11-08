@@ -22,7 +22,15 @@ public enum DesignTokens {
         public static let shadow = Color(hex: "#C9A98A")
         public static let success = Color(hex: "#1A9E5C")
         public static let warning = Color(hex: "#E8A317")
+        /// Error FILLS and icons only. Measures 3.79:1 on `background` and 4.01:1 on `surface`, so it
+        /// is below the 4.5:1 AA bar for text on both: never use it for a label.
         public static let error = Color(hex: "#E23D3D")
+        /// Error TEXT. `error` is too light to read as a label on either canvas, and the one place
+        /// that matters is "Delete account" -- the single irreversible action in the app, where
+        /// legibility is not a nicety. 4.89:1 on `background`, 5.18:1 on `surface`.
+        /// ContrastTests asserts both, and asserts that `error` still fails, so the two cannot be
+        /// quietly swapped back.
+        public static let errorText = Color(hex: "#C92A2A")
         // Semantic heatmap
         public static let heatGreen = Color(hex: "#FF4E2E").opacity(0.95) // best — ember pulse
         public static let heatYellow = Color(hex: "#F7C9A4")

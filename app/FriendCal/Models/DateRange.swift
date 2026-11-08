@@ -1,7 +1,9 @@
 import Foundation
 
 /// Codable/Hashable range replacement for ClosedRange<Date> which is not Codable.
-public struct DateRange: Codable, Equatable, Hashable {
+/// `Sendable` because it is two `Date` values and nothing else; declaring it keeps `Commitment` and
+/// anything else that crosses an isolation boundary from warning (an error in Swift 6 mode).
+public struct DateRange: Codable, Equatable, Hashable, Sendable {
     public var lowerBound: Date
     public var upperBound: Date
     public init(_ range: ClosedRange<Date>) {

@@ -38,9 +38,57 @@ struct FriendCalApp: App {
     private static let fixture = FixtureData.make(.fromLaunchArguments, now: FixtureClock.now())
     private static let store = makeStore(fixture: fixture)
 
+    @StateObject private var authGate = AuthGateModel(store: Self.store)
+
     var body: some Scene {
         WindowGroup {
-            AppTabView(fixture: Self.fixture, store: Self.store)
+            RootGateView(store: Self.store, fixture: Self.fixture, pendingTitle: pendingTitle)
+        }
+    }
+
+    private var pendingTitle: String? {
+        // pending deep link title hint for 1E
+        if let url = UserDefaults.standard.string(forKey: "FriendCalPendingLink").flatMap(URL.init(string:)), let link = DeepLink.parse(url) {
+            if case .proposal(_, let t) = link { return t }
+        }
+        return nil
+    }
+}
+
+/// Identity-keyed root gate (G7): signedOut shows AuthGate, signedIn shows AppTabView keyed by userID
+struct RootGateView: View {
+    let store: ProposalStore
+    let fixture: HomeFixture
+    let pendingTitle: String?
+    @StateObject private var model: AuthGateModel
+
+    init(store: ProposalStore, fixture: HomeFixture, pendingTitle: String?) {
+        self.store = store
+        self.fixture = fixture
+        self.pendingTitle = pendingTitle
+        _model = StateObject(wrappedValue: AuthGateModel(store: store))
+    }
+
+    var body: some View {
+        Group {
+            switch model.state {
+            case .signedOut, .failed:
+                AuthGateView(auth: model, pendingTitle: pendingTitle)
+            case .signingIn:
+                AuthGateView(auth: model, pendingTitle: pendingTitle)
+            case .signedIn(let id):
+                AppTabView(fixture: fixture, store: store)
+                    .id(id)
+                    .task {
+                        // replay pending link once on transition to authenticated-with-usable-name
+                        if let urlStr = UserDefaults.standard.string(forKey: "FriendCalPendingLink"), !UserDefaults.standard.bool(forKey: "FriendCalSuppressPendingLink") {
+                            if let url = URL(string: urlStr), let link = DeepLink.parse(url) {
+                                try? await store.join(link.proposalID)
+                                UserDefaults.standard.removeObject(forKey: "FriendCalPendingLink")
+                            }
+                        }
+                    }
+            }
         }
     }
 }

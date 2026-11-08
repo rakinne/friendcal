@@ -60,8 +60,14 @@ final class SupabaseService: SupabaseServiceProtocol {
         }
         let rows: [SanitizedRow] = try await client.from("sanitized_busy_blocks").select()
             .execute().value as [SanitizedRow]
+        // `.sanitized` is redundant today -- the view has no correlation columns to carry -- and is
+        // applied anyway: it is idempotent, and it means that if this query is ever repointed from
+        // the view at the base table, the result is still blanked instead of silently widening.
+        // One word here, versus a leak that no test would catch.
         return rows.filter { $0.range_start <= range.upperBound && $0.range_end >= range.lowerBound }.map { r in
-            BusyBlock(id: r.id, userID: r.user_id, range: DateRange(lower: r.range_start, upper: r.range_end), visibility: .public, hiddenFrom: [], createdAt: r.created_at)
+            BusyBlock(id: r.id, userID: r.user_id,
+                      range: DateRange(lower: r.range_start, upper: r.range_end),
+                      createdAt: r.created_at).sanitized
         }
     }
 

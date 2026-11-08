@@ -166,7 +166,9 @@ struct CreateProposalSheet: View {
     // MARK: Success (design 3.2A)
 
     private func success(_ p: Proposal) -> some View {
-        let link = DeepLink.proposal(p.id).url
+        // The title rides in the link so the recipient's invite screen has something to show while
+        // it joins -- under D6 they cannot read the plan until they have.
+        let link = DeepLink.proposal(p.id, title: p.title).url
         return VStack(alignment: .leading, spacing: 16) {
             Text("\(p.title) is live").textStyle(.display).foregroundStyle(DesignTokens.Colors.text)
                 .accessibilityAddTraits(.isHeader)
