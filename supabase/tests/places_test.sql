@@ -555,4 +555,23 @@ select t.refuses('...nor pass on a place', t.veto(t.plid(310), true, t.u(2)), '4
 select t.eq('no place was written by the stranger', (select count(*)::int from proposal_places where proposal_id = t.pid(32)), 1);
 select t.succeeds('the host can still suggest on it', t.suggest(t.pid(32), t.u(1), 'Host second', '30.30', '-97.70'));
 
+-- ---------------------------------------------------------------------------
+-- 16. A veto sticks. The suggester may withdraw their own place, but not one the host passed on: the
+--     vetoed row is what makes a re-suggestion refuse with FC_VETOED, so deleting it would let the same
+--     place come back as an active one.
+--     protects=withdrawing a passed-on place is refused FC_VETOED and the row stays, re-suggesting it
+--     is still refused, and once the host brings it back the suggester can withdraw it;
+--     fails_when=remove_place deletes a vetoed row and the host's pass-on is undone;
+--     no_claim=who may veto, covered in section 8.
+-- ---------------------------------------------------------------------------
+select t.mkplan(t.pid(33));
+select t.place(t.plid(320), t.pid(33), t.u(2), 'Passed then withdrawn');
+select t.succeeds('the host passes on the place', t.veto(t.plid(320), true, t.u(1)));
+select t.refuses('the suggester cannot withdraw a passed-on place', t.remove(t.plid(320), t.u(2)), 'P0001', 'FC_VETOED');
+select t.eq('the passed-on row is still there', (select count(*)::int from proposal_places where id = t.plid(320) and vetoed_at is not null), 1);
+select t.refuses('re-suggesting it is still refused', t.suggest(t.pid(33), t.u(3), 'Passed then withdrawn'), 'P0001', 'FC_VETOED');
+select t.succeeds('the host brings it back', t.veto(t.plid(320), false, t.u(1)));
+select t.succeeds('then the suggester can withdraw it', t.remove(t.plid(320), t.u(2)));
+select t.eq('and the row is gone', (select count(*)::int from proposal_places where id = t.plid(320)), 0);
+
 select 'places tests: all passed' as result;

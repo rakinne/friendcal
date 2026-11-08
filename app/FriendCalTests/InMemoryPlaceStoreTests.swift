@@ -448,6 +448,30 @@ final class InMemoryPlaceStoreTests: XCTestCase {
         do { try await s.removePlace(placeID: saved.id); XCTFail() } catch { XCTAssertEqual(error as? ProposalStoreError, boom) }
     }
 
+    /// protects=a place the host passed on cannot be withdrawn (FC_VETOED, the row stays), re-suggesting
+    /// it is still refused, and once the host brings it back the suggester can withdraw it; fails_when=
+    /// withdrawing deletes the vetoed row and the same place comes back as an active one; why_new=the
+    /// withdraw tests only cover active places; no_claim=the SQL, covered by places_test.sql section 16.
+    func testAPassedOnPlaceCannotBeWithdrawn() async throws {
+        let (s, p) = makeStore()
+        act(s, as: leo)
+        let mine = try await s.suggestPlace(proposalID: p.id, place("Target"))
+        act(s, as: sam)
+        _ = try await s.vetoPlace(placeID: mine.id, vetoed: true)
+        act(s, as: leo)
+        let withdrawn = await refusal { try await s.removePlace(placeID: mine.id) }
+        XCTAssertEqual(withdrawn, Refusal(code: "P0001", hint: "FC_VETOED", message: "the host passed on that place"))
+        XCTAssertTrue(s.places.contains { $0.id == mine.id && $0.isVetoed }, "the passed-on row stays")
+        act(s, as: pia)
+        let again = await refusal { _ = try await s.suggestPlace(proposalID: p.id, place("Target")) }
+        XCTAssertEqual(again?.hint, "FC_VETOED", "re-suggesting is still refused")
+        act(s, as: sam)
+        _ = try await s.vetoPlace(placeID: mine.id, vetoed: false)
+        act(s, as: leo)
+        try await s.removePlace(placeID: mine.id)
+        XCTAssertFalse(s.places.contains { $0.id == mine.id }, "after the host brings it back it can be withdrawn")
+    }
+
     /// protects=a deleted account is refused FC_ACCOUNT_DELETED by every place call, even from a stale
     /// session that still holds its id (the guard's is-active step); fails_when=a tombstone can still
     /// suggest, vote, pass on or withdraw a place; why_new=the delete tests only check that votes go;

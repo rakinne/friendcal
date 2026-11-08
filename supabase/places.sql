@@ -291,6 +291,7 @@ grant execute on function veto_place(uuid, boolean) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- remove_place: the suggester withdraws their own place. Its votes go with it through the cascade.
+-- A place the host passed on cannot be withdrawn (FC_VETOED): the veto must outlive the withdrawal.
 -- ---------------------------------------------------------------------------
 create or replace function remove_place(p_place_id uuid) returns void
 language plpgsql
@@ -312,6 +313,12 @@ begin
   if v_place.suggested_by <> auth.uid() then
     raise exception 'only the person who suggested a place can remove it'
       using errcode = '42501', hint = 'FC_NOT_YOUR_PLACE';
+  end if;
+  -- A place the host passed on stays. The vetoed row is what refuses a re-suggestion (suggest_place),
+  -- so deleting it would let the same place come back as an active one. The host can bring it back,
+  -- after which the suggester can withdraw it.
+  if v_place.vetoed_at is not null then
+    raise exception 'the host passed on that place' using errcode = 'P0001', hint = 'FC_VETOED';
   end if;
   delete from proposal_places where id = p_place_id;
 end $$;

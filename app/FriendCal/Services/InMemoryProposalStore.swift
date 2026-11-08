@@ -340,6 +340,9 @@ public final class InMemoryProposalStore: ProposalStore {
         guard places[index].suggestedBy == me else {
             throw Self.refusal("42501", "only the person who suggested a place can remove it", "FC_NOT_YOUR_PLACE")
         }
+        // A place the host passed on stays: the vetoed row is what refuses a re-suggestion, so
+        // deleting it would let the same place come back as an active one.
+        guard places[index].vetoedAt == nil else { throw Self.refusal("P0001", "the host passed on that place", "FC_VETOED") }
         let plan = places[index].proposalID
         places.remove(at: index)
         votes.removeAll { $0.placeID == placeID }
