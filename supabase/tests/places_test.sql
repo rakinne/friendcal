@@ -493,4 +493,66 @@ select t.eq('votes on the cancelled plan stay as history', (select count(*)::int
 select t.refuses('a deleted account cannot suggest', t.suggest(t.pid(20), t.u(8), 'X'), '42501', 'FC_ACCOUNT_DELETED');
 select t.refuses('...nor vote', t.vote(t.pid(20), t.plid(201), t.u(8)), '42501', 'FC_ACCOUNT_DELETED');
 
+-- ---------------------------------------------------------------------------
+-- 14. The schema holds what the functions rely on. These are direct superuser inserts, so only a
+--     constraint can refuse them; the client functions' own error contract is covered above.
+--     protects=a vote cannot point at another plan's place (the composite foreign key), and a plan
+--     holds one map_ref once, vetoed or not (the unique index), while the same map_ref on another plan
+--     is fine; fails_when=either constraint is dropped or loosened and the functions still pass;
+--     no_claim=the functions' error contract.
+-- ---------------------------------------------------------------------------
+select t.mkplan(t.pid(30));
+select t.mkplan(t.pid(31));
+select t.place(t.plid(301), t.pid(30), t.u(2), 'Plan thirty place');
+select t.place(t.plid(302), t.pid(31), t.u(2), 'Plan thirty-one place');
+select t.place(t.plid(303), t.pid(30), t.u(2), 'Passed first', ref => 'mk:shared', vetoed => true);
+do $$
+declare
+  caught text;
+begin
+  begin
+    perform t.cast(t.pid(30), t.u(3), t.plid(302));
+  exception when others then
+    get stacked diagnostics caught = returned_sqlstate;
+  end;
+  perform t.eq('a vote cannot point at another plan''s place (composite foreign key)', caught, '23503');
+
+  caught := null;
+  begin
+    perform t.place(t.plid(304), t.pid(30), t.u(3), 'Second', ref => 'mk:shared');
+  exception when others then
+    get stacked diagnostics caught = returned_sqlstate;
+  end;
+  perform t.eq('one map_ref per plan, even when the first place is vetoed (unique index)', caught, '23505');
+
+  caught := null;
+  begin
+    perform t.place(t.plid(305), t.pid(31), t.u(3), 'Other plan', ref => 'mk:shared');
+  exception when others then
+    get stacked diagnostics caught = returned_sqlstate;
+  end;
+  perform t.eq('the same map_ref on another plan is allowed', coalesce(caught, 'none'), 'none');
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 15. A plan whose distribution has no recipientIDs (the column defaults to '{}', and the insert policy
+--     does not constrain its shape). proposal_is_readable() returns NULL for a non-creator there, which
+--     RLS reads as "deny" but a bare `if not <NULL>` in plpgsql would read as "pass".
+--     protects=a non-member is refused FC_NOT_MEMBER when the readable test is UNKNOWN, not only when it
+--     is false, while the host keeps working; fails_when=the guard treats NULL as a pass and a stranger
+--     who holds the plan id can write to, and read back from, a plan they cannot read;
+--     no_claim=the hidden_from rules, covered in sections 3 and 4.
+-- ---------------------------------------------------------------------------
+insert into proposals(id, title, window_start, window_end, created_by, distribution, status,
+                      area_name, area_lat, area_lon)
+values (t.pid(32), 'No recipient list', '2026-12-01 00:00Z', '2026-12-14 00:00Z', t.u(1), '{}'::jsonb, 'requesting',
+        'Austin, TX', 30.2672, -97.7431);
+select t.place(t.plid(310), t.pid(32), t.u(1), 'Host place');
+select t.refuses('a non-member cannot suggest on a plan with no recipient list (NULL is not a pass)',
+                 t.suggest(t.pid(32), t.u(2), 'Intruder'), '42501', 'FC_NOT_MEMBER');
+select t.refuses('...nor vote on it', t.vote(t.pid(32), t.plid(310), t.u(2)), '42501', 'FC_NOT_MEMBER');
+select t.refuses('...nor pass on a place', t.veto(t.plid(310), true, t.u(2)), '42501', 'FC_NOT_MEMBER');
+select t.eq('no place was written by the stranger', (select count(*)::int from proposal_places where proposal_id = t.pid(32)), 1);
+select t.succeeds('the host can still suggest on it', t.suggest(t.pid(32), t.u(1), 'Host second', '30.30', '-97.70'));
+
 select 'places tests: all passed' as result;

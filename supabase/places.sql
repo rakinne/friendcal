@@ -57,9 +57,11 @@ begin
     raise exception 'this account has been deleted' using errcode = '42501', hint = 'FC_ACCOUNT_DELETED';
   end if;
 
-  -- Exclusion was handled above, so a false result here means "not a member". The readable rule has
-  -- exactly one copy (rls.sql); it reads auth.uid(), which a definer function does not change.
-  if not proposal_is_readable(v_prop.hidden_from, v_prop.created_by, v_prop.distribution) then
+  -- Exclusion was handled above, so anything but true here means "not a member". The readable rule has
+  -- exactly one copy (rls.sql); it reads auth.uid(), which a definer function does not change. It can
+  -- return NULL, not just false: a plan whose distribution has no recipient list gives `false or null`.
+  -- RLS reads NULL as deny, but `if not null` is not true in plpgsql, so the test must be `is not true`.
+  if proposal_is_readable(v_prop.hidden_from, v_prop.created_by, v_prop.distribution) is not true then
     raise exception 'you are not part of this plan' using errcode = '42501', hint = 'FC_NOT_MEMBER';
   end if;
 
