@@ -2,6 +2,21 @@
 
 All notable changes to FriendCal are listed here, newest first. The version lives in `VERSION`.
 
+## [0.1.1.0] - 2026-11-07
+
+### Added
+- "My Commitments" on the Me tab — your own holds and Busy blocks across all plans, read-only, with provenance and authorized titles via new `my_commitments(p_from)` RPC.
+- Me surface: `AuthGateView`, `MeView`, `AccountDeletionView` with sign-out and Apple-withheld-name handling; only the ~60-line `ASAuthorizationController` hop remains Apple-gated.
+- First SQL regression harness that actually tests privacy: `rls_test.sql`, `users_auth_test.sql`, `loop_test.sql` now load `rls.sql` in both fresh + upgraded modes with policy-count assertions.
+
+### Changed
+- Hardened Supabase RLS — the three `using(true)` leaks are closed: `proposals` and `availability_slots` are now row-scoped, `busy_blocks` keeps rows readable but revokes `hidden_from`/`source_proposal_id`/`event_id` from `authenticated` (so excluded viewers see a grey block, not a hole), and `events` is read-scoped via `stealth_excluded()` helper. `circles`/`circle_members` denied to `anon`.
+- `delete_account()` RPC: deleting your account anonymizes your `users` row (`Deleted account`, cleared avatar, `deleted_at`), tombstones the auth identity, cancels your open plans, releases your `softHold`s, and keeps locked plans and their Busy blocks intact.
+
+### Fixed
+- `supabase-stubs.sql` now mirrors Supabase's table grants — previous harness gave `authenticated` zero table privileges, so `select hidden_from from busy_blocks` was permission-denied before any fix and the stealth P0 had zero coverage.
+- `supabase/sql.yml` CI (Postgres 15) now exercises both fresh and upgraded loads.
+
 ## [0.1.0.0] - 2026-11-06
 
 ### Added
