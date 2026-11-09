@@ -252,5 +252,37 @@ select t.ok('lock_proposal stores the winner through the winner function, not an
 select t.ok('the plan-lock helper exists and sits beside the user-lock helper',
   exists (select 1 from pg_proc where proname = 'friendcal_lock_plans'));
 
-\echo 'lock_proposal tests: all passed'
+-- ---------------------------------------------------------------------------
+-- Who is "in" on a locked plan (locked_attendee_ids, locked_at): written by the lock, readable by a
+-- member, never writable by a client.
+-- ---------------------------------------------------------------------------
+select t.seed('10000000-0000-0000-0000-0000000000e1');
+-- Its own day, every recipient covering it: earlier tests already made u1 to u4 Busy on Nov 14.
+delete from availability_slots where source_proposal_id = '10000000-0000-0000-0000-0000000000e1';
+insert into availability_slots(user_id, range, source_proposal_id, state, expires_at)
+select t.u(n), '[2026-11-20 18:00Z,2026-11-20 20:00Z)'::tstzrange, '10000000-0000-0000-0000-0000000000e1'::uuid, 'softHold', now() + interval '30 days'
+  from generate_series(1, 5) n;
+select t.ok('lock succeeds for the attendee-list check',
+  t.lock('10000000-0000-0000-0000-0000000000e1', '2026-11-20 18:00Z', '2026-11-20 19:30Z', t.u(1)) = 'locked:5');
+select t.ok('locked_attendee_ids is exactly the people the lock gave a Busy block',
+  (select array(select unnest(locked_attendee_ids) order by 1) from proposals where id = '10000000-0000-0000-0000-0000000000e1')
+  = (select array(select user_id from busy_blocks where source_proposal_id = '10000000-0000-0000-0000-0000000000e1' order by 1)));
+select t.ok('...and is not empty',
+  (select cardinality(locked_attendee_ids) > 0 from proposals where id = '10000000-0000-0000-0000-0000000000e1'));
+select t.ok('locked_at is stamped',
+  (select locked_at is not null from proposals where id = '10000000-0000-0000-0000-0000000000e1'));
+select t.ok('a plan that is still open has no attendees and no locked_at',
+  (select locked_attendee_ids = '{}' and locked_at is null from proposals where id = '10000000-0000-0000-0000-0000000000b3'));
+select t.ok('clients may read both columns',
+  has_column_privilege('authenticated', 'proposals', 'locked_attendee_ids', 'SELECT')
+  and has_column_privilege('authenticated', 'proposals', 'locked_at', 'SELECT'));
+select t.ok('clients may not write either column',
+  not has_column_privilege('authenticated', 'proposals', 'locked_attendee_ids', 'INSERT')
+  and not has_column_privilege('authenticated', 'proposals', 'locked_attendee_ids', 'UPDATE')
+  and not has_column_privilege('authenticated', 'proposals', 'locked_at', 'INSERT')
+  and not has_column_privilege('authenticated', 'proposals', 'locked_at', 'UPDATE'));
+select t.ok('anon can read neither',
+  not has_column_privilege('anon', 'proposals', 'locked_attendee_ids', 'SELECT')
+  and not has_column_privilege('anon', 'proposals', 'locked_at', 'SELECT'));
 
+\echo 'lock_proposal tests: all passed'

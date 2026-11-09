@@ -147,7 +147,8 @@ begin
   -- applied before any plan is locked on a database.
   v_winner := friendcal_place_winner(p_id);
   update proposals
-     set status = 'locked', locked_date = p_start, locked_end = p_end, locked_place_id = v_winner
+     set status = 'locked', locked_date = p_start, locked_end = p_end, locked_place_id = v_winner,
+         locked_attendee_ids = v_covering, locked_at = now()
    where id = p_id;
   delete from availability_slots where source_proposal_id = p_id and state = 'softHold';
   begin

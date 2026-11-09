@@ -47,6 +47,16 @@ alter table proposals add column if not exists area_lat double precision;
 alter table proposals add column if not exists area_lon double precision;
 alter table proposals add column if not exists locked_place_id uuid;
 
+-- Who is "in" on a locked plan, and when it locked. Written by lock_proposal() alone (no client
+-- INSERT/UPDATE grant, see rls.sql). The client cannot derive this: busy_blocks.source_proposal_id is
+-- unreadable to it on purpose. Joins are refused once a plan is locked, so there is no post-lock list.
+alter table proposals add column if not exists locked_attendee_ids uuid[] not null default '{}';
+alter table proposals add column if not exists locked_at timestamptz;
+-- Plans locked before this column existed: the attendees are the people the lock gave a Busy block.
+update proposals p
+   set locked_attendee_ids = coalesce((select array_agg(b.user_id) from busy_blocks b where b.source_proposal_id = p.id), '{}')
+ where p.status = 'locked' and p.locked_attendee_ids = '{}';
+
 -- The city is all-or-none. A plan that predates this feature keeps all three null and passes. The
 -- explicit `is not null` tests on the coordinates matter: a CHECK passes when its expression is NULL,
 -- so without them a name with null coordinates would be accepted. The name is measured after btrim,
