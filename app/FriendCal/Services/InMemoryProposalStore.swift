@@ -32,6 +32,12 @@ public final class InMemoryProposalStore: ProposalStore {
     /// Test hook (design 2.3A): the next call of a listed operation throws its error instead of
     /// running, so the error map and every revert path are exercised without a network.
     public var failNext: [Operation: Error] = [:]
+
+    /// What happened on the server while the viewer's screen was stale (UI tests, design 2.8A): applied
+    /// silently, with no stream emission, just before the next vote, so the vote meets the real refusal
+    /// and the screen can only learn the truth by reconciling after that error.
+    public enum StaleChange: String { case vetoed, locked, removed }
+    public var staleBeforeNextVote: StaleChange?
     /// Artificial latency for every operation (loading states in UI tests).
     public var latency: Duration = .zero
 
@@ -222,6 +228,28 @@ public final class InMemoryProposalStore: ProposalStore {
     /// missing plan share ONE raise, and the exclusion is tested against `hiddenFrom` directly, never
     /// through `isReadable(by:)`: that is also false for a non-member, and a non-member who is not
     /// excluded must get FC_NOT_MEMBER, exactly as the SQL guard does.
+    private func applyStaleChange(proposalID: UUID, placeID: UUID?) {
+        guard let change = staleBeforeNextVote else { return }
+        staleBeforeNextVote = nil
+        switch change {
+        case .vetoed:
+            guard let placeID, let i = places.firstIndex(where: { $0.id == placeID }) else { return }
+            places[i].vetoedAt = now()
+            votes.removeAll { $0.placeID == placeID }
+        case .removed:
+            guard let placeID else { return }
+            places.removeAll { $0.id == placeID }
+            votes.removeAll { $0.placeID == placeID }
+        case .locked:
+            guard let i = proposals.firstIndex(where: { $0.id == proposalID }) else { return }
+            var p = proposals[i]
+            let window = DateRange(lower: p.window.lowerBound, upper: p.window.lowerBound.addingTimeInterval(2 * 3600))
+            ProposalService.apply(window: window, to: &p, attendees: p.joinedIDs, at: now())
+            p.lockedPlaceID = PlaceBoard.winner(places: places.filter { $0.proposalID == proposalID }, votes: votes.filter { $0.proposalID == proposalID })
+            proposals[i] = p
+        }
+    }
+
     private func placePlan(_ id: UUID?, as me: UUID) throws -> (index: Int, plan: Proposal) {
         guard let id, let index = proposals.firstIndex(where: { $0.id == id }), !proposals[index].hiddenFrom.contains(me) else {
             throw Self.refusal("P0002", "no such plan", "FC_NOT_FOUND")
@@ -287,6 +315,7 @@ public final class InMemoryProposalStore: ProposalStore {
 
     public func votePlace(proposalID: UUID, placeID: UUID?) async throws {
         let me = try await authorize(.votePlace)
+        applyStaleChange(proposalID: proposalID, placeID: placeID)
         _ = try placePlan(proposalID, as: me)
         guard let placeID else {
             votes.removeAll { $0.proposalID == proposalID && $0.voterID == me }

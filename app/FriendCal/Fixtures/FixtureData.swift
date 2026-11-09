@@ -30,6 +30,8 @@ enum FixtureScenario: String, CaseIterable {
     case placesTied            // friend; two places tied 2 to 2, different creation times
     case placesVetoed          // host; three active places and one the host passed on
     case placesLockReady       // host; at quorum, city set, four places, exactly one leads
+    case placesLockReadyTied   // host; at quorum, city set, two places tied 2 to 2 (the lock sheet names the tie-break)
+    case placesLockReadyNone   // host; at quorum, city set, two places and no votes (the lock sheet says no place yet)
     case placesLocked          // friend; locked, lockedPlaceID set, places and votes frozen
     case placesLockedNoWinner  // friend; locked, places exist, none had a vote, lockedPlaceID nil
     case noCity                // friend; requesting, no city
@@ -167,7 +169,7 @@ enum FixtureData {
             var f = invite(group: group, you: member("Sam"), now: now, calendar: calendar)
             f.extraProposals = invitesList(calendar: calendar)
             return f
-        case .placesEmpty, .placesVoting, .placesTied, .placesVetoed, .placesLockReady, .placesLocked, .placesLockedNoWinner,
+        case .placesEmpty, .placesVoting, .placesTied, .placesVetoed, .placesLockReady, .placesLockReadyTied, .placesLockReadyNone, .placesLocked, .placesLockedNoWinner,
              .noCity, .noCityHost, .placesZeroVotes, .placesOwnLeader, .placesDeparted, .placesCapped:
             return placesScenario(scenario, group: group, now: now, calendar: calendar)
         }
@@ -242,7 +244,12 @@ enum FixtureData {
         switch scenario {
         case .placesLocked, .placesLockedNoWinner, .placesDeparted:
             f = locked(group: group, you: maya, now: now, calendar: calendar)
-        case .placesLockReady, .placesVetoed, .noCityHost:
+        case .placesLockReady, .placesLockReadyTied, .placesLockReadyNone:
+            // Quorum without the host's own tap (8 of 10 at the best cell), so the Lock pill is offered.
+            var quorum = inviteGrid
+            quorum[0][1][5] = 8
+            f = invite(group: group, you: sam, grid: quorum, now: now, calendar: calendar)
+        case .placesVetoed, .noCityHost:
             f = invite(group: group, you: sam, now: now, calendar: calendar)
         default:
             f = invite(group: group, you: cleo, now: now, calendar: calendar)
@@ -266,6 +273,14 @@ enum FixtureData {
             let juniper = b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
             for v in [sam, nina] { b.vote(v, for: lola) }
             for v in [arlo, rosa] { b.vote(v, for: juniper) }
+        case .placesLockReadyTied:
+            let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            let juniper = b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
+            for v in [arlo, rosa] { b.vote(v, for: lola) }
+            for v in [mika, theo] { b.vote(v, for: juniper) }
+        case .placesLockReadyNone:
+            b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
+            b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)
         case .placesVetoed:
             let lola = b.add("Cafe Lola", by: maya, address: "2108 E Cesar Chavez St", lat: 30.2569, lon: -97.7167)
             let juniper = b.add("Juniper Table", by: leo, address: "1100 S Lamar Blvd", lat: 30.2531, lon: -97.7650)

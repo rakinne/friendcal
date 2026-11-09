@@ -11,6 +11,7 @@ struct LockedInviteView: View {
     /// "Go to Invites" from the gone state.
     var onGoToInvites: () -> Void = {}
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showAvailability = false
     @State private var showLock = false
     /// Edit plan. The item carries whether it opens on the city picker (the Places "Choose a city" pill):
@@ -38,6 +39,7 @@ struct LockedInviteView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.32), value: session.proposal?.status)
         }
         .scrollBounceBehavior(.basedOnSize)
         .toast(placesToast)
@@ -77,6 +79,12 @@ struct LockedInviteView: View {
                        lockedDay: window.map { DateText.day($0.lowerBound, calendar: session.calendar, locale: .current) },
                        lockedTime: window.map { DateText.timeRange($0, calendar: session.calendar, locale: .current) },
                        accessibilityLabel: cardLabel(p, state, caption))
+
+            // The place the lock froze, attached under the card (design PL-7). It fades in with the lock
+            // crossfade (320ms) and is instant under Reduce Motion.
+            if state.isLocked, let winner = session.winner {
+                WinnerRow(place: winner).transition(.opacity)
+            }
 
             if let error = joinError {
                 InlineError(error: error, retryTitle: "Retry") { joinIfNeeded(force: true) }
@@ -250,14 +258,18 @@ struct InlineError: View {
     @State private var showDetails = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text(error.message).textStyle(.caption).foregroundStyle(DesignTokens.Colors.error)
+                Text(error.message).textStyle(.caption).foregroundStyle(DesignTokens.Colors.errorText)
                     .accessibilityIdentifier("inlineError.message")
                 if let onRetry {
-                    Button(retryTitle, action: onRetry)
-                        .textStyle(.caption).foregroundStyle(DesignTokens.Colors.accentHover)
-                        .accessibilityIdentifier("inlineError.retry")
+                    Button(action: onRetry) {
+                        Text(retryTitle).textStyle(.caption).foregroundStyle(DesignTokens.Colors.accentHover)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("inlineError.retry")
                 }
             }
             if let details = error.details {
@@ -267,7 +279,10 @@ struct InlineError: View {
                         Image(systemName: showDetails ? "chevron.up" : "chevron.down").imageScale(.small)
                     }
                     .foregroundStyle(DesignTokens.Colors.textMuted)
+                    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("inlineError.details")
                 if showDetails {
                     Text(details).textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)

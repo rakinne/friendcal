@@ -32,6 +32,11 @@ struct FriendCalApp: App {
            let op = InMemoryProposalStore.Operation.allCases.first(where: { "\($0)" == name }) {
             store.failNext[op] = ProposalStoreError.network("simulated failure (-FriendCalFailNext \(name))")
         }
+        // `-FriendCalStaleNext vetoed|locked|removed`: the host's veto, the lock, or the suggester's withdrawal
+        // lands on the server unseen, just before the viewer's next vote (reconcile tests, design 2.8A).
+        if let name = UserDefaults.standard.string(forKey: "FriendCalStaleNext") {
+            store.staleBeforeNextVote = InMemoryProposalStore.StaleChange(rawValue: name)
+        }
         return store
     }
 

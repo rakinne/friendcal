@@ -398,4 +398,120 @@ final class PlacesUITests: XCTestCase {
         XCTAssertTrue(error.waitForExistence(timeout: 5))
         XCTAssertEqual(error.label, "Searching too fast. Wait a moment and try again.")
     }
+
+    // MARK: Winner, history and the lock (PL-7)
+
+    /// protects=a locked plan shows the stored winner row under the card with Open in Maps (44pt) and a
+    /// "How the vote went" row that opens the read-only list with the winner marked; fails_when=the row
+    /// shows a place the lock did not freeze, Open in Maps is under 44pt, or History is a dead button;
+    /// no_claim=that Maps launches (a system app) or the Postgres winner (#11); in-memory store.
+    func testLockedPlanShowsTheWinnerRowAndHistory() {
+        let app = openInvite("placesLocked")
+        let name = any(app, "places.winner.name")
+        XCTAssertTrue(name.waitForExistence(timeout: 5), screen(app))
+        XCTAssertTrue(name.label.hasPrefix("Winner. Cafe Lola"), name.label)
+        XCTAssertGreaterThanOrEqual(any(app, "places.winner.maps").frame.height, 44)
+        XCTAssertFalse(any(app, "places.vote").exists, "voting is closed")
+        XCTAssertFalse(any(app, "places.suggest").exists, "suggesting is closed")
+        let history = app.buttons["places.history"]
+        scrollTo(history, in: app)
+        XCTAssertGreaterThanOrEqual(history.frame.height, 44)
+        history.tap()
+        XCTAssertTrue(app.staticTexts["WINNER"].waitForExistence(timeout: 5), screen(app))
+        XCTAssertTrue(any(app, "history.voter").exists)
+        attach(app, "vote-history")
+    }
+
+    /// protects=places existed and none won, so "No place was picked." shows and no winner row does;
+    /// fails_when=an empty winner row or nothing at all shows; no_claim=the share text (unit-tested).
+    func testLockedPlanWithNoWinnerSaysSo() {
+        let app = openInvite("placesLockedNoWinner")
+        let line = any(app, "places.noWinner")
+        scrollTo(line, in: app)
+        XCTAssertEqual(line.label, "No place was picked.")
+        XCTAssertFalse(any(app, "places.winner.name").exists)
+    }
+
+    /// protects=a departed voter appears in the history with the neutral glyph and the name "A friend",
+    /// never "Deleted account"; fails_when=the tombstone name or a face color leaks; no_claim=who deleted
+    /// their account (server tombstones, #11).
+    func testHistoryNamesADepartedFriendAsAFriend() {
+        let app = openInvite("placesDeparted")
+        let history = app.buttons["places.history"]
+        scrollTo(history, in: app)
+        history.tap()
+        XCTAssertTrue(app.staticTexts["A friend"].firstMatch.waitForExistence(timeout: 5), screen(app))
+        XCTAssertFalse(app.staticTexts["Deleted account"].exists)
+    }
+
+    /// protects=locking from the lock sheet shows the STORED winner afterward (not the board leader) and
+    /// closes voting; fails_when=the row is missing or names another place; no_claim=the Postgres lock (#11).
+    func testLockTransitionShowsTheStoredWinner() {
+        let app = LockedInviteUITests.launch("placesLockReady", extra: ["-FriendCalSearch", "fixture"])
+        app.buttons["heatmap.openInvite"].tap()
+        let pill = app.buttons["invite.primary"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 5))
+        pill.tap()
+        XCTAssertTrue(any(app, "lockSheet").waitForExistence(timeout: 5))
+        app.buttons["lock.confirm"].tap()
+        let name = any(app, "places.winner.name")
+        XCTAssertTrue(name.waitForExistence(timeout: 5), screen(app))
+        XCTAssertTrue(name.label.hasPrefix("Winner. Cafe Lola"), name.label)
+        XCTAssertFalse(any(app, "places.vote").exists)
+    }
+
+    // MARK: Stale errors reconcile the screen (design 2.8A)
+
+    private func voteOnTheLeader(stale: String) -> (XCUIApplication, String) {
+        let app = openInvite("placesZeroVotes", extra: ["-FriendCalStaleNext", stale])
+        let name = any(app, "places.name")
+        scrollTo(name, in: app)
+        let before = name.label
+        let vote = app.buttons["places.vote"]
+        scrollTo(vote, in: app)
+        vote.tap()
+        return (app, before)
+    }
+
+    /// protects=a vote refused because the host passed on the place flips the screen (the place leaves the
+    /// leader card) and says why; fails_when=the row keeps a Vote control or only text changes;
+    /// no_claim=real race timing.
+    func testVoteOnAPassedPlaceReconciles() {
+        let (app, before) = voteOnTheLeader(stale: "vetoed")
+        let msg = any(app, "inlineError.message")
+        XCTAssertTrue(msg.waitForExistence(timeout: 5), screen(app))
+        XCTAssertEqual(msg.label, "The host passed on this place.")
+        XCTAssertNotEqual(any(app, "places.name").label, before, "the passed place must leave the leader card")
+    }
+
+    /// protects=a vote on a plan that just locked reloads to the locked state; fails_when=voting stays
+    /// open after FC_LOCKED; no_claim=real race timing.
+    func testVoteOnALockedPlanReloadsToLocked() {
+        let (app, _) = voteOnTheLeader(stale: "locked")
+        XCTAssertTrue(any(app, "invite.badge.locked").waitForExistence(timeout: 5), screen(app))
+        XCTAssertFalse(any(app, "places.vote").exists)
+        XCTAssertFalse(any(app, "places.suggest").exists)
+    }
+
+    /// protects=a vote for a place withdrawn meanwhile removes the row; fails_when=the gone place stays
+    /// on the card; no_claim=real race timing.
+    func testVoteOnAGonePlaceRemovesTheRow() {
+        let (app, before) = voteOnTheLeader(stale: "removed")
+        let msg = any(app, "inlineError.message")
+        XCTAssertTrue(msg.waitForExistence(timeout: 5), screen(app))
+        XCTAssertEqual(msg.label, "That place is gone.")
+        XCTAssertNotEqual(any(app, "places.name").label, before)
+    }
+
+    /// protects=the voters control opens a read-only list of who voted; fails_when=the control is a
+    /// toast stub; no_claim=names beyond the fixture's.
+    func testVotersControlOpensTheReadOnlyList() {
+        let app = openInvite("placesVoting")
+        let voters = app.buttons["places.voters"]
+        scrollTo(voters, in: app)
+        XCTAssertGreaterThanOrEqual(voters.frame.height, 44)
+        voters.tap()
+        XCTAssertTrue(any(app, "history.voter").waitForExistence(timeout: 5), screen(app))
+        XCTAssertTrue(app.buttons["history.done"].exists)
+    }
 }
