@@ -258,7 +258,7 @@ final class ProposalSession {
     var shareText: String? {
         guard let p = proposal else { return nil }
         if let window = p.lockedWindow, p.isLocked {
-            return ShareText.locked(title: p.title, window: window, calendar: calendar, locale: .current)
+            return ShareText.locked(title: p.title, window: window, calendar: calendar, locale: .current, place: winner?.name)
         }
         guard let cell = selectedCell else { return nil }
         return ShareText.format(title: p.title, cell: cell, calendar: calendar, locale: .current)
@@ -442,6 +442,7 @@ final class ProposalSession {
             await adoptStoreState()
             return saved
         } catch {
+            await reconcile(after: error)
             throw UserFacingError.map(error, action: .suggestPlace, creatorName: creatorName)
         }
     }
@@ -453,6 +454,7 @@ final class ProposalSession {
             try await store.votePlace(proposalID: id, placeID: placeID)
             await adoptStoreState()
         } catch {
+            await reconcile(after: error)
             throw UserFacingError.map(error, action: .votePlace, creatorName: creatorName)
         }
     }
@@ -465,6 +467,7 @@ final class ProposalSession {
             await adoptStoreState()
         } catch {
             let subject = places.first { $0.id == placeID }.map { name(of: $0.suggestedBy) }
+            await reconcile(after: error)
             throw UserFacingError.map(error, action: vetoed ? .vetoPlace : .bringBack, creatorName: creatorName, subjectName: subject)
         }
     }
@@ -476,8 +479,19 @@ final class ProposalSession {
             try await store.removePlace(placeID: placeID)
             await adoptStoreState()
         } catch {
+            await reconcile(after: error)
             throw UserFacingError.map(error, action: .removePlace, creatorName: creatorName)
         }
+    }
+
+    /// A refusal that means the screen is stale (design 2.8A: FC_VETOED, FC_LOCKED, FC_PLACE_NOT_FOUND,
+    /// FC_NOT_FOUND, FC_NOT_MEMBER) is followed by taking the server's state, so the row flips to Passed,
+    /// the plan reloads as locked, or the missing row disappears, rather than only showing a sentence.
+    /// A network failure changes nothing on the server, so it keeps the screen as it is.
+    private func reconcile(after error: Error) async {
+        guard case let ProposalStoreError.server(_, _, hint) = error,
+              let hint, ["FC_VETOED", "FC_LOCKED", "FC_PLACE_NOT_FOUND", "FC_NOT_FOUND", "FC_NOT_MEMBER", "FC_CLOSED"].contains(hint) else { return }
+        await adoptStoreState()
     }
 
     private func placePlanID() throws -> UUID {

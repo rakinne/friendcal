@@ -106,4 +106,14 @@ final class ContrastTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(Self.ratio(C.onPrimary, C.success), 3.0, "check glyph on the success badge")
         XCTAssertGreaterThanOrEqual(Self.ratio(C.text, C.surface2), 4.5, "DEMO badge and past-cell text on surface2")
     }
+
+    /// protects=the places UI's two pairs on `surface2` (design PL-10): passed-row meta and the
+    /// departed glyph in `textMuted`, and the outlined pill's pressed label in `accentHover`;
+    /// fails_when=either token or `surface2` drifts under 4.5:1; no_claim=the glyph itself, which is
+    /// non-text and held at 3:1 only.
+    func testPlacesPairsOnSurface2MeetAA() {
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.textMuted, C.surface2), 4.5, "passed row meta on surface2")
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.accentHover, C.surface2), 4.5, "outlined pill pressed on surface2")
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.errorText, C.surface2), 4.5, "error text on surface2")
+    }
 }

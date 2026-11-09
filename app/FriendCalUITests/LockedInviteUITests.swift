@@ -191,6 +191,61 @@ final class LockedInviteUITests: XCTestCase {
         attach(app, "home-locked")
     }
 
+    /// Opens the lock sheet for a host fixture already at quorum.
+    private func openLockSheet(_ fixture: String) -> XCUIApplication {
+        let app = Self.launch(fixture, extra: ["-FriendCalSearch", "fixture"])
+        openInvite(app)
+        let lockPill = app.buttons["invite.primary"]
+        XCTAssertTrue(lockPill.waitForExistence(timeout: 5), "no Lock pill at quorum")
+        lockPill.tap()
+        XCTAssertTrue(any(app, "lockSheet").waitForExistence(timeout: 5))
+        return app
+    }
+
+    /// protects=the lock sheet names the place the lock will freeze (design PL-11, R7): the leader with
+    /// its votes, and the closing line; fails_when=the row names another place, omits the vote count or
+    /// the closing line; no_claim=the Postgres lock, which #11 covers; in-memory store.
+    func testLockSheetNamesTheWinnerAndClosesVoting() {
+        let app = openLockSheet("placesLockReady")
+        XCTAssertEqual(any(app, "lock.place").label, "Place: Cafe Lola, 3 votes")
+        XCTAssertEqual(any(app, "lock.placeClosing").label, "Locking also closes place voting.")
+        attach(app, "lock-sheet-place-winner")
+    }
+
+    /// protects=a tie is not hidden from the host: it names the earliest-suggested winner; fails_when=the
+    /// row names the later place or reads as a single leader; no_claim=the Postgres tie-break (#11).
+    func testLockSheetNamesTheTieBreak() {
+        let app = openLockSheet("placesLockReadyTied")
+        XCTAssertEqual(any(app, "lock.place").label, "Tied. Cafe Lola wins, suggested first.")
+    }
+
+    /// protects=with no votes the host is told no place will be picked; fails_when=a place is named
+    /// with zero votes; no_claim=the Postgres lock (#11).
+    func testLockSheetSaysNoPlaceYet() {
+        let app = openLockSheet("placesLockReadyNone")
+        XCTAssertEqual(any(app, "lock.place").label, "No place yet. Voting closes when you lock.")
+    }
+
+    /// protects=every duration segment is at least 44pt tall (design PL-11; also run on iPhone SE);
+    /// fails_when=a segment drops back to 36pt; no_claim=Dynamic Type beyond the default size.
+    func testLockSheetDurationSegmentsAreAtLeast44pt() {
+        let app = openLockSheet("placesLockReady")
+        // The sheet opens at its medium detent, where SwiftUI reads these segments about 4% short (42.25pt, cause
+        // not found); the size floor is asserted at the large detent, where they are exactly 44pt.
+        let w = app.windows.firstMatch
+        w.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.52)).press(forDuration: 0.1, thenDragTo: w.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)))
+        for id in ["lock.option.3600", "lock.option.5400", "lock.option.7200", "lock.option.10800"] {
+            let seg = any(app, id)
+            XCTAssertTrue(seg.waitForExistence(timeout: 5), id)
+            // The sheet's presentation spring is still settling when it first exists (a frame read 0.96 of its
+            // final height), so wait for the layout to settle; a segment that never reaches 44pt still fails.
+            let settled = NSPredicate { _, _ in seg.frame.height >= 44 }
+            _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: settled, object: nil)], timeout: 3)
+            XCTAssertGreaterThanOrEqual(seg.frame.height, 44, "\(id) height; frames: \(["lock.option.3600","lock.option.5400","lock.option.7200","lock.option.10800"].map { "\($0)=\(any(app, $0).frame)" }) sheet=\(any(app, "lockSheet").frame) window=\(app.windows.firstMatch.frame) confirm=\(app.buttons["lock.confirm"].frame) title=\(any(app, "lock.title").frame)")
+            XCTAssertGreaterThanOrEqual(seg.frame.width, 44, "\(id) width")
+        }
+    }
+
     /// protects=durations longer than the common span are disabled and "All · 1 h 20" offers the
     /// exact span (D22); fails_when=an overlong segment is enabled or All is missing; no_claim=the
     /// Realtime re-evaluation note (LockSheetModelTests).

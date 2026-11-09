@@ -20,9 +20,10 @@ public enum ShareText {
     }
 
     /// Home's Share once a plan is locked (design 2.2A): "Brunch is locked: Sat, Nov 14 · 10:00 AM-12:00 PM".
-    public static func locked(title: String, window: DateRange, calendar: Calendar, locale: Locale) -> String {
+    /// With a winning place the message ends " at <name>" (design PL-7); without one it is unchanged.
+    public static func locked(title: String, window: DateRange, calendar: Calendar, locale: Locale, place: String? = nil) -> String {
         let day = DateText.day(window.lowerBound, calendar: calendar, locale: locale)
         let time = DateText.timeRange(window, calendar: calendar, locale: locale, separator: "-")
-        return "\(Proposal.displayTitle(title, isLocked: true)) is locked: \(day) · \(time)"
+        return "\(Proposal.displayTitle(title, isLocked: true)) is locked: \(day) · \(time)\(place.map { " at \($0)" } ?? "")"
     }
 }

@@ -11,34 +11,62 @@ struct PlacesSection: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var votingID: UUID?
     @State private var inlineError: UserFacingError?
+    @State private var lastVote: (row: PlaceBoard.Row, isVoted: Bool)?
     @State private var sheet: PresentedSheet?
 
     /// The two sheets this section opens, behind one modifier. (Search from inside the list is pushed
     /// by the list itself: one sheet at a time, design PL-4.)
-    private enum PresentedSheet: String, Identifiable {
-        case search, list
-        var id: String { rawValue }
+    private enum PresentedSheet: Identifiable {
+        case search, list, history
+        /// The leader card's voters control: who voted for one place.
+        case voters(UUID)
+        var id: String {
+            switch self {
+            case .search: return "search"
+            case .list: return "list"
+            case .history: return "history"
+            case .voters(let id): return "voters-\(id)"
+            }
+        }
     }
 
     var body: some View {
+        if session.proposal?.status == .locked, session.places.isEmpty {
+            EmptyView() // a locked plan that never had places shows nothing (PL-5)
+        } else {
+            section
+        }
+    }
+
+    /// A link holder whose join is still in flight reads the section but cannot act on it (design 2.8A).
+    private var isJoining: Bool { !session.isCreator && !session.isRecipient }
+
+    private var section: some View {
         VStack(alignment: .leading, spacing: 12) {
             Spacer().frame(height: 12) // 24pt gap total with content's 16 spacing; 12 here = 28? keep 24 visual
                 .accessibilityHidden(true)
 
-            Text("Where?")
-                .textStyle(.display)
-                .foregroundStyle(DesignTokens.Colors.text)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("places.heading")
+            if session.proposal?.status != .locked {
+                Text("Where?")
+                    .textStyle(.display)
+                    .foregroundStyle(DesignTokens.Colors.text)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("places.heading")
 
-            subline
+                subline
+            }
 
             if let error = inlineError {
-                InlineError(error: error, retryTitle: "Retry") { inlineError = nil }
+                InlineError(error: error, retryTitle: "Retry") {
+                    inlineError = nil
+                    if let again = lastVote { Task { await doVote(row: again.row, isVoted: again.isVoted) } }
+                }
             }
 
             if session.proposal?.status == .locked {
                 lockedSection
+            } else if isJoining {
+                joiningSkeleton
             } else if session.proposal?.area == nil {
                 noCitySection
             } else if session.board?.active.isEmpty == true {
@@ -53,6 +81,8 @@ struct PlacesSection: View {
             switch which {
             case .search: PlaceSearchSheet(session: session, onToast: onToast)
             case .list: PlacesListSheet(session: session, onToast: onToast)
+            case .history: VoteHistorySheet(session: session, only: nil)
+            case .voters(let id): VoteHistorySheet(session: session, only: id)
             }
         }
     }
@@ -75,42 +105,42 @@ struct PlacesSection: View {
     }
 
     // MARK: Locked
+    /// After the lock the winner is the row under the invite card (`WinnerRow`, hosted by the screen);
+    /// this section keeps only "How the vote went", or the no-winner line (design PL-7).
     private var lockedSection: some View {
         Group {
-            if let winner = session.winner {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "mappin.circle.fill").foregroundStyle(DesignTokens.Colors.accentHover).accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(winner.name).textStyle(.title).foregroundStyle(DesignTokens.Colors.text)
-                                .accessibilityIdentifier("places.winner.name")
-                            if let addr = winner.address {
-                                Text(addr).textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
-                            }
-                        }
+            if session.winner != nil {
+                Button { sheet = .history } label: {
+                    HStack {
+                        Text("How the vote went").textStyle(.label).foregroundStyle(DesignTokens.Colors.accentHover)
                         Spacer()
-                        Link(destination: URL(string: "http://maps.apple.com/?q=\(winner.latitude),\(winner.longitude)")!) {
-                            Text("Open in Maps").textStyle(.label).foregroundStyle(DesignTokens.Colors.accentHover)
-                                .frame(minHeight: 44)
-                        }
-                        .accessibilityIdentifier("places.winner.maps")
+                        Image(systemName: "chevron.right").imageScale(.small).foregroundStyle(DesignTokens.Colors.accentHover)
                     }
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.lg).fill(DesignTokens.Colors.surface))
-                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.lg).stroke(DesignTokens.Colors.border, lineWidth: 1))
-
-                    Button {} label: {
-                        HStack { Text("How the vote went").textStyle(.label).foregroundStyle(DesignTokens.Colors.accentHover); Spacer(); Image(systemName: "chevron.right").imageScale(.small).foregroundStyle(DesignTokens.Colors.accentHover) }
-                            .frame(minHeight: 44)
-                    }
-                    .accessibilityIdentifier("places.history")
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("places.history")
             } else {
                 Text("No place was picked.")
                     .textStyle(.body).foregroundStyle(DesignTokens.Colors.textMuted)
                     .accessibilityIdentifier("places.noWinner")
             }
         }
+    }
+
+    // MARK: Joining
+    private var joiningSkeleton: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Capsule().fill(Color.skeleton).frame(width: 180, height: 16)
+            Capsule().fill(Color.skeleton).frame(width: 120, height: 12)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.lg).fill(DesignTokens.Colors.surface))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading places")
+        .accessibilityIdentifier("places.joining")
     }
 
     // MARK: No city
@@ -200,7 +230,7 @@ struct PlacesSection: View {
             // Faces + names/count as one 44pt control
             if voteCount > 0 || !voters.isEmpty {
                 Button {
-                    onToast("Who voted sheet coming soon")
+                    sheet = .voters(row.id)
                 } label: {
                     HStack(spacing: 8) {
                         avatarStack(voters: voters)
@@ -289,6 +319,7 @@ struct PlacesSection: View {
     }
 
     private func doVote(row: PlaceBoard.Row, isVoted: Bool) async {
+        lastVote = (row, isVoted)
         votingID = row.id
         defer { votingID = nil }
         do {

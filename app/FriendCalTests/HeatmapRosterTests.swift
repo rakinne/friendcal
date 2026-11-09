@@ -129,6 +129,10 @@ final class HeatmapRosterTests: XCTestCase {
         let sat = HeatmapTests.date(2026, 11, 14, 10)
         XCTAssertEqual(ShareText.locked(title: "Brunch", window: DateRange(lower: sat, upper: sat.addingTimeInterval(7200)), calendar: HeatmapTests.calendar, locale: Locale(identifier: "en_US")),
                        "Brunch is locked: Sat, Nov 14 · 10:00 AM-12:00 PM")
+        // protects=the winner suffix (design PL-7); fails_when=a place is dropped or appended without " at ";
+        // no_claim=names that need escaping, which share text does not do.
+        XCTAssertEqual(ShareText.locked(title: "Brunch", window: DateRange(lower: sat, upper: sat.addingTimeInterval(7200)), calendar: HeatmapTests.calendar, locale: Locale(identifier: "en_US"), place: "Cafe Lola"),
+                       "Brunch is locked: Sat, Nov 14 · 10:00 AM-12:00 PM at Cafe Lola")
     }
 
     /// protects=the one set of date formatters the invite, sheets and rows use; fails_when=a day,

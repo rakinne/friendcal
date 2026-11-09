@@ -220,7 +220,7 @@ struct CreateProposalSheet: View {
     }
 
     private func fieldError(_ text: String, id: String) -> some View {
-        Text(text).textStyle(.caption).foregroundStyle(DesignTokens.Colors.error).accessibilityIdentifier(id)
+        Text(text).textStyle(.caption).foregroundStyle(DesignTokens.Colors.errorText).accessibilityIdentifier(id)
     }
 
     // MARK: Success (design 3.2A)

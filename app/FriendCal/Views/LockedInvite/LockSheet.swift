@@ -85,11 +85,14 @@ private struct DurationSegments: View {
                     Text(option.label).textStyle(.label).lineLimit(1).minimumScaleFactor(0.7)
                         .foregroundStyle(selected ? DesignTokens.Colors.onPrimary : DesignTokens.Colors.text)
                         .padding(.horizontal, 4)
-                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.sm).fill(selected ? DesignTokens.Colors.accentHover : .clear))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                // The target's size is set on the Button itself, so the accessibility frame is the 44pt
+                // box and not just the label's intrinsic size.
+                .frame(maxWidth: .infinity, minHeight: 44)
                 .disabled(!option.isEnabled)
                 .opacity(option.isEnabled ? 1 : 0.4)
                 .accessibilityLabel(option.label)
@@ -144,6 +147,8 @@ struct LockSheet: View {
 
                     attendees
 
+                    placeRow
+
                     if model.isTooShort {
                         Text("Everyone's free for less than an hour here.")
                             .textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
@@ -175,6 +180,32 @@ struct LockSheet: View {
         .onChange(of: session.lockSpan) { _, span in if let span { model.update(span: span) } }
         .onChange(of: session.lockState?.isLocked ?? false) { _, locked in if locked { dismiss() } }
         .accessibilityIdentifier("lockSheet")
+    }
+
+    /// What locking freezes for place voting (design PL-11): the projected winner, a tie with its
+    /// tie-break, or nothing; plus the closing line. Plans with no city have no place voting at all.
+    @ViewBuilder
+    private var placeRow: some View {
+        if session.proposal?.area != nil || !session.places.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(placeLine)
+                    .textStyle(.body).foregroundStyle(DesignTokens.Colors.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("lock.place")
+                Text("Locking also closes place voting.")
+                    .textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
+                    .accessibilityIdentifier("lock.placeClosing")
+            }
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    private var placeLine: String {
+        switch session.lockProjection {
+        case .winner(let place, let votes): return "Place: \(place.name), \(votes) \(votes == 1 ? "vote" : "votes")"
+        case .tied(let winner, _, _): return "Tied. \(winner.name) wins, suggested first."
+        case .none: return "No place yet. Voting closes when you lock."
+        }
     }
 
     /// Who the lock settles: the best cell's free members (design 5.3A).

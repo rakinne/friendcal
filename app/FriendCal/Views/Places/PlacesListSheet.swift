@@ -9,6 +9,8 @@ struct PlacesListSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var inlineError: UserFacingError?
+    /// What Retry repeats: the last place action the viewer tried.
+    @State private var lastAction: (() async -> Void)?
     @State private var actingID: UUID?
     @State private var vetoTarget: PlaceBoard.Row?
     @State private var searchPath: [String] = []
@@ -80,7 +82,10 @@ struct PlacesListSheet: View {
                 }
 
                 if let error = inlineError {
-                    InlineError(error: error, retryTitle: "Retry") { inlineError = nil }
+                    InlineError(error: error, retryTitle: "Retry") {
+                        inlineError = nil
+                        if let again = lastAction { Task { await again() } }
+                    }
                 }
 
                 // Active rows in frozen order
@@ -151,6 +156,7 @@ struct PlacesListSheet: View {
     // MARK: Actions
 
     private func doVote(_ row: PlaceBoard.Row) async {
+        lastAction = { await doVote(row) }
         actingID = row.id
         defer { actingID = nil }
         let wasVoted = session.board?.myVotePlaceID == row.id
@@ -168,12 +174,14 @@ struct PlacesListSheet: View {
             refreshCounts()
         } catch let e as UserFacingError {
             inlineError = e
-            // Stale error reconcile: reload counts
-            refreshCounts()
+            // The session already took the server's state (design 2.8A): a place the host passed on
+            // moves to Passed, one that is gone leaves the list. Re-sort so the correction shows.
+            refreeze()
         } catch { inlineError = UserFacingError.map(error, action: .votePlace, creatorName: session.creatorName) }
     }
 
     private func doVeto(_ row: PlaceBoard.Row) async {
+        lastAction = { await doVeto(row) }
         actingID = row.id
         defer { actingID = nil }
         do {
@@ -191,6 +199,7 @@ struct PlacesListSheet: View {
     }
 
     private func doBringBack(_ row: PlaceBoard.Row) async {
+        lastAction = { await doBringBack(row) }
         actingID = row.id
         defer { actingID = nil }
         do {
@@ -200,10 +209,12 @@ struct PlacesListSheet: View {
             frozenVetoed = session.board?.vetoed ?? []
         } catch let e as UserFacingError {
             inlineError = e
+            refreeze()
         } catch { inlineError = UserFacingError.map(error, action: .bringBack, creatorName: session.creatorName, subjectName: session.name(of: row.place.suggestedBy)) }
     }
 
     private func doWithdraw(_ row: PlaceBoard.Row) async {
+        lastAction = { await doWithdraw(row) }
         actingID = row.id
         defer { actingID = nil }
         do {
@@ -211,8 +222,13 @@ struct PlacesListSheet: View {
             inlineError = nil
             frozenActive = session.board?.active ?? []
             frozenVetoed = session.board?.vetoed ?? []
-        } catch let e as UserFacingError { inlineError = e }
+        } catch let e as UserFacingError { inlineError = e; refreeze() }
         catch { inlineError = UserFacingError.map(error, action: .removePlace, creatorName: session.creatorName) }
+    }
+
+    private func refreeze() {
+        frozenActive = session.board?.active ?? frozenActive
+        frozenVetoed = session.board?.vetoed ?? frozenVetoed
     }
 
     private func refreshCounts() {
@@ -354,15 +370,9 @@ private struct PlaceListRow: View {
     private func avatar(for id: UUID) -> some View {
         Group {
             if let member = session.members.first(where: { $0.id == id }) {
-                if member.name == User.deletedDisplayName {
-                    Image(systemName: "person.fill").imageScale(.small).foregroundStyle(DesignTokens.Colors.textMuted)
-                        .frame(width: 28, height: 28).background(Circle().fill(DesignTokens.Colors.surface2))
-                } else {
-                    FriendAvatar(member: member, size: 28, style: .badge)
-                }
+                FriendAvatar(member: member, size: 28, style: .badge)
             } else {
-                Image(systemName: "person.fill").imageScale(.small).foregroundStyle(DesignTokens.Colors.textMuted)
-                    .frame(width: 28, height: 28).background(Circle().fill(DesignTokens.Colors.surface2))
+                DepartedAvatar(size: 28)
             }
         }
     }
