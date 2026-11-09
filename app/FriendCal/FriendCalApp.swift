@@ -37,12 +37,15 @@ struct FriendCalApp: App {
 
     private static let fixture = FixtureData.make(.fromLaunchArguments, now: FixtureClock.now())
     private static let store = makeStore(fixture: fixture)
+    /// Place and city search (#14): MapKit, or `-FriendCalSearch fixture` for UI tests.
+    private static let placeSearch = PlaceSearchProvider.fromLaunchArguments()
 
     @StateObject private var authGate = AuthGateModel(store: Self.store)
 
     var body: some Scene {
         WindowGroup {
             RootGateView(store: Self.store, fixture: Self.fixture, pendingTitle: pendingTitle)
+                .environment(\.placeSearch, Self.placeSearch)
         }
     }
 

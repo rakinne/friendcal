@@ -6,9 +6,19 @@ import FriendCalCore
 struct PlacesSection: View {
     var session: ProposalSession
     var onToast: (String) -> Void = { _ in }
+    /// The host's "Choose a city" pill: the screen opens Edit plan with the city picker pushed.
+    var onChooseCity: () -> Void = {}
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var votingID: UUID?
     @State private var inlineError: UserFacingError?
+    @State private var sheet: PresentedSheet?
+
+    /// The two sheets this section opens, behind one modifier. (Search from inside the list is pushed
+    /// by the list itself: one sheet at a time, design PL-4.)
+    private enum PresentedSheet: String, Identifiable {
+        case search, list
+        var id: String { rawValue }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -39,7 +49,12 @@ struct PlacesSection: View {
 
             suggestOrCap
         }
-        .accessibilityIdentifier("places.section")
+        .sheet(item: $sheet) { which in
+            switch which {
+            case .search: PlaceSearchSheet(session: session, onToast: onToast)
+            case .list: PlacesListSheet(session: session, onToast: onToast)
+            }
+        }
     }
 
     // MARK: Subline (PL-1)
@@ -103,8 +118,7 @@ struct PlacesSection: View {
         Group {
             if session.isCreator {
                 Button {
-                    // Edit plan will be wired in T4; placeholder toast for now
-                    onToast("Choose a city")
+                    onChooseCity()
                 } label: {
                     OutlinePill(title: "Choose a city", fullWidth: true)
                 }
@@ -221,7 +235,7 @@ struct PlacesSection: View {
             let total = board.active.count + board.vetoed.count
             if total > 1 || board.vetoed.count > 0 {
                 Button {
-                    onToast("Places list coming soon")
+                    sheet = .list
                 } label: {
                     HStack {
                         Text("View all \(total) places").textStyle(.label).foregroundStyle(DesignTokens.Colors.accentHover)
@@ -229,6 +243,7 @@ struct PlacesSection: View {
                         Image(systemName: "chevron.right").imageScale(.small).foregroundStyle(DesignTokens.Colors.accentHover)
                     }
                     .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("places.viewAll")
@@ -343,7 +358,7 @@ struct PlacesSection: View {
             switch session.suggestAvailability {
             case .available:
                 Button {
-                    onToast("Search coming soon")
+                    sheet = .search
                 } label: {
                     OutlinePill(title: "Suggest a place", fullWidth: true)
                 }

@@ -67,6 +67,8 @@ struct AccountDeletionView: View {
             if let id = store.currentUserID {
                 UserDefaults.standard.removeObject(forKey: "FriendCalDisplayName.\(id.uuidString)")
             }
+            // the remembered city is per device: the next account must not inherit it
+            LastUsedCity().clear()
             // suppress pending deep link per 2B
             UserDefaults.standard.set(true, forKey: "FriendCalSuppressPendingLink")
             receipt = r

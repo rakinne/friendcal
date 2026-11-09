@@ -511,7 +511,12 @@ final class ProposalSession {
         do {
             let plan = try draft.validate(calendar: calendar)
             p.title = plan.title
-            p.window = plan.window
+            // Dates the host did not touch keep the stored window exactly. The draft rebuilds the window by
+            // day-snapping, and a stored window that was not already snapped would then read as a date
+            // change, which the store refuses once friends have marked times. That would block the one
+            // edit that stays open then: replacing the city (design 5.4A, PL-5). A real date change still
+            // goes through, so the store keeps enforcing the freeze.
+            if ProposalDraft(editing: p).window(calendar: calendar) != plan.window { p.window = plan.window }
             p.expectedCount = max(plan.expectedCount, p.joinedCount)
             // The city travels with the rest of the edit. Copying only title, window and headcount would
             // drop a city change while the dates are frozen.
