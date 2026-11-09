@@ -34,8 +34,14 @@ xcodebuild archive -project FriendCal.xcodeproj -scheme FriendCal \
   -destination 'generic/platform=iOS' -archivePath "$OUT/FriendCal.xcarchive" \
   -allowProvisioningUpdates | tail -3
 
-xcodebuild -exportArchive -archivePath "$OUT/FriendCal.xcarchive" \
+if ! xcodebuild -exportArchive -archivePath "$OUT/FriendCal.xcarchive" \
   -exportOptionsPlist Config/ExportOptions.plist -exportPath "$OUT/export" \
-  -allowProvisioningUpdates | grep -E "Upload succeeded|EXPORT|error" || true
+  -allowProvisioningUpdates > "$OUT/export.log" 2>&1 \
+  || ! grep -q "Upload succeeded" "$OUT/export.log"; then
+  grep -E "error" "$OUT/export.log" >&2 || true
+  echo "error: upload failed; full log: $OUT/export.log (retry with --no-bump)" >&2
+  exit 1
+fi
+echo "Upload succeeded."
 
 echo "Processing takes 5-15 min; Apple emails when the build is ready in TestFlight."
