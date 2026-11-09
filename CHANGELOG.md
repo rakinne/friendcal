@@ -2,6 +2,18 @@
 
 All notable changes to FriendCal are listed here, newest first. The version lives in `VERSION`.
 
+## [0.3.0.0] - 2026-11-08
+
+### Added
+- Choose a city for your plan. New plan now asks for a city, starts from the one you used last time, and the plan's Places section lets the host pick or change it.
+- Suggest places from the plan screen. Search near the plan's city, tap a result to add it, and see who already suggested it. If someone suggested the same place, you can vote for theirs instead.
+- Vote, pass on and bring back places from a full list. The host can pass on a place and bring it back, and you can take your vote back or withdraw a place you suggested. Each action tells you what happened, and a failed one shows a message.
+- Clear messages when a search can't finish. You see whether you searched too fast, lost your connection, found nothing, or picked a place outside the city.
+
+### Changed
+- The host can now change a plan's city after friends have marked times. The dates stay frozen, so changing the dates is still refused.
+- Signing out or deleting your account forgets the remembered city, so the next person on the phone doesn't start with yours.
+
 ## [0.2.0.0] - 2026-11-08
 
 ### Added

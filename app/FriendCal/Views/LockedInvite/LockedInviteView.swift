@@ -13,9 +13,17 @@ struct LockedInviteView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showAvailability = false
     @State private var showLock = false
-    @State private var showEdit = false
+    /// Edit plan. The item carries whether it opens on the city picker (the Places "Choose a city" pill):
+    /// a separate flag set alongside `isPresented` was read stale when the sheet first presented.
+    @State private var editSheet: EditSheet?
+
+    private struct EditSheet: Identifiable {
+        let id = UUID()
+        var startsOnCityPicker = false
+    }
     @State private var lockAck = 0
     @State private var joinError: UserFacingError?
+    @State private var placesToast = ToastCenter()
     @State private var minuteTick = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -32,6 +40,7 @@ struct LockedInviteView: View {
             .padding(.vertical, 12)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .toast(placesToast)
         .background(DesignTokens.Colors.background.ignoresSafeArea())
         .navigationTitle(session.lockState?.navTitle ?? "Locked Invite")
         .navigationBarTitleDisplayMode(.inline)
@@ -51,8 +60,8 @@ struct LockedInviteView: View {
         .sheet(isPresented: $showLock) {
             LockSheet(session: session)
         }
-        .sheet(isPresented: $showEdit) {
-            CreateProposalSheet(mode: .edit(session), onCreated: { _ in })
+        .sheet(item: $editSheet) { edit in
+            CreateProposalSheet(mode: .edit(session), startOnCityPicker: edit.startsOnCityPicker, onCreated: { _ in })
                 .presentationDetents([.large])
         }
     }
@@ -122,8 +131,13 @@ struct LockedInviteView: View {
                 .textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("invite.progress")
+
+            PlacesSection(session: session, onToast: { msg in placesToast.show(msg) }, onChooseCity: {
+                editSheet = EditSheet(startsOnCityPicker: true)
+            })
         }
     }
+
 
     private func cardLabel(_ p: Proposal, _ state: LockState, _ caption: String?) -> String {
         if case .locked(let window, _, _) = state {
@@ -141,7 +155,7 @@ struct LockedInviteView: View {
                 ShareLink(item: text) { Label("Share invite", systemImage: "square.and.arrow.up") }
             }
             if session.isCreator, session.proposal?.status == .requesting {
-                Button { showEdit = true } label: { Label("Edit plan", systemImage: "pencil") }
+                Button { editSheet = EditSheet() } label: { Label("Edit plan", systemImage: "pencil") }
                     .accessibilityIdentifier("invite.edit")
             }
         } label: {

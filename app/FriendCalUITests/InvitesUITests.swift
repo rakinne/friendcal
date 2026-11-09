@@ -64,10 +64,11 @@ final class InvitesUITests: XCTestCase {
     /// missing, or Done lands on Home; no_claim=DatePicker validation (ProposalDraftTests), share
     /// sheet contents.
     func testCreateFromHomeLandsOnTheInvite() {
-        let app = LockedInviteUITests.launch("noProposal")
+        let app = LockedInviteUITests.launch("noProposal", extra: PlacesUITests.lastCity(PlacesUITests.austinCity))
         app.buttons["heatmap.requestTimes"].tap()
         XCTAssertTrue(any(app, "createSheet").waitForExistence(timeout: 5))
         XCTAssertEqual(app.textFields["create.title"].placeholderValue, "Brunch")
+        XCTAssertEqual(app.buttons["create.city"].label, "City, Austin, TX", "the host's last city is prefilled (design 3.1A)")
         XCTAssertEqual(any(app, "create.expectedValue").label, "8")
         XCTAssertTrue(app.staticTexts["How many people, counting you?"].exists)
         let submit = app.buttons["create.submit"]
@@ -95,7 +96,7 @@ final class InvitesUITests: XCTestCase {
     /// (design 2.3A) and the retry succeeds; fails_when=the error is a transient toast, lacks details,
     /// or the sheet closes; no_claim=real network failures (`-FriendCalFailNext` stands in).
     func testCreateFailureShowsInlineErrorWithDetailsAndRetries() {
-        let app = LockedInviteUITests.launch("noProposal", extra: ["-FriendCalFailNext", "create"])
+        let app = LockedInviteUITests.launch("noProposal", extra: ["-FriendCalFailNext", "create"] + PlacesUITests.lastCity(PlacesUITests.austinCity))
         app.buttons["heatmap.requestTimes"].tap()
         XCTAssertTrue(any(app, "createSheet").waitForExistence(timeout: 5))
         app.buttons["create.submit"].tap()

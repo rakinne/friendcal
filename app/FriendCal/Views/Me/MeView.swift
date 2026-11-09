@@ -59,6 +59,7 @@ struct MeView: View {
             }
             Section {
                 Button("Sign out") {
+                    LastUsedCity().clear()
                     Task { await store.signOut() }
                 }
                 .foregroundStyle(DesignTokens.Colors.text)

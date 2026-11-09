@@ -469,6 +469,30 @@ final class ProposalSessionTests: XCTestCase {
         XCTAssertEqual(s.proposal?.area, newCity)
     }
 
+    /// protects=a city-only edit succeeds while friends' holds freeze the dates, even though the fixture's
+    /// window is not day-snapped, and an actual date change is still refused with the frozen-dates
+    /// sentence; fails_when=the draft's day-snapped window is sent as a date change (the host could not
+    /// replace a city once anyone marked a time) or the refusal is dropped; no_claim=the server's own
+    /// freeze rule (the SQL lane) and the edit sheet UI.
+    func testCityOnlyEditSucceedsWithFrozenDatesAndADateChangeStillFails() async throws {
+        let s = session(.placesVetoed)
+        XCTAssertTrue(s.hasAnyHold, "the fixture has friends' holds, so the dates are frozen")
+        let before = try XCTUnwrap(s.proposal)
+        let dallas = SearchArea(name: "Dallas, TX", latitude: 32.7767, longitude: -96.7970)
+        var draft = ProposalDraft(editing: before)
+        draft.area = dallas
+        try await s.edit(draft)
+        XCTAssertEqual(s.proposal?.area, dallas)
+        XCTAssertEqual(s.proposal?.window, before.window, "the stored window is kept exactly")
+
+        draft = ProposalDraft(editing: try XCTUnwrap(s.proposal))
+        draft.from = cal.date(byAdding: .day, value: 1, to: draft.from)!
+        do { try await s.edit(draft); XCTFail("a date change is refused once friends have marked times") } catch let e as UserFacingError {
+            XCTAssertEqual(e.message, "Can't change the dates once friends have marked times.")
+        }
+        XCTAssertEqual(s.proposal?.window, before.window)
+    }
+
     /// protects=a departed friend is named "A friend", never the tombstone's "Deleted account", while a
     /// living member keeps their name; fails_when=the tombstone name leaks into the screen or a living
     /// friend loses theirs; no_claim=the avatar glyph (#14).

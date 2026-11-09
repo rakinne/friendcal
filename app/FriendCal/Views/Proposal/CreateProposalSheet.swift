@@ -12,24 +12,45 @@ struct CreateProposalSheet: View {
         case edit(ProposalSession)
     }
 
+    /// Screens pushed inside the sheet's own stack.
+    enum Route: Hashable { case city }
+
     let mode: Mode
     /// Create only: called with the new proposal when Done is tapped on the success step (3.2A).
     var onCreated: (Proposal) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var draft: ProposalDraft
+    @State private var path: [Route] = []
+    @State private var openedCityPicker = false
+    private let startOnCityPicker: Bool
     @State private var isSaving = false
     @State private var error: UserFacingError?
     @State private var created: Proposal?
     @State private var copied = false
     @FocusState private var titleFocused: Bool
 
-    init(mode: Mode, onCreated: @escaping (Proposal) -> Void) {
+    /// `startOnCityPicker` is the host's "Choose a city" pill on a plan that has none: it opens Edit plan
+    /// with the picker already pushed (design PL-5).
+    init(mode: Mode, startOnCityPicker: Bool = false, onCreated: @escaping (Proposal) -> Void) {
         self.mode = mode
         self.onCreated = onCreated
+        self.startOnCityPicker = startOnCityPicker
         switch mode {
-        case .create(_, let calendar, let now): _draft = State(initialValue: ProposalDraft.default(now: now(), calendar: calendar))
+        case .create(_, let calendar, let now):
+            // A new plan needs a city (#10 R1), prefilled with the host's last one.
+            var draft = ProposalDraft.default(now: now(), calendar: calendar)
+            draft.requiresArea = true
+            draft.area = LastUsedCity().load()
+            _draft = State(initialValue: draft)
         case .edit(let session): _draft = State(initialValue: session.proposal.map(ProposalDraft.init(editing:)) ?? ProposalDraft.default(now: session.now(), calendar: session.calendar))
         }
+    }
+
+    /// "Places already suggested stay." once a plan has places (design 7.3A), because replacing the city
+    /// does not touch them; otherwise the reason a host is asked for one (3.1A).
+    private var cityCaption: String {
+        if case .edit(let session) = mode, !session.places.isEmpty { return "Places already suggested stay." }
+        return "So friends can suggest places nearby."
     }
 
     private var calendar: Calendar {
@@ -58,7 +79,7 @@ struct CreateProposalSheet: View {
     private var isValid: Bool { errors.isEmpty && draft.expectedCount >= minimumPeople }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 if let created {
                     success(created)
@@ -73,6 +94,17 @@ struct CreateProposalSheet: View {
                     Button(created == nil ? "Cancel" : "Done") { finish() }
                         .foregroundStyle(DesignTokens.Colors.accentHover)
                         .accessibilityIdentifier(created == nil ? "create.cancel" : "create.done")
+                }
+            }
+            .onAppear {
+                if startOnCityPicker && !openedCityPicker {
+                    openedCityPicker = true
+                    path.append(.city)
+                }
+            }
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .city: CityPickerView { area in draft.area = area }
                 }
             }
         }
@@ -95,6 +127,11 @@ struct CreateProposalSheet: View {
                         .padding(.horizontal, 12).frame(minHeight: 44)
                         .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).stroke(DesignTokens.Colors.border, lineWidth: 1))
                         .accessibilityIdentifier("create.title")
+                }
+                field("City") {
+                    cityRow
+                    Text(cityCaption).textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
+                        .accessibilityIdentifier("create.cityCaption")
                 }
                 field("From") {
                     DatePicker("From", selection: $draft.from, displayedComponents: .date)
@@ -150,6 +187,29 @@ struct CreateProposalSheet: View {
         .padding(20)
         .disabled(isSaving && error == nil)
         .onSubmit { titleFocused = false }
+    }
+
+    /// The city row (design 3.1A): the name and a chevron once chosen, an outlined "Choose a city" pill
+    /// before. It stays enabled when the dates are frozen: changing the city does not move any hold.
+    private var cityRow: some View {
+        Button { path.append(.city) } label: {
+            if let area = draft.area {
+                HStack {
+                    Text(area.name).textStyle(.body).foregroundStyle(DesignTokens.Colors.text).lineLimit(1)
+                    Spacer()
+                    Image(systemName: "chevron.right").imageScale(.small).foregroundStyle(DesignTokens.Colors.textMuted)
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 12).frame(minHeight: 44)
+                .background(RoundedRectangle(cornerRadius: DesignTokens.Radius.md).stroke(DesignTokens.Colors.border, lineWidth: 1))
+                .contentShape(Rectangle())
+            } else {
+                OutlinePill(title: "Choose a city", fullWidth: true)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(draft.area.map { "City, \($0.name)" } ?? "Choose a city")
+        .accessibilityIdentifier("create.city")
     }
 
     private func field<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -218,8 +278,10 @@ struct CreateProposalSheet: View {
                 case .create(let store, let calendar, _):
                     let plan = try draft.validate(calendar: calendar)
                     created = try await store.create(plan)
+                    if let area = plan.area { LastUsedCity().save(area) }
                 case .edit(let session):
                     try await session.edit(draft)
+                    if let area = draft.area { LastUsedCity().save(area) }
                     dismiss()
                 }
             } catch let failure as UserFacingError {
