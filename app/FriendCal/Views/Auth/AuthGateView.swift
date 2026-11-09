@@ -71,6 +71,10 @@ struct AuthGateView: View {
 
                     // Input card — ivory, hairline, pill CTA, friction line inside (E)
                     VStack(alignment: .leading, spacing: 14) {
+                        if auth.usesApple {
+                            AppleSignInSection(auth: auth)
+                        }
+                        if !auth.usesApple {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Your name")
                                 .textStyle(.label)
@@ -102,6 +106,7 @@ struct AuthGateView: View {
                         .disabled(!canContinue)
                         .opacity(canContinue ? 1 : 0.5)
                         .accessibilityIdentifier("auth.continue")
+                        }
 
                         // Friction promise — the line you loved from B, now inside the card (E)
                         Text("No password. Takes 10 seconds.")
@@ -111,7 +116,7 @@ struct AuthGateView: View {
                             .accessibilityIdentifier("auth.frictionLine")
 
                         if case .failed(let err) = auth.state {
-                            InlineError(error: err) { Task { await auth.signIn(displayName: trimmedName) } }
+                            InlineError(error: err, onRetry: auth.usesApple ? nil : { Task { await auth.signIn(displayName: trimmedName) } })
                                 .padding(.top, 4)
                         }
                     }
@@ -141,7 +146,7 @@ struct AuthGateView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .background(DesignTokens.Colors.background.ignoresSafeArea())
-        .onAppear { isNameFocused = true }
+        .onAppear { isNameFocused = !auth.usesApple }
     }
 
     private var brandRow: some View {
@@ -290,6 +295,22 @@ final class AuthGateModel: ObservableObject {
             }
         }
     }
+
+    /// True when the store signs in with Apple (the network store); the name form is for demo data.
+    var usesApple: Bool { store is AppleSignInCapable }
+
+    func signInWithApple(idToken: String, nonce: String, displayName: String?) async {
+        guard let apple = store as? AppleSignInCapable else { return }
+        do {
+            let id = try await apple.signInWithApple(idToken: idToken, nonce: nonce, displayName: displayName)
+            if let name = displayName { UserDefaults.standard.set(name, forKey: "FriendCalDisplayName.\(id.uuidString)") }
+        } catch {
+            // state already set to .failed by store
+        }
+    }
+
+    /// A failure that happened before the store was involved (Apple's sheet, a missing token).
+    func fail(_ message: String) { state = .failed(UserFacingError(message: message)) }
 
     func signIn(displayName: String) async {
         do {
