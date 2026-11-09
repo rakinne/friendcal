@@ -376,7 +376,8 @@ grant delete on busy_blocks to authenticated;  -- scoped to own rows by busy_del
 revoke all on proposals from authenticated, anon;
 grant select (id, title, window_start, window_end, created_by, distribution, status,
               locked_date, locked_end, created_at,
-              area_name, area_lat, area_lon, locked_place_id) on proposals to authenticated;
+              area_name, area_lat, area_lon, locked_place_id,
+              locked_attendee_ids, locked_at) on proposals to authenticated;
 -- The city can be set at creation. `locked_place_id` is deliberately absent from the insert and update
 -- grants: the winner is written by lock_proposal() alone, and a direct write fails on the column
 -- privilege before any policy or the edit guard runs.

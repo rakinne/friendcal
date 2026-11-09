@@ -35,8 +35,18 @@ struct FriendCalApp: App {
         return store
     }
 
-    private static let fixture = FixtureData.make(.fromLaunchArguments, now: FixtureClock.now())
-    private static let store = makeStore(fixture: fixture)
+    /// The network store unless a launch argument or a missing config says otherwise: `-FriendCalStore
+    /// memory` and any `-FriendCalFixture` (UI tests, previews) keep the in-memory store, and so does a
+    /// build with no Supabase URL and key in Info.plist (fresh clones, CI).
+    private static let network: SupabaseProposalStore? = {
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: "FriendCalStore") == "memory" || defaults.string(forKey: "FriendCalFixture") != nil { return nil }
+        return SupabaseProposalStore.fromBundle()
+    }()
+    /// Home still reads a fixture for its group header; against the network store that is the empty
+    /// one, so no demo friends appear next to real plans.
+    private static let fixture = FixtureData.make(network == nil ? .fromLaunchArguments : .noFriends, now: FixtureClock.now())
+    private static let store: any ProposalStore = network ?? makeStore(fixture: fixture)
     /// Place and city search (#14): MapKit, or `-FriendCalSearch fixture` for UI tests.
     private static let placeSearch = PlaceSearchProvider.fromLaunchArguments()
 

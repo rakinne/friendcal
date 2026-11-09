@@ -58,6 +58,13 @@ targets:
     deploymentTarget: "18.0"
     supportedDestinations: [iOS]
     bundleId: com.friendcal.app
+    entitlements:
+      path: FriendCal/FriendCal.entitlements
+      properties:
+        # Sign in with Apple (native signInWithIdToken). The App ID must also have the capability
+        # enabled in the Apple Developer portal, or automatic signing refuses the profile.
+        com.apple.developer.applesignin:
+          - Default
     info:
       path: FriendCal/Info.plist
       properties:
@@ -89,6 +96,11 @@ targets:
         LSRequiresIPhoneOS: true
         # Standard HTTPS only (Supabase); skips the per-build export-compliance prompt in TestFlight.
         ITSAppUsesNonExemptEncryption: false
+        # Network store config, filled from Config/Local.xcconfig (gitignored). Empty or unexpanded
+        # means the app falls back to the in-memory store. The anon key is a public client key; RLS is
+        # what protects the data.
+        SupabaseURL: $(SUPABASE_URL)
+        SupabaseAnonKey: $(SUPABASE_ANON_KEY)
     settings:
       base:
         INFOPLIST_FILE: FriendCal/Info.plist
