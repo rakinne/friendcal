@@ -87,6 +87,8 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         LSRequiresIPhoneOS: true
+        # Standard HTTPS only (Supabase); skips the per-build export-compliance prompt in TestFlight.
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         INFOPLIST_FILE: FriendCal/Info.plist
