@@ -2,6 +2,14 @@
 
 All notable changes to FriendCal are listed here, newest first. The version lives in `VERSION`.
 
+## [0.4.0.0] - 2026-11-10
+
+### Added
+- A Groups tab that shows your friends and the crews you've put them in, with each friend's current status and whether you're free together.
+- Start a crew from your friends, and set your own status: free now, free until a time, or away with a short note.
+- Poke a friend who hasn't answered your availability request. Pokes live in a new Pokes tab, which shows a badge when something is waiting.
+- Tag along on a friend's locked plan. If you were sent a plan you're not in, one tap joins you from the plan's sheet.
+
 ## [0.3.0.0] - 2026-11-08
 
 ### Added

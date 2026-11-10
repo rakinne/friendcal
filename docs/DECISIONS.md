@@ -20,3 +20,4 @@ While blocked on Apple Developer verification (~1 day), shipped server rules + a
 - **Account deletion (D8/D10):** `delete_account()` RPC — delete identity, anonymize row, keep locked plans. Verified by `users_auth_test.sql`.
 - **Target honestly lowered (D7):** This wave does *not* make two phones converge; `SupabaseProposalStore` is next wave.
 - **Apple revocation out of wave (re-cost D2/eng D7):** Auth code single-use/5-min + needs team-signed client secret — would gate submission on verification. Deferred with unconditional Settings fallback.
+- **Poke limit replaced (social wave, 2026-11-10):** one live poke per (from, to); a re-send returns the existing poke; a poke expires after one hour. Supersedes the 24h per-proposal rule from 2026-11-04. Enforced in `supabase/social.sql`.

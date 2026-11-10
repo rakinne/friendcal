@@ -80,7 +80,9 @@ struct AppTabView: View {
             await social.startNotifications()
             followPendingPush()
             // `-FriendCalPushTap poke/<uuid>`: a UI test's stand-in for tapping a push.
+            #if DEBUG
             if let route = UserDefaults.standard.string(forKey: "FriendCalPushTap").flatMap(PushRoute.init(launchArgument:)) { follow(route) }
+            #endif
         }
         .onReceive(NotificationCenter.default.publisher(for: .friendCalPushTapped)) { _ in followPendingPush() }
         .onReceive(NotificationCenter.default.publisher(for: .friendCalPushArrived)) { _ in Task { await social.refresh() } }

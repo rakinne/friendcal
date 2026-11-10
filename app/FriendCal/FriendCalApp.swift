@@ -28,13 +28,19 @@ struct FriendCalApp: App {
     /// `-FriendCalFailNext <operation>` makes one operation fail once (error-path UI tests).
     private static func makeStore(fixture: HomeFixture) -> InMemoryProposalStore {
         // `-FriendCalTagAlong plan`: Leo hosts a locked "Tacos" tomorrow that you were sent and are not in.
+        #if DEBUG
         let withPlan = UserDefaults.standard.string(forKey: "FriendCalTagAlong") == "plan"
+        #else
+        let withPlan = false
+        #endif
         let fixture = withPlan ? FixtureData.withTagAlongPlan(fixture, now: FixtureClock.now()) : fixture
         let store = FixtureData.store(fixture, clock: FixtureClock.now)
         // `-FriendCalPokes inbox`: pokes already waiting, out and faded when the app opens.
+        #if DEBUG
         if UserDefaults.standard.string(forKey: "FriendCalPokes") == "inbox" {
             FixtureData.seedPokes(into: store, fixture: fixture, now: FixtureClock.now())
         }
+        #endif
         let latency = UserDefaults.standard.double(forKey: "FriendCalStoreLatency")
         if latency > 0 { store.latency = .seconds(latency) }
         // `-FriendCalFailNext create|tapFree|lock|...`: that operation fails once with a network error.
