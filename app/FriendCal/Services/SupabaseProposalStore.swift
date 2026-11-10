@@ -35,6 +35,8 @@ public final class SupabaseProposalStore: ProposalStore, AppleSignInCapable {
     private let authLock = NSLock()
     private var watchers: [UUID: [UUID: Watcher]] = [:]
     private let client: SupabaseClient
+    /// The APNs token this session registered, so sign-out can remove exactly that one.
+    private var registeredToken: String?
     private let availability = AvailabilityService()
 
     private final class Watcher {
@@ -115,6 +117,12 @@ public final class SupabaseProposalStore: ProposalStore, AppleSignInCapable {
     }
 
     public func signOut() async {
+        // While the session can still authorize it: the next person to sign in on this phone must not
+        // inherit the last one's pushes. Best effort, because sign-out never fails.
+        if let token = registeredToken {
+            _ = try? await client.rpc("unregister_device", params: ["p_token": token]).execute()
+            registeredToken = nil
+        }
         try? await client.auth.signOut(scope: .local)
         stopWatching()
         currentUserID = nil
@@ -350,6 +358,76 @@ public final class SupabaseProposalStore: ProposalStore, AppleSignInCapable {
         }
     }
 
+    // MARK: Poke and Tag along
+
+    public func sendPoke(to userID: UUID, about proposalID: UUID?) async throws -> PokeReceipt {
+        try await perform { _ in
+            let row: PokeRow = try await self.client.rpc("send_poke", params: PokeParams(p_to: userID, p_proposal: proposalID)).execute().value
+            return PokeReceipt(poke: row.model, isNew: row.isNew ?? true)
+        }
+    }
+
+    public func acknowledgePoke(_ id: UUID, via: Poke.AckVia) async throws -> Poke {
+        try await perform { _ in
+            let row: PokeRow = try await self.client.rpc("ack_poke", params: AckParams(p_id: id, p_via: via.rawValue)).execute().value
+            return row.model
+        }
+    }
+
+    public func tagAlong(_ proposalID: UUID) async throws -> Proposal {
+        try await perform { _ in
+            try await self.client.rpc("tag_along", params: ["p_id": proposalID]).execute()
+            let p = try await self.fetchProposal(proposalID)
+            self.nudge(proposalID)
+            return p
+        }
+    }
+
+    /// Four small reads under RLS rather than one definer RPC: every name and title here is one the
+    /// caller could already read, so there is no new server surface to get wrong.
+    public func inbox() async throws -> SocialInbox {
+        try await perform { me in
+            let now = Date()
+            async let pokeRows: [PokeRow] = self.client.from("pokes").select(Self.pokeColumns)
+                .gte("created_at", value: Self.timestamp(now.addingTimeInterval(-PokeFeed.history)))
+                .order("created_at", ascending: false).limit(200).execute().value
+            async let tagRows: [TagAlongRow] = self.client.from("tag_alongs").select("proposal_id,user_id,created_at")
+                .gte("created_at", value: Self.timestamp(now.addingTimeInterval(-PokeFeed.noticeWindow)))
+                .neq("user_id", value: me.uuidString)
+                .order("created_at", ascending: false).limit(100).execute().value
+            let pokes = try await pokeRows.map(\.model)
+            let tags = try await tagRows
+
+            let planIDs = Set(tags.map(\.proposalID) + pokes.compactMap(\.proposalID))
+            var plans: [PlanTitleRow] = []
+            if !planIDs.isEmpty {
+                plans = try await self.client.from("proposals").select("id,title,created_by")
+                    .in("id", values: planIDs.map(\.uuidString)).execute().value
+            }
+            let hosted = Dictionary(uniqueKeysWithValues: plans.filter { $0.createdBy == me }.map { ($0.id, $0.title) })
+            let notices = tags.compactMap { row in
+                hosted[row.proposalID].map { TagAlongNotice(proposalID: row.proposalID, userID: row.userID, planTitle: $0, createdAt: row.createdAt) }
+            }
+
+            let people = Set(pokes.flatMap { [$0.fromID, $0.toID] } + notices.map(\.userID))
+            var names: [UUID: String] = [:]
+            if !people.isEmpty {
+                let users: [UserRow] = try await self.client.from("users").select(Self.userColumns)
+                    .in("id", values: people.map(\.uuidString)).execute().value
+                for user in users { names[user.id] = user.displayName }
+            }
+            return SocialInbox(pokes: pokes, tagAlongs: notices, names: names,
+                               planTitles: Dictionary(uniqueKeysWithValues: plans.map { ($0.id, $0.title) }))
+        }
+    }
+
+    public func registerDevice(token: String, sandbox: Bool) async throws {
+        try await perform { _ in
+            try await self.client.rpc("register_device", params: ["p_token": token, "p_environment": sandbox ? "sandbox" : "production"]).execute()
+            self.registeredToken = token.lowercased()
+        }
+    }
+
     // MARK: Changes (polling)
 
     public func changes(for id: UUID) -> AsyncStream<ProposalChange> {
@@ -446,6 +524,13 @@ public final class SupabaseProposalStore: ProposalStore, AppleSignInCapable {
     }
 
     private static let proposalColumns = "id,title,window_start,window_end,created_by,distribution,status,locked_date,locked_end,created_at,area_name,area_lat,area_lon,locked_place_id,locked_attendee_ids,locked_at"
+    private static let pokeColumns = "id,from_user,to_user,proposal_id,created_at,expires_at,acknowledged_at,ack_via"
+    /// PostgREST filter values are text; a fixed-format UTC timestamp is unambiguous to Postgres.
+    static func timestamp(_ date: Date) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f.string(from: date)
+    }
     private static let slotColumns = "id,user_id,range,source_proposal_id,state,expires_at,created_at"
 }
 
@@ -659,6 +744,55 @@ private struct DeletionRow: Decodable {
         case releasedHolds = "released_holds", lockedPlansKept = "locked_plans_kept"
     }
 }
+
+private struct PokeRow: Decodable {
+    var id: UUID
+    var fromID: UUID
+    var toID: UUID
+    var proposalID: UUID?
+    var createdAt: Date
+    var expiresAt: Date
+    var acknowledgedAt: Date?
+    var ackVia: String?
+    /// Present on send_poke's answer only.
+    var isNew: Bool?
+    enum CodingKeys: String, CodingKey {
+        case id, fromID = "from_user", toID = "to_user", proposalID = "proposal_id"
+        case createdAt = "created_at", expiresAt = "expires_at", acknowledgedAt = "acknowledged_at"
+        case ackVia = "ack_via", isNew = "is_new"
+    }
+    var model: Poke {
+        Poke(id: id, fromID: fromID, toID: toID, proposalID: proposalID, createdAt: createdAt, expiresAt: expiresAt,
+             acknowledgedAt: acknowledgedAt, ackVia: acknowledgedAt == nil ? nil : (ackVia.flatMap(Poke.AckVia.init(rawValue:)) ?? .app))
+    }
+}
+
+private struct TagAlongRow: Decodable {
+    var proposalID: UUID
+    var userID: UUID
+    var createdAt: Date
+    enum CodingKeys: String, CodingKey { case proposalID = "proposal_id", userID = "user_id", createdAt = "created_at" }
+}
+
+private struct PlanTitleRow: Decodable {
+    var id: UUID
+    var title: String
+    var createdBy: UUID?
+    enum CodingKeys: String, CodingKey { case id, title, createdBy = "created_by" }
+}
+
+/// `p_proposal` is sent as an explicit null for the same reason as `VoteParams.p_place_id`.
+private struct PokeParams: Encodable {
+    var p_to: UUID
+    var p_proposal: UUID?
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(p_to, forKey: .p_to)
+        try c.encode(p_proposal, forKey: .p_proposal)
+    }
+    enum CodingKeys: String, CodingKey { case p_to, p_proposal }
+}
+private struct AckParams: Encodable { var p_id: UUID; var p_via: String }
 
 // RPC parameter names are the SQL parameter names, so these keep the `p_` prefix.
 private struct FromParam: Encodable { var p_from: Date }

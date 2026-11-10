@@ -196,8 +196,62 @@ enum FixtureData {
             users.append(User(id: you, displayName: "You"))
             current = you
         }
-        return InMemoryProposalStore(users: users, proposals: proposals, slots: fixture.slots, busyBlocks: fixture.busyBlocks,
-                                     places: fixture.places, votes: fixture.votes, currentUserID: current, now: clock)
+        let store = InMemoryProposalStore(users: users, proposals: proposals, slots: fixture.slots, busyBlocks: fixture.busyBlocks,
+                                          places: fixture.places, votes: fixture.votes, currentUserID: current, now: clock)
+        // The demo roster is the demo friend graph: Groups lists these people whether or not a plan
+        // exists yet, so they must be pokeable either way. The server has no such set (social.sql).
+        store.friendIDs = Set(fixture.members.map(\.id))
+        return store
+    }
+
+    // MARK: Poke and Tag along
+
+    /// Who the fixture is signed in as, by the same rule as `store(_:clock:)`.
+    static func viewerID(_ fixture: HomeFixture) -> UUID {
+        fixture.currentUserID ?? fixture.proposal?.createdBy ?? fixture.members.first?.id ?? fixtureID(9_000)
+    }
+
+    /// The poke a UI test taps as a push (`-FriendCalPushTap poke/<this>`): Arlo's, still live.
+    static let incomingPokeID = fixtureID(7_001)
+
+    /// `-FriendCalPokes inbox`: Arlo poked you 8 minutes ago about the plan; your poke to Nina is still
+    /// out; Leo saw yours; Maya's faded an hour and a half ago. One of every state the tab draws.
+    @MainActor
+    static func seedPokes(into store: InMemoryProposalStore, fixture: HomeFixture, now: Date) {
+        let me = viewerID(fixture)
+        func friend(_ name: String) -> UUID? { fixture.members.first { $0.name == name && $0.id != me }?.id }
+        func minutes(_ m: Double) -> Date { now.addingTimeInterval(m * 60) }
+        var pokes: [Poke] = []
+        if let arlo = friend("Arlo") {
+            pokes.append(Poke(id: incomingPokeID, fromID: arlo, toID: me, proposalID: fixture.proposal?.id, createdAt: minutes(-8)))
+        }
+        if let nina = friend("Nina") { pokes.append(Poke(id: fixtureID(7_002), fromID: me, toID: nina, createdAt: minutes(-12))) }
+        if let leo = friend("Leo") {
+            pokes.append(Poke(id: fixtureID(7_003), fromID: me, toID: leo, createdAt: minutes(-20), acknowledgedAt: minutes(-5), ackVia: .push))
+        }
+        if let maya = friend("Maya") { pokes.append(Poke(id: fixtureID(7_004), fromID: maya, toID: me, createdAt: minutes(-150))) }
+        store.seed(pokes: pokes)
+    }
+
+    /// `-FriendCalTagAlong plan`: adds "Tacos", hosted by Leo and locked for tomorrow 7-9 PM with
+    /// Leo, Maya and Nina in. You were sent it and are not in, so it is yours to tag along to.
+    static func withTagAlongPlan(_ fixture: HomeFixture, now: Date, calendar: Calendar = .current) -> HomeFixture {
+        let me = viewerID(fixture)
+        let going = ["Leo", "Maya", "Nina"].compactMap { name in fixture.members.first { $0.name == name && $0.id != me }?.id }
+        guard let host = going.first else { return fixture }
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
+        let start = calendar.date(bySettingHour: 19, minute: 0, second: 0, of: tomorrow) ?? tomorrow
+        var plan = Proposal(id: fixtureID(7_100), title: "Tacos",
+                            window: DateRange(lower: calendar.startOfDay(for: now), upper: start.addingTimeInterval(7 * 86_400)),
+                            createdBy: host, distribution: Distribution(mode: .newGroup, recipientIDs: going + [me]),
+                            createdAt: now.addingTimeInterval(-86_400), expectedCount: going.count + 1)
+        ProposalService.apply(window: DateRange(lower: start, upper: start.addingTimeInterval(7_200)), to: &plan, attendees: going,
+                              at: now.addingTimeInterval(-3_600))
+        var next = fixture
+        next.extraProposals.append(plan)
+        next.busyBlocks += going.map { BusyBlock(userID: $0, range: DateRange(lower: start, upper: start.addingTimeInterval(7_200)),
+                                                 sourceProposalID: plan.id, createdAt: now.addingTimeInterval(-3_600)) }
+        return next
     }
 
     private static func expiringHold(group: String, now: Date, calendar: Calendar) -> HomeFixture {

@@ -8,6 +8,17 @@ public struct UserFacingError: Error, Equatable {
         case lock, mark, join, create, load, edit, deleteAccount, signIn
         /// Place voting (#10): suggest, vote, pass on (host), bring back (host), withdraw (suggester).
         case suggestPlace, votePlace, vetoPlace, removePlace, bringBack
+        /// Poke and Tag along (supabase/social.sql).
+        case poke, ackPoke, tagAlong, notifications
+
+        /// Like the place actions: the SQLSTATE-level fallbacks below speak about locking, and none
+        /// of these ever mean that.
+        var isSocialAction: Bool {
+            switch self {
+            case .poke, .ackPoke, .tagAlong, .notifications: return true
+            default: return false
+            }
+        }
 
         var isPlaceAction: Bool {
             switch self {
@@ -54,6 +65,14 @@ public struct UserFacingError: Error, Equatable {
             case "FC_NOT_SIGNED_IN": return UserFacingError(message: "Sign in to continue.", details: details)
             case "FC_ACCOUNT_DELETED": return UserFacingError(message: "This account has been deleted.", details: details)
             case "FC_NOT_FOUND": return UserFacingError(message: "This plan is gone.", details: details)
+            // Poke and Tag along (social.sql).
+            case "FC_SELF_POKE": return UserFacingError(message: "You can't poke yourself.", details: details)
+            case "FC_NOT_FRIEND": return UserFacingError(message: "You can only poke friends you share a plan with.", details: details)
+            case "FC_POKE_NOT_FOUND": return UserFacingError(message: "That poke is gone.", details: details)
+            case "FC_NOT_LOCKED": return UserFacingError(message: "This plan isn't locked yet. Mark your times instead.", details: details)
+            case "FC_PLAN_OVER": return UserFacingError(message: "This plan already happened.", details: details)
+            case "FC_BUSY": return UserFacingError(message: "You're already busy then.", details: details)
+            case "FC_BAD_TOKEN": return UserFacingError(message: "Couldn't turn on notifications. Try again.", details: details)
             // Place voting (#11). Sentences are the design document's, section Copy; where it marks one
             // "Proposed" it still needs sign-off.
             case "FC_NO_AREA":
@@ -84,6 +103,7 @@ public struct UserFacingError: Error, Equatable {
             }
             // The code-level fallbacks below speak about locking; a place action never means that.
             if action.isPlaceAction, code != "42501" { return UserFacingError(message: generic(action), details: details) }
+            if action.isSocialAction { return UserFacingError(message: generic(action), details: details) }
             switch code {
             case "22023": return UserFacingError(message: "Not enough friends are free anymore. Pick another time.", details: details)
             case "40001": return UserFacingError(message: "Availability changed while locking. Try again.", details: details)
@@ -128,6 +148,7 @@ public struct UserFacingError: Error, Equatable {
         case .vetoPlace, .bringBack: return "Only \(host) can pass on a place."
         case .removePlace: return "Only the person who suggested a place can withdraw it."
         case .suggestPlace, .votePlace: return "Join this plan to suggest or vote."
+        case .poke, .ackPoke, .tagAlong, .notifications: return generic(action)
         case .lock, .mark, .join, .create, .load: return "Only \(host) can lock this plan."
         }
     }
@@ -150,6 +171,10 @@ public struct UserFacingError: Error, Equatable {
         case .votePlace: return "Couldn't save your vote. Retry."
         case .vetoPlace, .bringBack: return "Couldn't update that place. Retry."
         case .removePlace: return "Couldn't remove that place. Retry."
+        case .poke: return "Couldn't send that poke. Try again."
+        case .ackPoke: return "Couldn't update that poke. Try again."
+        case .tagAlong: return "Couldn't tag along. Try again."
+        case .notifications: return "Couldn't turn on notifications. Try again."
         }
     }
 }
