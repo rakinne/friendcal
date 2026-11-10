@@ -1,8 +1,13 @@
 import SwiftUI
 import FriendCalCore
 
-enum AppTab: Hashable {
+enum AppTab: String, Hashable {
     case home, groups, pokes, invites, me
+
+    /// `-FriendCalTab groups` opens a tab directly (UI tests, screenshots); Home otherwise.
+    static var fromLaunchArguments: AppTab {
+        UserDefaults.standard.string(forKey: "FriendCalTab").flatMap(AppTab.init(rawValue:)) ?? .home
+    }
 }
 
 /// Native iOS 26 TabView (Liquid Glass) with `Tab` items (D34, X3). Home content relies on the
@@ -13,7 +18,8 @@ struct AppTabView: View {
     let store: ProposalStore
     let fixture: HomeFixture
     @State private var home: ProposalSession
-    @State private var tab: AppTab = .home
+    @State private var groups: GroupsSession
+    @State private var tab: AppTab = .fromLaunchArguments
     @State private var homePath: [UUID] = []
     @State private var invitesPath: [UUID] = []
     @State private var toast = ToastCenter()
@@ -24,6 +30,9 @@ struct AppTabView: View {
         self.store = store
         self.fixture = fixture
         _home = State(initialValue: ProposalSession(store: store, fixture: fixture, now: FixtureClock.now))
+        _groups = State(initialValue: GroupsSession(
+            seed: .make(fixture: fixture, youID: store.currentUserID, scenario: .fromLaunchArguments, now: FixtureClock.now()),
+            now: FixtureClock.now))
     }
 
     init(scenario: FixtureScenario = .fromLaunchArguments) {
@@ -42,7 +51,7 @@ struct AppTabView: View {
                         }
                 }
             }
-            Tab("Groups", systemImage: "person.2", value: .groups) { StubTabView(title: "Groups") }
+            Tab("Groups", systemImage: "person.2", value: .groups) { GroupsView(session: groups, onToast: { toast.show($0) }) }
             Tab("Pokes", systemImage: "hand.wave", value: .pokes) { StubTabView(title: "Pokes") }
             Tab("Invites", systemImage: "envelope", value: .invites) {
                 InvitesView(store: store, path: $invitesPath, members: fixture.members, clock: FixtureClock.now)
@@ -94,4 +103,4 @@ struct StubTabView: View {
 
 #Preview("Shell") { AppTabView(scenario: .populated) }
 #Preview("Shell, invite") { AppTabView(scenario: .lockedInvite) }
-#Preview("Stub tab") { StubTabView(title: "Groups") }
+#Preview("Stub tab") { StubTabView(title: "Pokes") }

@@ -58,6 +58,8 @@ public enum DesignTokens {
         /// Invite headline (issue #5 R9). Views cap it at xxxLarge inside the fixed-aspect card (design 6.2A).
         public static let hero = custom(.cabinetExtrabold, 34, .largeTitle)
         public static let display = custom(.cabinetExtrabold, 26, .title2)
+        /// Friend and folder names on Groups (variant D).
+        public static let rowName = custom(.cabinetExtrabold, 20, .title3)
         public static let title = custom(.sourceSansSemibold, 17, .headline)
         public static let button = custom(.sourceSansSemibold, 17, .headline)
         public static let body = custom(.sourceSansRegular, 15, .body)
@@ -81,6 +83,7 @@ extension DesignTokens {
         public static let wordmark = TextStyle(font: Typography.wordmark, tracking: -0.28) // -0.01em x 28
         public static let hero = TextStyle(font: Typography.hero, tracking: -0.68)         // -0.02em x 34
         public static let display = TextStyle(font: Typography.display, tracking: -0.52)   // -0.02em x 26
+        public static let rowName = TextStyle(font: Typography.rowName, tracking: -0.4) // -0.02em x 20
         public static let title = TextStyle(font: Typography.title, tracking: 0)
         public static let button = TextStyle(font: Typography.button, tracking: 0)
         public static let body = TextStyle(font: Typography.body, tracking: 0)
