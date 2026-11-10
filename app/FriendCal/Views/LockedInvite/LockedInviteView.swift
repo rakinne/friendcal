@@ -24,6 +24,9 @@ struct LockedInviteView: View {
     }
     @State private var lockAck = 0
     @State private var joinError: UserFacingError?
+    @State private var isTaggingAlong = false
+    @State private var tagAlongError: UserFacingError?
+    @State private var tagAlongs = 0
     @State private var placesToast = ToastCenter()
     @State private var minuteTick = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
@@ -54,6 +57,7 @@ struct LockedInviteView: View {
         .onChange(of: session.screen) { _, screen in if screen == .ready { joinIfNeeded() } }
         .onAppear { if session.screen == .ready { joinIfNeeded() } }
         .sensoryFeedback(.success, trigger: lockAck)
+        .sensoryFeedback(.success, trigger: tagAlongs)
         .sheet(isPresented: $showAvailability) {
             AvailabilitySheet(session: session)
                 .presentationDetents([.large])
@@ -135,6 +139,20 @@ struct LockedInviteView: View {
                 .frame(maxWidth: .infinity)
             }
 
+            // Locked without you is not the end of it: one tap joins, and the host is told.
+            if session.canTagAlong {
+                if let error = tagAlongError {
+                    InlineError(error: error, retryTitle: "Retry") { tagAlong() }
+                }
+                Button { tagAlong() } label: {
+                    PrimaryPill(title: "Tag along", isBusy: isTaggingAlong, fill: DesignTokens.Colors.accentHover)
+                }
+                .buttonStyle(.plain)
+                .disabled(isTaggingAlong)
+                .accessibilityHint("Joins this plan. \(session.creatorName ?? "The host") is told")
+                .accessibilityIdentifier("invite.tagAlong")
+            }
+
             Text(state.progress(headcount: p.headcount))
                 .textStyle(.caption).foregroundStyle(DesignTokens.Colors.textMuted)
                 .frame(maxWidth: .infinity)
@@ -172,6 +190,21 @@ struct LockedInviteView: View {
         }
         .accessibilityLabel("More")
         .accessibilityIdentifier("invite.menu")
+    }
+
+    private func tagAlong() {
+        guard !isTaggingAlong else { return }
+        isTaggingAlong = true
+        tagAlongError = nil
+        Task {
+            defer { isTaggingAlong = false }
+            do {
+                placesToast.show(try await session.tagAlong())
+                tagAlongs += 1
+            } catch {
+                tagAlongError = error as? UserFacingError ?? UserFacingError.map(error, action: .tagAlong)
+            }
+        }
     }
 
     /// A link holder who is not on the plan yet joins on open (D3); PR2 signs in first.

@@ -2,7 +2,8 @@ import SwiftUI
 import FriendCalCore
 
 /// Poke (coral, dominant) and Share slot (teal, quieter), 52pt pills at a 1.38 : 1 split.
-/// Poke is an honest stub: impact haptic + toast (D20). Share is a native ShareLink with the
+/// Poke opens "Who needs a poke?" (PokePickerSheet), since Home shows a group, not one friend; the
+/// pokes themselves go through `SocialSession`. Share is a native ShareLink with the
 /// selected slot (X9), disabled with a VoiceOver hint when there is nothing to share (X6, X10).
 struct ActionRow: View {
     var isLoading = false

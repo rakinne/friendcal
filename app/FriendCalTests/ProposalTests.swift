@@ -181,15 +181,6 @@ final class ProposalTests: XCTestCase {
         return HeatmapCell(day: start, daypart: .afternoon, interval: interval, freeCount: commonCount, commonCount: commonCount, commonWindow: commonCount > 0 ? interval : nil, total: total)
     }
 
-    func testPokeRateLimit() async {
-        let svc = PokeService()
-        let from = UUID(), to = UUID(), pid = UUID()
-        let first = await svc.recordPokeSafe(from: from, to: to, proposalID: pid)
-        XCTAssertNotNil(first)
-        let second = await svc.recordPokeSafe(from: from, to: to, proposalID: pid)
-        XCTAssertNil(second, "second poke within 24h must be nil")
-    }
-
     func testDesignTokensHexParsing() {
         XCTAssertEqual(Proposal(id: UUID(), title: "t", window: DateRange(Date.now...Date.now.addingTimeInterval(100)), createdBy: UUID(), distribution: Distribution(mode: .separately, recipientIDs: [])).title, "t")
     }

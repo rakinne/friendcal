@@ -88,15 +88,21 @@ final class HomeUITests: XCTestCase {
         attach(app, "home-week2")
     }
 
-    /// protects=Poke is an honest stub: a toast, announced, that goes away (D20); fails_when=no
-    /// toast, wrong copy, or it never dismisses; no_claim=the impact haptic, and the exact 2.5s
-    /// duration (the toast runs 6s here so XCUITest's idle wait can't miss it).
-    func testPokeShowsComingSoonToast() {
+    /// protects=Home's Poke asks who, since Home shows a group: the picker lists people on the plan, a
+    /// row's pill pokes that friend, the toast says so, and the pill turns into "Poked"; fails_when=
+    /// Poke does nothing, sends without asking, or the row stays pokeable after a send; no_claim=the
+    /// impact haptic and the push the friend receives (store tests).
+    func testPokeOpensPickerAndPokesAFriend() {
         let app = Self.launch(extra: ["-FriendCalToastSeconds", "6"])
         app.buttons["home.poke"].tap()
-        XCTAssertTrue(toast(app, "Poke is coming soon").waitForExistence(timeout: 2))
-        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: toast(app))
-        wait(for: [gone], timeout: 10)
+        XCTAssertTrue(app.descendants(matching: .any)["pokePicker"].waitForExistence(timeout: 5))
+        let pill = app.buttons["pokePicker.poke"].firstMatch
+        XCTAssertTrue(pill.waitForExistence(timeout: 5))
+        pill.tap()
+        let sent = app.staticTexts.matching(NSPredicate(format: "identifier == 'toast' AND label BEGINSWITH 'Poked ' AND label ENDSWITH 'It fades in an hour.'")).firstMatch
+        XCTAssertTrue(sent.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier == 'pokePicker.poke' AND label CONTAINS 'is poked'")).firstMatch
+            .waitForExistence(timeout: 5), "the poked row must read as spent")
     }
 
     /// protects=Stealth never shows a false privacy state (D21); fails_when=the tap turns the
@@ -140,15 +146,15 @@ final class HomeUITests: XCTestCase {
         attach(app, "drawer-selected")
     }
 
-    /// protects=stub tabs are reachable from the native tab bar (D34); fails_when=a tab is
-    /// missing or doesn't switch; no_claim=tab content (out of scope). Issue #5 D10: Invites left
-    /// the stub list (testInvitesTabListsThePlan covers it). Me is a real screen since the auth work
-    /// (MeView), so it is reached by its navigation title instead of a `stub.` identifier.
-    func testStubTabs() {
+    /// protects=every tab is reachable from the native tab bar (D34); fails_when=a tab is
+    /// missing or doesn't switch; no_claim=tab content (GroupsUITests, PokesUITests, InvitesUITests).
+    /// No tab is a stub any more: Groups and Pokes are screens with their own root identifiers, and Me
+    /// is reached by its navigation title.
+    func testEveryTabIsReachable() {
         let app = Self.launch()
         for tab in ["Groups", "Pokes"] {
             app.tabBars.buttons[tab].tap()
-            XCTAssertTrue(app.descendants(matching: .any)["stub.\(tab.lowercased())"].waitForExistence(timeout: 3), tab)
+            XCTAssertTrue(app.descendants(matching: .any)[tab.lowercased()].waitForExistence(timeout: 5), tab)
             attach(app, "tab-\(tab.lowercased())")
         }
         app.tabBars.buttons["Me"].tap()
