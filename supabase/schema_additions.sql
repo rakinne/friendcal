@@ -124,3 +124,5 @@ as $$
          or (p_distribution -> 'recipientIDs') ? upper(p_uid::text)),
     false)
 $$;
+revoke all on function friendcal_has_recipient(jsonb, uuid) from public, anon;
+grant execute on function friendcal_has_recipient(jsonb, uuid) to authenticated;

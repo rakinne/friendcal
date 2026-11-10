@@ -231,7 +231,7 @@ select t.eq('a client cannot create a plan whose window ends before it starts',
 -- (role public) that OR every stricter policy away. This harness never creates them, so without this
 -- section the drops at the top of rls.sql are dead code in CI.
 --
--- Value: protects=rls.sql removes the five known blanket policies and the self-check's predicate catches a differently named one; fails_when=a drop line is removed or misnamed, or the predicate stops matching a permissive true policy; why_new=no other test seeds these policies; seam=none; no_claim=other policy names on a real project (the self-check raises for those)
+-- Value: protects=rls.sql removes the five known blanket policies and friendcal_blanket_policies() catches a differently named one, the exempt name on the wrong table, and an anon one, while ignoring service_role; fails_when=a drop line is removed or misnamed, or the predicate stops matching a permissive true policy; why_new=no other test seeds these policies; seam=none; no_claim=other policy names on a real project (the self-check raises for those)
 -- ===========================================================================
 \getenv fc_fixtures FC_FIXTURES
 create policy "allow all users" on users for all using (true) with check (true);
@@ -242,15 +242,27 @@ create policy "allow all availability" on availability_slots for all using (true
 \i :fc_fixtures/../../rls.sql
 select t.eq('rls.sql removed all five blanket policies',
   (select count(*)::int from pg_policies where schemaname = 'public' and policyname like 'allow all%'), 0);
-select t.eq('and no other permissive true policy remains besides busy_read_all_authed',
-  (select count(*)::int from pg_policies
-    where schemaname = 'public' and permissive = 'PERMISSIVE' and (qual = 'true' or with_check = 'true')
-      and policyname <> 'busy_read_all_authed'), 0);
+select t.ok('and the self-check function reports no blanket policy on a clean project', friendcal_blanket_policies() is null);
+-- A policy under a name the drops do not know.
 create policy "Open Sesame" on proposals for all using (true) with check (true);
-select t.eq('the self-check predicate sees a blanket policy under a name the drops do not know',
-  (select count(*)::int from pg_policies
-    where schemaname = 'public' and permissive = 'PERMISSIVE' and (qual = 'true' or with_check = 'true')
-      and policyname <> 'busy_read_all_authed'), 1);
+select t.ok('friendcal_blanket_policies names a blanket policy the drops do not know',
+  friendcal_blanket_policies() = 'proposals: Open Sesame');
 drop policy "Open Sesame" on proposals;
+-- The deliberate busy_blocks policy's NAME on another table must not be exempt (policy names are per table).
+create policy "busy_read_all_authed" on proposals for select to authenticated using (true);
+select t.ok('...and the exemption is not by name alone: the same name on proposals is flagged',
+  friendcal_blanket_policies() = 'proposals: busy_read_all_authed');
+drop policy "busy_read_all_authed" on proposals;
+create policy "anon peek" on events for select to anon using (true);
+select t.ok('...and a blanket policy for anon is flagged',
+  friendcal_blanket_policies() = 'events: anon peek');
+drop policy "anon peek" on events;
+create policy "service role only" on events for all to service_role using (true) with check (true);
+select t.ok('...but one for a role that cannot reach the table through the API is not',
+  friendcal_blanket_policies() is null);
+drop policy "service role only" on events;
+select t.ok('the check function is not callable by clients',
+  not has_function_privilege('authenticated', 'friendcal_blanket_policies()', 'EXECUTE')
+  and not has_function_privilege('anon', 'friendcal_blanket_policies()', 'EXECUTE'));
 
 \echo 'rls tests: all passed'
