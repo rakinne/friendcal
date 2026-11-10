@@ -199,6 +199,17 @@ final class PokeTests: XCTestCase {
         XCTAssertEqual(TagAlongRules.whoIsIn(sooner, friend: nil), "2 are in")
     }
 
+    /// protects=the line the joiner reads: the host is told only when someone else hosts, and a missing
+    /// host name falls back to "The host"; fails_when=the host is told about their own plan or the
+    /// fallback disappears; no_claim=the push the host receives (social_test.sql section 7).
+    func testJoinedCopyTellsTheHostOnlyWhenSomeoneElseHosts() {
+        XCTAssertEqual(TagAlongRules.joinedText(planTitle: "Tacos", hostName: "Sam", isHost: true), "You're in for Tacos.")
+        XCTAssertEqual(TagAlongRules.joinedText(planTitle: "Tacos", hostName: "Sam", isHost: false),
+                       "You're in for Tacos. Sam has been told.")
+        XCTAssertEqual(TagAlongRules.joinedText(planTitle: "Tacos", hostName: nil, isHost: false),
+                       "You're in for Tacos. The host has been told.")
+    }
+
     // MARK: Push route
 
     /// protects=a push tap is routed only from a well-formed `fc` payload; anything else opens the app

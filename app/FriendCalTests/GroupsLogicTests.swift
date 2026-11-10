@@ -90,6 +90,7 @@ final class GroupsLogicTests: XCTestCase {
         XCTAssertEqual(free.rowText(name: "Arlo", now: now, calendar: calendar).time, "free now")
         XCTAssertEqual(Presence.quiet.rowText(name: "You", isYou: true, now: now).message, "set your status")
         XCTAssertNil(Presence.quiet.rowText(name: "Leo", now: now).message)
+        XCTAssertEqual(Presence.quiet.rowText(name: "You", isYou: true, now: now).spoken, "You, no status yet. Double tap to set one")
     }
 
     func testSpanWording() {
@@ -138,6 +139,18 @@ final class GroupsLogicTests: XCTestCase {
         let alone = GroupsLayout.folders(crews: [], friends: [])
         XCTAssertEqual(alone.map(\.title), [GroupsFolder.friendsTitle])
         XCTAssertTrue(alone[0].members.isEmpty)
+    }
+
+    /// protects=a friend in two crews shows in both, and the automatic folder holds only the friends in
+    /// no crew; fails_when=a shared friend vanishes from one crew or also lands in the automatic folder.
+    func testFriendInTwoCrewsShowsInBoth() {
+        let brunch = Crew(name: "Brunch", memberIDs: [maya.id, leo.id])
+        let run = Crew(name: "Run club", memberIDs: [leo.id])
+        let folders = GroupsLayout.folders(crews: [brunch, run], friends: [maya, leo, nina])
+        XCTAssertEqual(folders.map(\.title), ["Brunch", "Run club", GroupsFolder.friendsTitle])
+        XCTAssertEqual(folders[0].members, [maya, leo])
+        XCTAssertEqual(folders[1].members, [leo])
+        XCTAssertEqual(folders[2].members, [nina])
     }
 
     func testOnlineCount() {
@@ -212,6 +225,30 @@ final class GroupsLogicTests: XCTestCase {
         XCTAssertEqual(nudge.action, .setStatus)
         let after = MomentsEngine.moment(friends: [maya], presence: { _ in .quiet }, viewerFree: true, viewerHasStatus: true, now: now)
         XCTAssertNil(after.action)
+        XCTAssertEqual(nudge.text, "Nobody has set a status yet. Be the first.")
+        XCTAssertEqual(after.text, "Nobody else has set a status yet.")
+    }
+
+    /// protects=the ending line says "shift ends" for anything but a movie, and a status ending more
+    /// than 3 hours out is not announced yet; fails_when=a work shift reads as a movie, or a far-off end
+    /// is announced early and drops the longest-stay clause; no_claim=the exact 3-hour edge.
+    func testEndingSoonWordingAndWindow() {
+        let shift = [maya.id: FriendStatus(kind: .work, since: at(16), until: at(21, 40))]
+        XCTAssertEqual(MomentsEngine.moment(friends: [maya], presence: presence(shift), viewerFree: false, now: now, calendar: calendar).text,
+                       "Maya's shift ends in 1 h 30.")
+        let far = [leo.id: FriendStatus(kind: .movies, since: at(19), until: at(23, 40))]
+        XCTAssertEqual(MomentsEngine.moment(friends: [leo], presence: presence(far), viewerFree: false, now: now, calendar: calendar).text,
+                       "Leo has been at the movies for 1 h 10.")
+    }
+
+    /// protects=the both-free line says "till" when the free status has an end, and carries no italic
+    /// detail when the friend wrote no message; fails_when=an empty detail renders as a blank line, or
+    /// an end time is dropped; no_claim=the 12-hour clock format beyond this case.
+    func testBothFreeWithAnEndAndNoMessage() {
+        let statuses = [arlo.id: FriendStatus(kind: .free, since: at(20), until: at(22))]
+        let m = MomentsEngine.moment(friends: [arlo], presence: presence(statuses), viewerFree: true, now: now, calendar: calendar)
+        XCTAssertEqual(m.text, "You and Arlo are both free till 10 PM.")
+        XCTAssertNil(m.detail)
     }
 
     // MARK: Day ribbon
