@@ -22,6 +22,17 @@
 --                         whole point.
 -- ===========================================================================
 
+-- 0) Remove the blanket policies from the first project setup (`using (true) with check (true)`, role
+--    public). Permissive policies are OR'd, so while any of these exists every policy below is
+--    decorative: all rows of these tables are readable and writable at the row level. Found on the
+--    live project 2026-11-10; they were never in a repo file.
+-- ---------------------------------------------------------------------------
+drop policy if exists "allow all users" on users;
+drop policy if exists "allow all proposals" on proposals;
+drop policy if exists "allow all busy" on busy_blocks;
+drop policy if exists "allow all events" on events;
+drop policy if exists "allow all availability" on availability_slots;
+
 -- ---------------------------------------------------------------------------
 -- 1) busy_blocks. Every authenticated viewer gets every row, so an excluded viewer is byte-for-byte
 --    indistinguishable from a stranger. The correlation columns are handled by GRANT, at the bottom.
@@ -195,7 +206,7 @@ as $$
   select not (auth.uid() = any (coalesce(p_hidden_from, '{}'::uuid[])))
      and (
        p_created_by = auth.uid()
-       or (coalesce(p_distribution, '{}'::jsonb) -> 'recipientIDs') ? auth.uid()::text
+       or friendcal_has_recipient(p_distribution, auth.uid())
      )
 $$;
 revoke all on function proposal_is_readable(uuid[], uuid, jsonb) from public, anon;
@@ -435,6 +446,26 @@ drop policy if exists "votes_read_involved" on place_votes;
 create policy "votes_read_involved" on place_votes for select to authenticated
   using (exists (select 1 from proposals p where p.id = place_votes.proposal_id));
 
+-- Permissive policies on public tables whose expression is the literal `true`, for a role a client can
+-- be. A permissive `true` policy ORs every stricter policy on its table away. The one deliberate
+-- `using (true)` is busy_read_all_authed: select-only, authenticated, on busy_blocks (section 1), so
+-- the exemption names all four, not just the name (policy names are per table). Limit: this matches
+-- the deparsed text `true` only; `1 = 1` or `auth.role() = 'authenticated'` would pass, and it runs
+-- only when this file does. Returns the offenders as text, NULL when there are none.
+create or replace function friendcal_blanket_policies() returns text
+language sql
+stable
+as $$
+  select string_agg(tablename || ': ' || policyname, ', ' order by tablename, policyname)
+    from pg_policies
+   where schemaname = 'public' and permissive = 'PERMISSIVE'
+     and (qual = 'true' or with_check = 'true')
+     and roles && array['public', 'anon', 'authenticated']::name[]
+     and not (tablename = 'busy_blocks' and policyname = 'busy_read_all_authed'
+              and cmd = 'SELECT' and roles = array['authenticated']::name[])
+$$;
+revoke all on function friendcal_blanket_policies() from public, anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- 9) Self-check. In single-transaction mode a failure here rolls the whole file back rather than
 --    leaving a half-installed policy set; statement-by-statement it prints the mismatch.
@@ -488,6 +519,11 @@ begin
    where grantee = 'anon' and table_schema = 'public';
   if v_tables is not null then
     raise exception 'rls.sql: anon still holds privileges on %', v_tables;
+  end if;
+
+  v_tables := friendcal_blanket_policies();
+  if v_tables is not null then
+    raise exception 'rls.sql: blanket policy still present, which defeats row security (in a one-statement paste the section 0 drops roll back with this error; delete it and re-run): %', v_tables;
   end if;
 
   raise notice 'rls.sql: policy set, views and column grants verified';

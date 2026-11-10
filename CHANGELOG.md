@@ -2,6 +2,12 @@
 
 All notable changes to FriendCal are listed here, newest first. The version lives in `VERSION`.
 
+## [0.4.1.0] - 2026-11-10
+
+### Fixed
+- Friends you invite to a plan can now see it, its places, and each other. Before, only the person who made a plan could open it, because the app saves friends' ids in capital letters and the server looked for them in lowercase.
+- Plans are now private to the people on them. A leftover open-access setting let any signed-in account read every plan, event and profile, and made the server's privacy rules do nothing. It is removed, and the database setup now stops with an error if one comes back.
+
 ## [0.4.0.0] - 2026-11-10
 
 ### Added

@@ -285,4 +285,37 @@ select t.eq('every raise in ' || p.proname || ' carries an FC_ hint',
   from pg_proc p
  where p.proname in ('send_poke', 'ack_poke', 'tag_along', 'register_device', 'unregister_device');
 
+-- ===========================================================================
+-- Recipients stored the way the Swift client stores them: UPPERCASE uuid text. The creator is not
+-- either recipient, so friendcal_share_plan and the plan lookup in send_poke can only succeed through
+-- friendcal_has_recipient; tag_along's "already a recipient" test likewise. Ids are t.uh(n): t.u(n) is
+-- all digits, so upper() of it is the same string and proves nothing.
+--
+-- Value: protects=a poke between two uppercase-stored recipients attaches the shared plan, and tag_along does not add a second spelling of an existing recipient; fails_when=either call goes back to a case-sensitive recipient test (the plan is silently not attached, or tag_along appends a duplicate); why_new=every fixture above stores all-digit ids that are identical in both cases; seam=none; no_claim=mixed-case ids (unsupported by design)
+-- ===========================================================================
+insert into users(id, display_name) values (t.uh(7), 'Hex7'), (t.uh(8), 'Hex8'), (t.uh(2), 'Hex2');
+\set UPPLAN 90000000-0000-0000-0000-000000000005
+\set UPLOCK 90000000-0000-0000-0000-000000000006
+insert into proposals(id, title, window_start, window_end, created_by, distribution)
+values (:'UPPLAN', 'Uppercase plan', now() + interval '1 day', now() + interval '14 days', t.u(1),
+        jsonb_build_object('mode', 'newGroup', 'recipientIDs', jsonb_build_array(upper(t.uh(7)::text), upper(t.uh(8)::text))));
+select t.eq('two uppercase-stored recipients can poke each other about their plan',
+  t.poke_field(t.uh(7), t.uh(8), 'proposal_id', :'UPPLAN'), :'UPPLAN');
+update proposals set hidden_from = array[t.uh(8)]::uuid[] where id = :'UPPLAN';
+select t.eq('exclusion outranks uppercase membership in friendcal_share_plan',
+  friendcal_share_plan(t.uh(7), t.uh(8)), false);
+
+insert into proposals(id, title, window_start, window_end, created_by, distribution, status,
+                      locked_date, locked_end, locked_attendee_ids, locked_at)
+values (:'UPLOCK', 'Uppercase tacos', now() - interval '1 day', now() + interval '10 days', t.u(1),
+        jsonb_build_object('mode', 'newGroup', 'recipientIDs', jsonb_build_array(upper(t.u(1)::text), upper(t.uh(2)::text))),
+        'locked', now() + interval '5 days', now() + interval '5 days 2 hours',
+        array[t.u(1)]::uuid[], now());
+select t.eq('an uppercase-stored recipient tags along',
+  t.scalar(format('select tag_along(%L) ->> ''already_in''', :'UPLOCK'), t.uh(2)), 'false');
+select t.eq('...and is still listed once, not once per spelling',
+  (select jsonb_array_length(distribution -> 'recipientIDs') from proposals where id = :'UPLOCK'), 2);
+select t.eq('...and a second tap reports already_in',
+  t.scalar(format('select tag_along(%L) ->> ''already_in''', :'UPLOCK'), t.uh(2)), 'true');
+
 do $$ begin raise notice 'social tests: all passed'; end $$;

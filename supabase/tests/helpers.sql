@@ -30,6 +30,12 @@ create or replace function t.u(n int) returns uuid language sql immutable as $$
   select ('00000000-0000-0000-0000-00000000000' || n)::uuid
 $$;
 
+-- Fixture ids whose text contains hex LETTERS. t.u(n) is all digits, so upper(t.u(n)::text) is the same
+-- string and a test of "stored in uppercase" built on it proves nothing. Use t.uh(n) for any case test.
+create or replace function t.uh(n int) returns uuid language sql immutable as $$
+  select ('abcdef00-0000-0000-0000-00000000000' || n)::uuid
+$$;
+
 -- t.become(role, uid): bind auth.uid() and switch role for the rest of the transaction.
 create or replace function t.become(role text, uid uuid) returns void language plpgsql as $$
 begin

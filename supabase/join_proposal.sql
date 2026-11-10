@@ -39,7 +39,7 @@ create view proposal_summaries with (security_invoker = true) as
     p.locked_end,
     p.created_at,
     -- Distinct, because a recipient listed twice is one person (lock_proposal counts them once too).
-    (select count(distinct e.value)
+    (select count(distinct lower(e.value))
        from jsonb_array_elements_text(coalesce(p.distribution -> 'recipientIDs', '[]'::jsonb)) e)::int
       as recipient_count,
     -- What the creator said they were inviting, if they said. Null when unstated.
@@ -48,7 +48,7 @@ create view proposal_summaries with (security_invoker = true) as
     -- one who said four and has six joined should read six. Hence greatest(), not either alone.
     greatest(
       coalesce(nullif(p.distribution ->> 'expectedCount', '')::int, 0),
-      (select count(distinct e.value)
+      (select count(distinct lower(e.value))
          from jsonb_array_elements_text(coalesce(p.distribution -> 'recipientIDs', '[]'::jsonb)) e)::int
     ) as attendee_count
   from proposals p;
@@ -94,7 +94,7 @@ begin
   end if;
 
   v_ids := coalesce(v_prop.distribution -> 'recipientIDs', '[]'::jsonb);
-  v_already := v_ids ? v_uid::text;
+  v_already := friendcal_has_recipient(jsonb_build_object('recipientIDs', v_ids), v_uid);
 
   if v_prop.status <> 'requesting' and not v_already then
     -- Joining a plan that has already been decided. Someone already party to it may still read it.

@@ -142,4 +142,76 @@ select t.ok('but it may still be set at INSERT time, when the client composes th
 select t.ok('but join_proposal moved distribution successfully, through definer context',
   ((select distribution -> 'recipientIDs' from proposals where id = :'OPEN') ? t.u(3)::text));
 
+-- ===========================================================================
+-- 5. The Swift client encodes UUIDs as UPPERCASE text; Postgres renders uuid::text in lowercase and
+--    jsonb `?` is an exact match. A recipient stored the way the app stores them must still read the
+--    plan, see its summary, and join idempotently -- and exclusion must still outrank membership.
+--    (Found on the live project once the blanket `allow all` policies were dropped.)
+--
+--    Every id here is t.uh(n), not t.u(n): t.u(n) is all digits, so upper() of it is the same string
+--    and the test would pass against the old case-sensitive code. (A mutation check proved it.)
+-- ===========================================================================
+insert into users(id, display_name) select t.uh(n), 'h' || n from generate_series(1, 5) n;
+insert into auth.users(id, email) select t.uh(n), 'h' || n || '@example.com' from generate_series(1, 5) n;
+select t.ok('the case fixtures really differ by case', upper(t.uh(2)::text) <> t.uh(2)::text);
+
+-- Value: protects=a recipient stored in uppercase reads the plan and its summary, a stranger does not, and joining is idempotent; fails_when=proposal_is_readable or join_proposal goes back to a case-sensitive recipient test; why_new=every other fixture stores all-digit ids that are identical in both cases; seam=none; no_claim=mixed-case ids (unsupported by design)
+\set UPPER 80000000-0000-0000-0000-000000000003
+insert into proposals(id, title, window_start, window_end, created_by, distribution)
+values (:'UPPER', 'Uppercase recipients', '2026-12-01 00:00Z', '2026-12-14 00:00Z', t.uh(1),
+        jsonb_build_object('mode', 'newGroup',
+          'recipientIDs', jsonb_build_array(upper(t.uh(1)::text), upper(t.uh(2)::text))));
+select t.eq('a recipient stored in uppercase can read the plan',
+  t.rows('select 1 from proposals where id = ' || quote_literal(:'UPPER'), t.uh(2)), 1);
+select t.eq('...and its summary',
+  t.rows('select 1 from proposal_summaries where id = ' || quote_literal(:'UPPER'), t.uh(2)), 1);
+select t.eq('a stranger still reads nothing',
+  t.rows('select 1 from proposals where id = ' || quote_literal(:'UPPER'), t.uh(3)), 0);
+select t.eq('joining as an uppercase-stored recipient reports already_member, not a second entry',
+  t.scalar('select join_proposal(' || quote_literal(:'UPPER') || ') ->> ''already_member''', t.uh(2)), 'true');
+select t.eq('and the recipient list still has exactly two entries',
+  (select jsonb_array_length(distribution -> 'recipientIDs') from proposals where id = :'UPPER'), 2);
+select t.eq('the summary counts them once',
+  t.scalar('select recipient_count::text from proposal_summaries where id = ' || quote_literal(:'UPPER'), t.uh(1)), '2');
+
+-- Value: protects=the users read policy admits a co-participant stored in uppercase through its recipient branch; fails_when=the policy reverts to a case-sensitive recipient test; why_new=reading the host passes through created_by and never reaches that branch; seam=none; no_claim=none beyond protects
+\set UPPER2 80000000-0000-0000-0000-000000000004
+insert into proposals(id, title, window_start, window_end, created_by, distribution)
+values (:'UPPER2', 'Uppercase pair', '2026-12-01 00:00Z', '2026-12-14 00:00Z', t.uh(1),
+        jsonb_build_object('mode', 'newGroup',
+          'recipientIDs', jsonb_build_array(upper(t.uh(2)::text), upper(t.uh(4)::text))));
+select t.eq('a recipient stored in uppercase reads another uppercase recipient (not the host)',
+  t.rows('select 1 from users where id = ' || quote_literal(t.uh(4)), t.uh(2)), 1);
+select t.eq('a user who is on no plan cannot read them',
+  t.rows('select 1 from users where id = ' || quote_literal(t.uh(4)), t.uh(5)), 0);
+
+-- Value: protects=a person listed in both spellings counts once in the summary; fails_when=count(distinct lower(...)) reverts to count(distinct ...); why_new=no other fixture lists one person twice; seam=none; no_claim=none beyond protects
+\set MIXED 80000000-0000-0000-0000-000000000005
+insert into proposals(id, title, window_start, window_end, created_by, distribution)
+values (:'MIXED', 'Both spellings', '2026-12-01 00:00Z', '2026-12-14 00:00Z', t.uh(1),
+        jsonb_build_object('mode', 'newGroup', 'expectedCount', 1,
+          'recipientIDs', jsonb_build_array(t.uh(2), upper(t.uh(2)::text), upper(t.uh(3)::text))));
+select t.eq('one person in both spellings is counted once (recipient_count)',
+  t.scalar('select recipient_count::text from proposal_summaries where id = ' || quote_literal(:'MIXED'), t.uh(1)), '2');
+select t.eq('...and attendee_count is the larger of that and expectedCount',
+  t.scalar('select attendee_count::text from proposal_summaries where id = ' || quote_literal(:'MIXED'), t.uh(1)), '2');
+
+-- Value: protects=friendcal_has_recipient contract for each spelling, a non-member, a NULL uid and a missing list; fails_when=either spelling arm, the NULL-uid guard or the coalesce is removed; why_new=other assertions reach it only through policies; seam=none; no_claim=none beyond protects
+select t.eq('helper: lowercase spelling matches',
+  friendcal_has_recipient(jsonb_build_object('recipientIDs', jsonb_build_array(t.uh(2)::text)), t.uh(2)), true);
+select t.eq('helper: uppercase spelling matches',
+  friendcal_has_recipient(jsonb_build_object('recipientIDs', jsonb_build_array(upper(t.uh(2)::text))), t.uh(2)), true);
+select t.eq('helper: a non-member does not match',
+  friendcal_has_recipient(jsonb_build_object('recipientIDs', jsonb_build_array(t.uh(2)::text)), t.uh(3)), false);
+select t.eq('helper: a NULL uid is false, not NULL',
+  friendcal_has_recipient(jsonb_build_object('recipientIDs', jsonb_build_array(t.uh(2)::text)), null), false);
+select t.eq('helper: false, never NULL, when distribution has no recipientIDs',
+  friendcal_has_recipient('{}'::jsonb, t.uh(2)), false);
+select t.eq('helper: nor when the distribution itself is NULL',
+  friendcal_has_recipient(null, t.uh(2)), false);
+
+update proposals set hidden_from = array[t.uh(2)]::uuid[] where id = :'UPPER';
+select t.eq('exclusion outranks an uppercase-stored membership',
+  t.rows('select 1 from proposals where id = ' || quote_literal(:'UPPER'), t.uh(2)), 0);
+
 \echo 'join_proposal tests: all passed'
