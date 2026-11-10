@@ -142,8 +142,8 @@ as $$
      where p.status <> 'cancelled'
        and not (p_a = any (coalesce(p.hidden_from, '{}'::uuid[])))
        and not (p_b = any (coalesce(p.hidden_from, '{}'::uuid[])))
-       and (p.created_by = p_a or (coalesce(p.distribution, '{}'::jsonb) -> 'recipientIDs') ? p_a::text)
-       and (p.created_by = p_b or (coalesce(p.distribution, '{}'::jsonb) -> 'recipientIDs') ? p_b::text))
+       and (p.created_by = p_a or friendcal_has_recipient(p.distribution, p_a))
+       and (p.created_by = p_b or friendcal_has_recipient(p.distribution, p_b)))
 $$;
 revoke all on function friendcal_share_plan(uuid, uuid) from public, anon, authenticated;
 
@@ -210,8 +210,8 @@ begin
        and p.status <> 'cancelled'
        and not (v_uid = any (coalesce(p.hidden_from, '{}'::uuid[])))
        and not (p_to = any (coalesce(p.hidden_from, '{}'::uuid[])))
-       and (p.created_by = v_uid or (coalesce(p.distribution, '{}'::jsonb) -> 'recipientIDs') ? v_uid::text)
-       and (p.created_by = p_to or (coalesce(p.distribution, '{}'::jsonb) -> 'recipientIDs') ? p_to::text);
+       and (p.created_by = v_uid or friendcal_has_recipient(p.distribution, v_uid))
+       and (p.created_by = p_to or friendcal_has_recipient(p.distribution, p_to));
     if found then
       v_plan_id := v_plan.id;
       v_plan_title := v_plan.title;
@@ -344,7 +344,7 @@ begin
 
   v_ids := coalesce(v_prop.distribution -> 'recipientIDs', '[]'::jsonb);
   update proposals
-     set distribution = case when v_ids ? v_uid::text then distribution
+     set distribution = case when friendcal_has_recipient(v_prop.distribution, v_uid) then distribution
                              else jsonb_set(coalesce(distribution, '{}'::jsonb), '{recipientIDs}',
                                             v_ids || to_jsonb(v_uid::text)) end,
          locked_attendee_ids = locked_attendee_ids || v_uid

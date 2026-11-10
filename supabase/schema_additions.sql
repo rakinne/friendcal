@@ -104,3 +104,23 @@ do $$ begin
   alter table proposals add constraint proposals_locked_place_fkey
     foreign key (locked_place_id) references proposal_places(id) on delete set null;
 exception when duplicate_object then null; end $$;
+
+-- Is p_uid listed in distribution.recipientIDs? The Swift client encodes UUIDs as UPPERCASE text
+-- (UUID.uuidString) while Postgres renders uuid::text in lowercase, and jsonb `?` is an exact string
+-- match, so a bare `? uid::text` never found a recipient the app had added. Both spellings are tested
+-- (not lower() over every element, which would scan each array). Always true or false, never NULL: a
+-- plan whose distribution lacks recipientIDs would otherwise yield NULL, and a plpgsql `if not f()`
+-- on NULL fails open (see the proposal_is_readable note in rls.sql).
+-- Only the two spellings Swift and Postgres produce are matched; a mixed-case id is not a member (it
+-- fails closed, never widens access). coalesce() costs the GIN index its use inside policies; at this
+-- table size that is accepted in exchange for the NULL guarantee.
+create or replace function friendcal_has_recipient(p_distribution jsonb, p_uid uuid) returns boolean
+language sql
+immutable
+as $$
+  select coalesce(
+    p_uid is not null
+    and ((p_distribution -> 'recipientIDs') ? p_uid::text
+         or (p_distribution -> 'recipientIDs') ? upper(p_uid::text)),
+    false)
+$$;

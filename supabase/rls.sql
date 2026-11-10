@@ -22,6 +22,17 @@
 --                         whole point.
 -- ===========================================================================
 
+-- 0) Remove the blanket policies from the first project setup (`using (true) with check (true)`, role
+--    public). Permissive policies are OR'd, so while any of these exists every policy below is
+--    decorative: all rows of these tables are readable and writable at the row level. Found on the
+--    live project 2026-11-10; they were never in a repo file.
+-- ---------------------------------------------------------------------------
+drop policy if exists "allow all users" on users;
+drop policy if exists "allow all proposals" on proposals;
+drop policy if exists "allow all busy" on busy_blocks;
+drop policy if exists "allow all events" on events;
+drop policy if exists "allow all availability" on availability_slots;
+
 -- ---------------------------------------------------------------------------
 -- 1) busy_blocks. Every authenticated viewer gets every row, so an excluded viewer is byte-for-byte
 --    indistinguishable from a stranger. The correlation columns are handled by GRANT, at the bottom.
@@ -195,7 +206,7 @@ as $$
   select not (auth.uid() = any (coalesce(p_hidden_from, '{}'::uuid[])))
      and (
        p_created_by = auth.uid()
-       or (coalesce(p_distribution, '{}'::jsonb) -> 'recipientIDs') ? auth.uid()::text
+       or friendcal_has_recipient(p_distribution, auth.uid())
      )
 $$;
 revoke all on function proposal_is_readable(uuid[], uuid, jsonb) from public, anon;
@@ -488,6 +499,18 @@ begin
    where grantee = 'anon' and table_schema = 'public';
   if v_tables is not null then
     raise exception 'rls.sql: anon still holds privileges on %', v_tables;
+  end if;
+
+  -- Section 0 drops the known blanket policies by name; this catches one spelled differently, or a
+  -- dashboard re-adding it. A permissive `true` policy ORs every stricter policy on its table away.
+  -- busy_read_all_authed is the one deliberate `using (true)`: a select-only policy (section 1).
+  select string_agg(tablename || ': ' || policyname, ', ' order by tablename, policyname) into v_tables
+    from pg_policies
+   where schemaname = 'public' and permissive = 'PERMISSIVE'
+     and (qual = 'true' or with_check = 'true')
+     and policyname <> 'busy_read_all_authed';
+  if v_tables is not null then
+    raise exception 'rls.sql: blanket policy still present, which defeats row security: %', v_tables;
   end if;
 
   raise notice 'rls.sql: policy set, views and column grants verified';

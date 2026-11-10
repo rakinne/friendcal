@@ -226,4 +226,31 @@ select t.eq('a client cannot create a plan whose window ends before it starts',
           || '(''30000000-0000-0000-0000-00000000000c'', ''Backwards'', ''2027-01-08 00:00Z'', ''2027-01-01 00:00Z'', '
           || quote_literal(t.u(1)) || ', ''{}''::jsonb)', t.u(1))).sqlstate, '42501');
 
+-- ===========================================================================
+-- Blanket policies from the first project setup. The live project shipped five `using (true)` policies
+-- (role public) that OR every stricter policy away. This harness never creates them, so without this
+-- section the drops at the top of rls.sql are dead code in CI.
+--
+-- Value: protects=rls.sql removes the five known blanket policies and the self-check's predicate catches a differently named one; fails_when=a drop line is removed or misnamed, or the predicate stops matching a permissive true policy; why_new=no other test seeds these policies; seam=none; no_claim=other policy names on a real project (the self-check raises for those)
+-- ===========================================================================
+\getenv fc_fixtures FC_FIXTURES
+create policy "allow all users" on users for all using (true) with check (true);
+create policy "allow all proposals" on proposals for all using (true) with check (true);
+create policy "allow all busy" on busy_blocks for all using (true) with check (true);
+create policy "allow all events" on events for all using (true) with check (true);
+create policy "allow all availability" on availability_slots for all using (true) with check (true);
+\i :fc_fixtures/../../rls.sql
+select t.eq('rls.sql removed all five blanket policies',
+  (select count(*)::int from pg_policies where schemaname = 'public' and policyname like 'allow all%'), 0);
+select t.eq('and no other permissive true policy remains besides busy_read_all_authed',
+  (select count(*)::int from pg_policies
+    where schemaname = 'public' and permissive = 'PERMISSIVE' and (qual = 'true' or with_check = 'true')
+      and policyname <> 'busy_read_all_authed'), 0);
+create policy "Open Sesame" on proposals for all using (true) with check (true);
+select t.eq('the self-check predicate sees a blanket policy under a name the drops do not know',
+  (select count(*)::int from pg_policies
+    where schemaname = 'public' and permissive = 'PERMISSIVE' and (qual = 'true' or with_check = 'true')
+      and policyname <> 'busy_read_all_authed'), 1);
+drop policy "Open Sesame" on proposals;
+
 \echo 'rls tests: all passed'

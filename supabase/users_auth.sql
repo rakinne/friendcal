@@ -36,7 +36,7 @@ create policy "users_read_self_and_co_participants"
       or exists (
         select 1 from proposals p
          where p.created_by = users.id
-            or (p.distribution -> 'recipientIDs') ? users.id::text
+            or friendcal_has_recipient(p.distribution, users.id)
       )
     )
   );
