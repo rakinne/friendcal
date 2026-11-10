@@ -60,7 +60,7 @@ newdb() { psql_db postgres -c "create database $1" >/dev/null; }
 # Every .sql file this wave adds, in application order, after schema.sql. Each must be idempotent.
 # schema_additions.sql comes first: every policy, view and function after it may assume its columns.
 WAVE_SQL=(schema_additions.sql lock_proposal.sql rls.sql)
-for f in users_auth.sql join_proposal.sql commitments.sql places.sql; do
+for f in users_auth.sql join_proposal.sql commitments.sql places.sql social.sql; do
   [[ -f "$ROOT/supabase/$f" ]] && WAVE_SQL+=("$f")
 done
 

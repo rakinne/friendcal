@@ -12,6 +12,7 @@ public final class InMemoryProposalStore: ProposalStore {
     public enum Operation: Hashable, CaseIterable {
         case proposals, load, create, update, join, tapFree, release, lock, myCommitments, signIn, deleteAccount
         case suggestPlace, votePlace, vetoPlace, removePlace
+        case sendPoke, acknowledgePoke, tagAlong, inbox, registerDevice
     }
 
     public private(set) var users: [User]
@@ -20,6 +21,16 @@ public final class InMemoryProposalStore: ProposalStore {
     public var busyBlocks: [BusyBlock]
     public private(set) var places: [Place]
     public private(set) var votes: [PlaceVote]
+    /// Poke and Tag along (supabase/social.sql), row for row.
+    public private(set) var pokes: [Poke] = []
+    public private(set) var tagAlongs: [TagAlong] = []
+    /// device_tokens: token -> owner.
+    public private(set) var deviceTokens: [String: UUID] = [:]
+    /// push_outbox: what the server would hand to APNs. Tests read it to assert who was told what.
+    public private(set) var outbox: [QueuedPush] = []
+    /// Friends beyond the people the caller shares a plan with. The server has no friends table yet,
+    /// so there this set is empty; demo data fills it so Groups' roster can be poked before a plan exists.
+    public var friendIDs: Set<UUID> = []
     public private(set) var currentUserID: UUID?
     public private(set) var authState: AuthState = .signedOut
     public private(set) var identityGeneration: Int = 0
@@ -37,6 +48,17 @@ public final class InMemoryProposalStore: ProposalStore {
     /// silently, with no stream emission, just before the next vote, so the vote meets the real refusal
     /// and the screen can only learn the truth by reconciling after that error.
     public enum StaleChange: String { case vetoed, locked, removed }
+
+    /// One push_outbox row.
+    public struct QueuedPush: Equatable, Sendable {
+        public enum Kind: String, Sendable { case poke, tagAlong = "tag_along" }
+        public var recipientID: UUID
+        public var kind: Kind
+        public var title: String
+        public var body: String
+        public var route: PushRoute
+        public var expiresAt: Date?
+    }
     public var staleBeforeNextVote: StaleChange?
     /// Artificial latency for every operation (loading states in UI tests).
     public var latency: Duration = .zero
@@ -128,6 +150,9 @@ public final class InMemoryProposalStore: ProposalStore {
             users[index].avatarURL = nil
         }
         deletedUserIDs.insert(me)
+        // friendcal_purge_push_on_delete: a departed account stops receiving.
+        deviceTokens = deviceTokens.filter { $0.value != me }
+        outbox.removeAll { $0.recipientID == me }
 
         for id in Set(cancelled).union(votedOn) { emit(id) }
         currentUserID = nil
@@ -376,6 +401,130 @@ public final class InMemoryProposalStore: ProposalStore {
         places.remove(at: index)
         votes.removeAll { $0.placeID == placeID }
         emit(plan)
+    }
+
+    // MARK: Poke and Tag along (social.sql's contract, check for check)
+
+    private func isActive(_ id: UUID) -> Bool { users.contains { $0.id == id } && !deletedUserIDs.contains(id) }
+
+    /// friendcal_share_plan(): a plan neither is hidden from, with both on it, not cancelled.
+    private func sharePlan(_ a: UUID, _ b: UUID) -> Bool {
+        proposals.contains { $0.status != .cancelled && $0.isReadable(by: a) && $0.isReadable(by: b) }
+    }
+
+    private func displayName(_ id: UUID) -> String {
+        let name = users.first { $0.id == id }?.displayName.trimmingCharacters(in: .whitespaces) ?? ""
+        return name.isEmpty ? SocialInbox.unknownName : name
+    }
+
+    public func sendPoke(to userID: UUID, about proposalID: UUID?) async throws -> PokeReceipt {
+        let me = try await authorize(.sendPoke)
+        guard !deletedUserIDs.contains(me) else {
+            throw Self.refusal("42501", "this account has been deleted", "FC_ACCOUNT_DELETED")
+        }
+        guard userID != me else { throw Self.refusal("22023", "you cannot poke yourself", "FC_SELF_POKE") }
+        guard isActive(userID), friendIDs.contains(userID) || sharePlan(me, userID) else {
+            throw Self.refusal("P0002", "you can only poke friends you share a plan with", "FC_NOT_FRIEND")
+        }
+        let at = now()
+        if let live = pokes.last(where: { $0.fromID == me && $0.toID == userID && $0.isLive(at: at) }) {
+            return PokeReceipt(poke: live, isNew: false)
+        }
+        // The plan is context, never authorization: unreadable by either person, it is dropped.
+        let plan = proposalID.flatMap { id in
+            proposals.first { $0.id == id && $0.status != .cancelled && $0.isReadable(by: me) && $0.isReadable(by: userID) }
+        }
+        for i in pokes.indices where pokes[i].fromID == userID && pokes[i].toID == me && pokes[i].isLive(at: at) {
+            pokes[i].acknowledgedAt = at
+            pokes[i].ackVia = .pokeBack
+        }
+        let poke = Poke(fromID: me, toID: userID, proposalID: plan?.id, createdAt: at)
+        pokes.append(poke)
+        let body = plan.map { "About \($0.title). Poke back before it fades in an hour." } ?? "Poke back before it fades in an hour."
+        outbox.append(QueuedPush(recipientID: userID, kind: .poke, title: "\(displayName(me)) poked you", body: body,
+                                 route: .poke(poke.id), expiresAt: poke.expiresAt))
+        return PokeReceipt(poke: poke, isNew: true)
+    }
+
+    public func acknowledgePoke(_ id: UUID, via: Poke.AckVia) async throws -> Poke {
+        let me = try await authorize(.acknowledgePoke)
+        guard let index = pokes.firstIndex(where: { $0.id == id && $0.toID == me }) else {
+            throw Self.refusal("P0002", "no such poke", "FC_POKE_NOT_FOUND")
+        }
+        if pokes[index].isLive(at: now()) {
+            pokes[index].acknowledgedAt = now()
+            pokes[index].ackVia = via == .push ? .push : .app
+        }
+        return pokes[index]
+    }
+
+    public func tagAlong(_ proposalID: UUID) async throws -> Proposal {
+        let me = try await authorize(.tagAlong)
+        guard let index = proposals.firstIndex(where: { $0.id == proposalID }), !proposals[index].hiddenFrom.contains(me) else {
+            throw Self.refusal("P0002", "no such plan", "FC_NOT_FOUND")
+        }
+        guard !deletedUserIDs.contains(me) else {
+            throw Self.refusal("42501", "this account has been deleted", "FC_ACCOUNT_DELETED")
+        }
+        var p = proposals[index]
+        switch TagAlongRules.refusal(p, user: me, now: now()) {
+        case .notFound: throw Self.refusal("P0002", "no such plan", "FC_NOT_FOUND")
+        case .notLocked: throw Self.refusal("55000", "this plan is not locked yet", "FC_NOT_LOCKED")
+        case .closed: throw Self.refusal("55000", "this plan is \(p.status.rawValue), not open to join", "FC_CLOSED")
+        case .over: throw Self.refusal("55000", "this plan is over", "FC_PLAN_OVER")
+        case .alreadyIn: return p
+        case nil: break
+        }
+        guard let window = p.lockedWindow else { throw Self.refusal("55000", "this plan is over", "FC_PLAN_OVER") }
+        // busy_blocks' exclusion constraint: no two hard Busy blocks of one person may overlap.
+        guard !busyBlocks.contains(where: { $0.userID == me && $0.range.overlaps(window) }) else {
+            throw Self.refusal("23P01", "you are already busy then", "FC_BUSY")
+        }
+        ensureUser(me)
+        busyBlocks.append(BusyBlock(userID: me, range: window, visibility: .public, hiddenFrom: [], sourceProposalID: p.id, createdAt: now()))
+        if !p.distribution.recipientIDs.contains(me) { p.distribution.recipientIDs.append(me) }
+        p.lockedAttendeeIDs.append(me)
+        proposals[index] = p
+        if !tagAlongs.contains(where: { $0.proposalID == p.id && $0.userID == me }) {
+            tagAlongs.append(TagAlong(proposalID: p.id, userID: me, createdAt: now()))
+        }
+        if p.createdBy != me, isActive(p.createdBy) {
+            outbox.append(QueuedPush(recipientID: p.createdBy, kind: .tagAlong, title: "\(displayName(me)) is tagging along",
+                                     body: "They just joined \(p.title).", route: .tagAlong(proposalID: p.id), expiresAt: window.upperBound))
+        }
+        emit(p.id)
+        return p
+    }
+
+    public func inbox() async throws -> SocialInbox {
+        let me = try await authorize(.inbox)
+        let mine = pokes.filter { $0.fromID == me || $0.toID == me }
+        let notices = tagAlongs.compactMap { row -> TagAlongNotice? in
+            guard let plan = proposals.first(where: { $0.id == row.proposalID }), plan.createdBy == me, plan.isReadable(by: me) else { return nil }
+            return TagAlongNotice(proposalID: row.proposalID, userID: row.userID, planTitle: plan.title, createdAt: row.createdAt)
+        }
+        let people = Set(mine.flatMap { [$0.fromID, $0.toID] } + notices.map(\.userID))
+        var titles: [UUID: String] = [:]
+        for id in Set(mine.compactMap(\.proposalID)) {
+            if let plan = proposals.first(where: { $0.id == id }), plan.isReadable(by: me) { titles[id] = plan.title }
+        }
+        return SocialInbox(pokes: mine, tagAlongs: notices,
+                           names: Dictionary(uniqueKeysWithValues: people.map { ($0, displayName($0)) }), planTitles: titles)
+    }
+
+    public func registerDevice(token: String, sandbox: Bool) async throws {
+        let me = try await authorize(.registerDevice)
+        let hex = token.lowercased()
+        guard (32...200).contains(hex.count), hex.allSatisfy({ $0.isHexDigit }) else {
+            throw Self.refusal("22023", "not a device token", "FC_BAD_TOKEN")
+        }
+        deviceTokens[hex] = me
+    }
+
+    /// Fixtures and tests: pokes that arrived (or went out) before the screen opened.
+    public func seed(pokes: [Poke], tagAlongs: [TagAlong] = []) {
+        self.pokes = pokes
+        self.tagAlongs = tagAlongs
     }
 
     public func tapFree(proposalID: UUID, range: DateRange, expiresAt: Date?) async throws -> AvailabilitySlot {

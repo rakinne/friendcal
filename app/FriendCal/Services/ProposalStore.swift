@@ -187,6 +187,27 @@ public protocol ProposalStore: AnyObject {
     /// Suggester only: withdraws their own place; its votes go with it.
     func removePlace(placeID: UUID) async throws
 
+    // MARK: Poke and Tag along (supabase/social.sql). Server-first like places: the caller awaits the
+    // store and shows what it answers. These are the ONLY entry points, so a poke sent from Home, from a
+    // row on Groups and from the Pokes tab is the same call with the same rules.
+
+    /// Pokes a friend, optionally about a plan. One live poke per friend at a time: a second call
+    /// while the first is still out returns that poke with `isNew == false` and notifies nobody.
+    /// Poking someone who has a live poke out to the caller acknowledges theirs. Refused for
+    /// yourself (FC_SELF_POKE) and for anyone the caller shares no plan with (FC_NOT_FRIEND).
+    func sendPoke(to userID: UUID, about proposalID: UUID?) async throws -> PokeReceipt
+    /// The recipient saw it. Idempotent, and a no-op on a poke that already ended; a poke that is
+    /// not the caller's is FC_POKE_NOT_FOUND, exactly like one that does not exist.
+    func acknowledgePoke(_ id: UUID, via: Poke.AckVia) async throws -> Poke
+    /// Joins a locked plan that has not ended: the caller becomes a recipient and an attendee, gets
+    /// the plan's Busy block, and the host is notified. Idempotent. Refusals: FC_NOT_FOUND (also for
+    /// a hidden viewer), FC_NOT_LOCKED, FC_CLOSED, FC_PLAN_OVER, FC_BUSY.
+    func tagAlong(_ proposalID: UUID) async throws -> Proposal
+    /// The caller's pokes in both directions and the tag alongs on plans they host.
+    func inbox() async throws -> SocialInbox
+    /// Stores this device's APNs token for the caller, so pokes and tag alongs reach it.
+    func registerDevice(token: String, sandbox: Bool) async throws
+
     func tapFree(proposalID: UUID, range: DateRange, expiresAt: Date?) async throws -> AvailabilitySlot
     /// Removes one of the current user's own holds (C3).
     func release(slotID: UUID) async throws

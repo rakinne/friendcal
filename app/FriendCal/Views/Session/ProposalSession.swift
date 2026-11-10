@@ -519,6 +519,22 @@ final class ProposalSession {
         }
     }
 
+    /// Whether this viewer can join the plan after its lock (the invite's "Tag along").
+    var canTagAlong: Bool { proposal.map { TagAlongRules.canTagAlong($0, user: currentUserID, now: now()) } ?? false }
+
+    /// Joins a locked plan the viewer was not locked into; the host is told. The same store rule the
+    /// Tag along sheet on Groups uses. Returns the sentence to show.
+    func tagAlong() async throws -> String {
+        guard let id = proposalID else { return "" }
+        do {
+            let plan = try await store.tagAlong(id)
+            await load()
+            return TagAlongRules.joinedText(planTitle: plan.title, hostName: creatorName, isHost: plan.isCreator(currentUserID))
+        } catch {
+            throw UserFacingError.map(error, action: .tagAlong, creatorName: creatorName)
+        }
+    }
+
     /// Creator edits (design 5.4A); the store enforces the rules and the session applies the result.
     func edit(_ draft: ProposalDraft) async throws {
         guard var p = proposal else { return }

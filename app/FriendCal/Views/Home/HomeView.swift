@@ -8,6 +8,8 @@ import FriendCalCore
 /// its cell and "in" chips, and the DEMO badge sits inside the header row on the in-memory store.
 struct HomeView: View {
     var session: ProposalSession
+    /// Poke goes through the shared session, like every other Poke in the app.
+    let social: SocialSession
     /// Push the invite for this proposal (design 1.1A).
     var onOpenInvite: (UUID) -> Void = { _ in }
     /// A plan was created from Request times: the shell shows it on the Invites tab (design 3.2A).
@@ -16,6 +18,7 @@ struct HomeView: View {
     @State private var toast = ToastCenter()
     @State private var showDrawer = false
     @State private var showCreate = false
+    @State private var showPoke = false
     /// Held in state so redraws don't resubscribe and restart the 60s countdown (X12).
     @State private var minuteTick = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     #if DEBUG
@@ -33,7 +36,7 @@ struct HomeView: View {
                 }
                 ActionRow(isLoading: session.isLoading, shareText: session.shareText,
                           shareDisabledHint: session.shareDisabledHint,
-                          onPoke: { toast.show("Poke is coming soon") })
+                          onPoke: { showPoke = true })
                     .padding(.top, 16)
                 StealthRow(isLoading: session.isLoading, onTap: { toast.show("Stealth is coming soon. Nothing is hidden yet.") })
                     .padding(.top, 12)
@@ -55,6 +58,12 @@ struct HomeView: View {
                           calendar: session.calendar, isLoading: session.isLoading)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showPoke) {
+            PokePickerSheet(social: social, targets: pokeTargets, planID: session.proposal?.id, planTitle: session.proposal?.displayTitle,
+                            faces: Dictionary(session.members.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }))
+                .presentationDetents([.medium, .large])
+                .presentationBackground(DesignTokens.Colors.background)
+        }
         .sheet(isPresented: $showCreate) {
             CreateProposalSheet(mode: .create(session.store, calendar: session.calendar, now: session.now), onCreated: onCreated)
                 .presentationDetents([.large])
@@ -62,6 +71,15 @@ struct HomeView: View {
         #if DEBUG
         .sheet(isPresented: $showDebug) { DebugSheet(session: session) }
         #endif
+    }
+
+    /// Everyone on the plan but you, the ones who have not picked a time first. Only the host can
+    /// tell who that is: a recipient reads only their own holds (rls.sql section 3), so to anyone
+    /// else every friend would look silent, and the sheet says nothing rather than something false.
+    private var pokeTargets: [PokeTarget] {
+        PokeTarget.order(members: session.members.map { (id: $0.id, name: $0.name) },
+                         answered: Set(session.slots.map(\.userID)), me: session.currentUserID,
+                         isCollecting: session.proposal?.status == .requesting && session.isCreator)
     }
 
     // MARK: Modules
@@ -130,18 +148,18 @@ struct HomeView: View {
     }
 }
 
-#Preview("Home, populated") { HomeView(session: ProposalSession(fixture: FixtureData.make(.populated))) }
-#Preview("Home, loading") { HomeView(session: ProposalSession(fixture: FixtureData.make(.loading))) }
-#Preview("Home, empty") { HomeView(session: ProposalSession(fixture: FixtureData.make(.noFriends))) }
-#Preview("Home, no proposal") { HomeView(session: ProposalSession(fixture: FixtureData.make(.noProposal))) }
-#Preview("Home, zero overlap") { HomeView(session: ProposalSession(fixture: FixtureData.make(.zeroOverlap))) }
-#Preview("Home, few friends") { HomeView(session: ProposalSession(fixture: FixtureData.make(.fewFriends))) }
-#Preview("Home, locked") { HomeView(session: ProposalSession(fixture: FixtureData.make(.lockedPlan))) }
+#Preview("Home, populated") { HomeView(session: ProposalSession(fixture: FixtureData.make(.populated)), social: .preview(.populated)) }
+#Preview("Home, loading") { HomeView(session: ProposalSession(fixture: FixtureData.make(.loading)), social: .preview(.loading)) }
+#Preview("Home, empty") { HomeView(session: ProposalSession(fixture: FixtureData.make(.noFriends)), social: .preview(.noFriends)) }
+#Preview("Home, no proposal") { HomeView(session: ProposalSession(fixture: FixtureData.make(.noProposal)), social: .preview(.noProposal)) }
+#Preview("Home, zero overlap") { HomeView(session: ProposalSession(fixture: FixtureData.make(.zeroOverlap)), social: .preview(.zeroOverlap)) }
+#Preview("Home, few friends") { HomeView(session: ProposalSession(fixture: FixtureData.make(.fewFriends)), social: .preview(.fewFriends)) }
+#Preview("Home, locked") { HomeView(session: ProposalSession(fixture: FixtureData.make(.lockedPlan)), social: .preview(.lockedPlan)) }
 #Preview("Home, 0-count cell selected") {
     // X10: a tapped cell with nobody in common stays selected, chips show everyone busy,
     // Share is disabled with "Nobody shares an hour here yet".
     let model = ProposalSession(fixture: FixtureData.make(.zeroOverlap))
     if let cell = model.visibleWeek?.cells.first(where: \.isEnabled) { model.select(cell.id) }
-    return HomeView(session: model)
+    return HomeView(session: model, social: .preview(.zeroOverlap))
 }
-#Preview("Home, stale") { HomeView(session: ProposalSession(fixture: FixtureData.make(.stale))) }
+#Preview("Home, stale") { HomeView(session: ProposalSession(fixture: FixtureData.make(.stale)), social: .preview(.stale)) }

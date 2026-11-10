@@ -116,4 +116,28 @@ final class ContrastTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(Self.ratio(C.accentHover, C.surface2), 4.5, "outlined pill pressed on surface2")
         XCTAssertGreaterThanOrEqual(Self.ratio(C.errorText, C.surface2), 4.5, "error text on surface2")
     }
+
+    /// protects=every text pair Groups (variant D) draws meets AA: names and messages on the ivory
+    /// plate, the teal word badge, muted "BUSY" on the busy plate (surface2), white on the teal
+    /// duration chip and Tag along, white on coral for the Moments action; fails_when=a token edit
+    /// drops any pair under its bar; no_claim=the painted scenes (no text sits on them, the plate is opaque).
+    func testGroupsTextPairsMeetAA() {
+        let body: [(String, Color, Color)] = [
+            ("name on plate", C.text, C.surface),
+            ("word badge on plate", C.accentHover, C.surface),
+            ("BUSY on busy plate", C.textMuted, C.surface2),
+            ("time on busy plate", C.text, C.surface2),
+            ("duration chip selected", C.onPrimary, C.accentHover),
+            ("duration chip outline", C.accentHover, C.surface),
+            ("Moments detail on card", C.textMuted, C.surface),
+            ("ribbon label on card", C.textMuted, C.surface),
+            ("free glyph on amber", C.text, C.warning),
+        ]
+        for (name, fg, bg) in body {
+            XCTAssertGreaterThanOrEqual(Self.ratio(fg, bg), 4.5, name)
+        }
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.onPrimary, C.primary), 3.0, "coral action label (17pt semibold)")
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.onPrimary, C.primary), 3.0, "ribbon glyph on coral is not used; teal glyph below")
+        XCTAssertGreaterThanOrEqual(Self.ratio(C.onPrimary, C.accentHover), 4.5, "ribbon glyph on teal")
+    }
 }
