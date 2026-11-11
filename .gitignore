@@ -49,3 +49,6 @@ app/FriendCal/Resources/Fonts/CabinetGrotesk-*.otf
 
 # Per-machine signing team (see app/Signing.xcconfig)
 app/Config/Local.xcconfig
+
+# Cloudflare Wrangler local state
+.wrangler/
