@@ -137,6 +137,10 @@ public protocol ProposalStore: AnyObject {
 
     /// Signs in (or restores) the current user. The in-memory store creates a local identity.
     func signIn(displayName: String?) async throws -> UUID
+    /// The signed-in user's saved name, nil when signed out or still the "Friend" placeholder.
+    func myDisplayName() async throws -> String?
+    /// Saves the signed-in user's name, so every invite and friend link says who it is from.
+    func setDisplayName(_ name: String) async throws
     /// Drops the current identity. Not a failure path: it always succeeds and always ends signedOut.
     func signOut() async
     /// Deletes the current user's account: cancels their open plans, releases every hold on those
