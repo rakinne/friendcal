@@ -2,6 +2,14 @@
 
 All notable changes to FriendCal are listed here, newest first. The version lives in `VERSION`.
 
+## [0.6.0.0] - 2026-11-11
+
+### Fixed
+- Your status now reaches your friends. Before, a status you set stayed on your phone, so nobody else ever saw it. It is saved to the server, your friends see it on their Groups tab, and it comes back after you relaunch the app. If the server refuses it, your status goes back to what it was and a message says so.
+
+### Added
+- Statuses are private to you and your friends. Strangers, removed friends and deleted accounts never see one, and a status that has ended disappears for everyone.
+
 ## [0.5.0.0] - 2026-11-10
 
 ### Added
