@@ -169,6 +169,8 @@ Components entries into DESIGN.md; nothing covered the engineering half.
 **Priority:** P2
 **Depends on:** Issue #5 PR2 (Team ID, entitlements); owning friendcal.app; a public TestFlight link.
 
+**Update 2026-11-10:** Folded into Add a friend PR 3 (task T4), which serves `/p/<id>` beside `/f/<token>` from one site and one AASA file. See `docs/designs/friendcal-add-friend-spec.md` section 4.8. Close this entry when that PR ships.
+
 ## Groups
 
 ### Groups as a real entity (saved crew as proposal recipients)
@@ -309,6 +311,106 @@ around it. The row ordering rule (issue 1D) must survive a release without the l
 **Effort:** S
 **Priority:** P3
 **Depends on:** None.
+
+## Friends
+
+All from the 2026-11-10 `/autoplan` review of Add a friend. The build spec is `docs/designs/friendcal-add-friend-spec.md`; the reasoning is in `docs/designs/friendcal-add-friend.md`.
+
+### Push forwarder: nothing is delivered today
+
+**What:** The Edge Function that sends `push_outbox` rows to APNs (`supabase/functions/push-notify`, named at `supabase/social.sql:33`), its APNs key and schedule, plus the app-side handling of the `friend_joined` kind (`PushRoute` case, shell routing to Groups, `-FriendCalPushTap friend/<uuid>`).
+
+**Why:** The function is not in the repo and the live Supabase project has zero Edge Functions (checked 2026-11-10). Pokes shipped in 0.4.0.0 queue rows that are never sent, and a person whose app is closed never learns a friend connected.
+
+**Context:** Decision d4 at the gate: its own plan, started next. `push_outbox` rows carry `expires_at`; `friend_joined` rows expire after 24 hours so a late forwarder sends nothing stale. `aps-environment` is `development` in `app/FriendCal/FriendCal.entitlements`.
+
+**Effort:** L
+**Priority:** P1
+**Depends on:** An APNs key; a decision on how the function is triggered.
+
+### Stop exposing `busy_blocks.visibility` to clients
+
+**What:** Remove `visibility` from the column grant at `supabase/rls.sql:379` and add the assertion to `rls_test.sql`.
+
+**Why:** Every signed-in client can read it, so a client can tell a `stealth` block from a `public` one, which is the signal the stealth design hides. The sanitized view already leaves it out (`rls.sql:266`).
+
+**Context:** Found by static read during the review; not exploited. Nothing leaks today because the server only writes `public` (`lock_proposal.sql:157`). Check what the app reads from the base table before removing it.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None.
+
+### Statuses on the server, readable by friends
+
+**What:** A statuses table with its own RLS, written from the Status studio and read through `friendcal_is_friend`, replacing the in-memory statuses in `GroupsSession`.
+
+**Why:** A status set today stays on one device while the app says "Status shared" (`app/FriendCal/Views/Groups/GroupsSession.swift:5`). After Add a friend ships, a friend's row shows a name and Busy only.
+
+**Context:** Deferred as E8. The friend graph is its prerequisite and its read gate. Crews are in the same position (device-only).
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** Add a friend PR 1.
+
+### Connect through a plan
+
+**What:** After someone joins a host's plan, offer "Connect with <host>" on the invite, using the same accept path as the personal link.
+
+**Why:** Both strategy reviewers argued a plan is the reason to act today and the personal link is an abstract ask; one link would deliver both the plan and the connection.
+
+**Context:** Gate decision uc3: not in the Add a friend work; design it next. It touches `join_proposal` and the invite screen. Decide whether it is an offer or automatic, and how it interacts with `hidden_from`.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Add a friend PR 1 and PR 2.
+
+### Ask for a name before the first Connect
+
+**What:** When a person's name is still the placeholder "Friend", ask for one on the Accept screen before Connect.
+
+**Why:** On the real store there is no name step after sign-in (`AuthGateView.swift:77` shows the field only for the in-memory store), so an inviter can gain a friend called "Friend".
+
+**Context:** Review item EN9. The Me screen already has a withheld-name prompt to reuse.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Add a friend PR 2.
+
+### Join count on the Add a friend sheet
+
+**What:** Show how many people connected with the current link.
+
+**Why:** It tells the sender when a link has travelled further than intended. The server already keeps the count.
+
+**Context:** Deferred as E4 because it changes the approved sheet mockup; needs a design pass.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Add a friend PR 2.
+
+### A general block list
+
+**What:** Block a person outright, beyond removing them.
+
+**Why:** Remove already stops one person reconnecting through your links; a block would also cover pokes through a shared plan and future features.
+
+**Context:** Deferred as E10. Revisit if removal proves insufficient with real users.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Add a friend PR 1.
+
+### Coral buttons miss AA contrast
+
+**What:** White text on coral `#FF4E2E` is about 3.3:1, under the 4.5:1 needed for 17pt semibold button text. Decide a darker fill or a text treatment and update DESIGN.md and `ContrastTests`.
+
+**Why:** Every primary button in the app has it, including the new Share link and Connect buttons.
+
+**Context:** Raised by the outside design reviewer on 2026-11-10 and confirmed by the WCAG formula. System-wide, so not changed inside the Add a friend work.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** A design decision on the coral treatment.
 
 ## Completed
 
