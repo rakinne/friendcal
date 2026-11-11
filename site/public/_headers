@@ -1,0 +1,26 @@
+/*
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000
+
+/f
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
+/f/*
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
+/p
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
+/p/*
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600

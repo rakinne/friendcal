@@ -21,7 +21,7 @@ settings:
     SWIFT_VERSION: "5.9"
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     MARKETING_VERSION: "0.2.0"
-    CURRENT_PROJECT_VERSION: "5"
+    CURRENT_PROJECT_VERSION: "6"
     SWIFT_EMIT_LOC_STRINGS: YES
 
 packages:
@@ -65,6 +65,10 @@ targets:
         # enabled in the Apple Developer portal, or automatic signing refuses the profile.
         com.apple.developer.applesignin:
           - Default
+        # Universal links for friendcal.app/f/<token> and /p/<id> (site/ serves the apple-app-site-association).
+        # The App ID needs the Associated Domains capability, which automatic signing enables on first use.
+        com.apple.developer.associated-domains:
+          - applinks:friendcal.app
         # Push for Poke and Tag along. `development` is what a debug build needs; Xcode's export
         # rewrites it to `production` for TestFlight and the App Store. The App ID needs the Push
         # Notifications capability, which automatic signing enables on first use.

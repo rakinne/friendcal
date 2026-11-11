@@ -1,0 +1,5 @@
+# Both landing pages are one static file each; the path after /f/ or /p/ is read by landing.js.
+# Status 200 is a rewrite (the URL does not change). Never add a redirect for the
+# /.well-known/apple-app-site-association path: Apple does not follow redirects there.
+/f/*  /f  200
+/p/*  /p  200

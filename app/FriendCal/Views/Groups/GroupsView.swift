@@ -22,6 +22,8 @@ struct GroupsView: View {
     var onToast: (String) -> Void = { _ in }
     /// A plan was joined from the Tag along sheet.
     var onOpenPlan: (UUID) -> Void = { _ in }
+    /// Opens the Add a friend sheet (the shell owns it).
+    var onAddFriend: () -> Void = {}
 
     private struct StudioRequest: Identifiable {
         let id = UUID()
@@ -35,6 +37,8 @@ struct GroupsView: View {
     /// Set when the friend card asks for Tag along: one sheet has to finish leaving before the next opens.
     @State private var tagAlongAfterCard: Buddy?
     @State private var crewsStarted = 0
+    /// A friend being removed through the card; the toast and the row follow the server's answer.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         // The list redraws each minute so "till 11:00 PM" statuses expire on time.
@@ -69,6 +73,10 @@ struct GroupsView: View {
                 .presentationDetents([.medium, .large])
                 .presentationBackground(DesignTokens.Colors.background)
         }
+        .onAppear { session.setOnScreen(true) }
+        .onDisappear { session.setOnScreen(false) }
+        .task { await session.refresh() }
+        .sensoryFeedback(.success, trigger: session.celebrations)
         .sensoryFeedback(.impact, trigger: social.pokesSent)
         .sensoryFeedback(.success, trigger: social.plansJoined)
         .sensoryFeedback(.success, trigger: session.statuses[session.you.id])
@@ -88,6 +96,15 @@ struct GroupsView: View {
         }
         if !session.friends.isEmpty && session.crews.isEmpty {
             StartCrewCard { startBuilding() }.groupsRow(top: 6, bottom: 6)
+        }
+        if let error = session.loadError {
+            InlineError(error: error, onRetry: { Task { await session.refresh(force: true) } })
+                .groupsRow()
+        } else if session.isLoadingRoster {
+            Capsule().fill(Color.skeleton).frame(height: 56)
+                .accessibilityElement(children: .ignore).accessibilityLabel("Loading your friends")
+                .accessibilityIdentifier("groups.loading")
+                .groupsRow()
         }
         ForEach(session.folders) { folder in
             FolderHeader(folder: folder, isExpanded: session.isExpanded(folder)) {
@@ -118,6 +135,13 @@ struct GroupsView: View {
                     .accessibilityAddTraits(.isHeader)
             }
             Spacer()
+            Button(action: onAddFriend) {
+                Image(systemName: "person.badge.plus").font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(DesignTokens.Colors.accentHover)
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel("Add a friend")
+            .accessibilityIdentifier("groups.addFriend")
             Button { studio = StudioRequest(kind: nil) } label: {
                 Text(session.myPresence.status == nil ? "Set status" : "Edit status")
                     .textStyle(.label).foregroundStyle(DesignTokens.Colors.onPrimary)
@@ -146,14 +170,23 @@ struct GroupsView: View {
         let presence = session.presence(of: buddy.id)
         let text = session.rowText(for: buddy)
         let poked = social.pokeCountdown(to: buddy.id)
+        let highlighted = session.highlighted.contains(buddy.id)
+        let removing = session.removing.contains(buddy.id)
         return Button { openCard = buddy } label: {
             GroupRow(buddy: buddy, presence: presence, text: text, poked: poked)
+                // A new connection reads as a two-second ring; under Reduce Motion it is a plain
+                // colour change with no animation.
+                .overlay(RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                    .stroke(DesignTokens.Colors.accent, lineWidth: 3).opacity(highlighted ? 1 : 0))
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: highlighted)
+                .opacity(removing ? 0.4 : 1)
         }
         .buttonStyle(PressableStyle())
+        .disabled(removing)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(poked.map { "\(text.spoken), poked, \($0)" } ?? text.spoken)
         .accessibilityHint("Opens their card")
-        .accessibilityIdentifier("groups.row")
+        .accessibilityIdentifier(highlighted ? "groups.row.highlighted" : "groups.row")
         .groupsRow()
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button { poke(buddy) } label: { Label("Poke", systemImage: "hand.point.up.left.fill") }
@@ -173,14 +206,21 @@ struct GroupsView: View {
         FriendCard(buddy: buddy, presence: session.presence(of: buddy.id), text: session.rowText(for: buddy),
                    ribbon: session.ribbon(for: buddy.id), nowFraction: DayRibbon.fraction(of: session.now, now: session.now, calendar: session.calendar),
                    showsActions: showsActions, pokeCountdown: social.pokeCountdown(to: buddy.id)) { action in
-            if action == .tagAlong { tagAlongAfterCard = buddy } else { poke(buddy) }
+            switch action {
+            case .tagAlong: tagAlongAfterCard = buddy
+            case .poke: poke(buddy)
+            case .remove: remove(buddy)
+            }
             openCard = nil
         }
     }
 
     @ViewBuilder
     private func seat(for folder: GroupsFolder) -> some View {
-        if folder.isAutomatic && folder.members.isEmpty {
+        if session.loadError != nil || session.isLoadingRoster {
+            // Never "no friends" while the first read is out or has failed.
+            EmptyView()
+        } else if folder.isAutomatic && folder.members.isEmpty {
             InviteSeatCard(title: "No friends here yet", subtitle: "Friends who join FriendCal land here. Invite one.") { onToast("Invites by link are coming soon") }
         } else {
             InviteSeatCard { onToast("Invites by link are coming soon") }
@@ -263,11 +303,22 @@ struct GroupsView: View {
         Task { await social.poke(buddy.id, name: buddy.name) }
     }
 
+    /// The card confirmed Remove: the row dims, then leaves with a toast or comes back with the sentence.
+    private func remove(_ buddy: Buddy) {
+        Task {
+            if let error = await session.remove(buddy) {
+                onToast(error.message)
+            } else {
+                onToast("Removed \(buddy.name)")
+            }
+        }
+    }
+
     private func perform(_ action: Moment.Action) {
         switch action {
         case .poke(let id, let name): Task { await social.poke(id, name: name) }
         case .setStatus: studio = StudioRequest(kind: nil)
-        case .invite: onToast("Invites by link are coming soon")
+        case .invite: onAddFriend()
         }
     }
 

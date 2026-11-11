@@ -130,16 +130,20 @@ final class GroupsUITests: XCTestCase {
         XCTAssertEqual(toast(app).label, "Maya & Leo is ready")
     }
 
-    /// protects=a person with no friends still has a useful screen: the invite nudge in Moments and a
-    /// dashed open seat, both honest stubs; fails_when=the screen goes blank or an invite claims to
-    /// send; no_claim=real invite links (they do not exist yet).
+    /// protects=a person with no friends still has a useful screen: the nudge in Moments, whose action
+    /// reads "Add a friend" and opens the sheet, and a dashed open seat that stays an honest stub;
+    /// fails_when=the screen goes blank or the Moments action does nothing; no_claim=the system share sheet.
     func testAloneStateInvitesTheFirstFriend() {
         let app = Self.launch("alone")
         XCTAssertEqual(any(app, "groups.moment").staticTexts.firstMatch.label, "Quiet in here. Invite your first friend.")
         XCTAssertFalse(any(app, "groups.startCrew").exists)
         attach(app, "groups-alone")
         app.buttons["groups.invite"].tap()
-        XCTAssertEqual(toast(app).label, "Invites by link are coming soon")
+        XCTAssertEqual(toast(app).label, "Invites by link are coming soon", "the seat card is not an entry point")
+        let action = app.buttons["groups.moment.action"]
+        XCTAssertEqual(action.label, "Add a friend")
+        action.tap()
+        XCTAssertTrue(any(app, "addFriend.link").waitForExistence(timeout: 8))
     }
 
     /// protects=every Groups control is at least 44pt tall: header pill, sticker chips, studio

@@ -19,6 +19,14 @@ public enum ShareText {
         "\(Proposal.displayTitle(title, isLocked: false)) Mark when you're free in FriendCal: \(url.absoluteString)"
     }
 
+    /// The friend-link message: "Sam wants to connect with you on FriendCal." and the link on the next line.
+    /// A blank name reads "A friend".
+    public static func friendLink(name: String, url: URL) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let who = trimmed.isEmpty || trimmed == Friend.placeholderName ? "A friend" : trimmed
+        return "\(who) wants to connect with you on FriendCal.\n\(url.absoluteString)"
+    }
+
     /// Home's Share once a plan is locked (design 2.2A): "Brunch is locked: Sat, Nov 14 · 10:00 AM-12:00 PM".
     /// With a winning place the message ends " at <name>" (design PL-7); without one it is unchanged.
     public static func locked(title: String, window: DateRange, calendar: Calendar, locale: Locale, place: String? = nil) -> String {

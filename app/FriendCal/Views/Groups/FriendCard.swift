@@ -7,7 +7,7 @@ import FriendCalCore
 /// same path as every other Poke in the app. While a poke to this friend is still out, the pill
 /// shows its time left instead of offering a second.
 struct FriendCard: View {
-    enum Action { case poke, tagAlong }
+    enum Action { case poke, tagAlong, remove }
 
     let buddy: Buddy
     let presence: Presence
@@ -18,6 +18,7 @@ struct FriendCard: View {
     /// "52 min left" while your poke to this friend is out.
     var pokeCountdown: String?
     var onAction: (Action) -> Void = { _ in }
+    @State private var confirmRemove = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
@@ -55,11 +56,24 @@ struct FriendCard: View {
                     actionPill("Tag along", icon: "person.2.fill", fill: DesignTokens.Colors.accentHover) { onAction(.tagAlong) }
                         .accessibilityIdentifier("friend.tagAlong")
                 }
+                // Apart from Poke and Tag along, in error-text: a quiet, deliberate control.
+                Button { confirmRemove = true } label: {
+                    Text("Remove friend").textStyle(.label).foregroundStyle(DesignTokens.Colors.errorText)
+                        .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                }
+                .padding(.top, DesignTokens.Spacing.sm)
+                .accessibilityIdentifier("friend.remove")
             }
         }
         .padding(DesignTokens.Spacing.md)
         .background(DesignTokens.Colors.surface)
         .accessibilityElement(children: showsActions ? .contain : .combine)
+        .confirmationDialog("Remove \(buddy.name)?", isPresented: $confirmRemove, titleVisibility: .visible) {
+            Button("Remove", role: .destructive) { onAction(.remove) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("\(buddy.name) won't be able to reconnect with your link. To reconnect later, open \(buddy.name)'s link.")
+        }
     }
 
     private func actionPill(_ title: String, icon: String, fill: Color, foreground: Color = DesignTokens.Colors.onPrimary,

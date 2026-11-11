@@ -6,7 +6,31 @@ import SwiftUI
 /// DESIGN.md: cream #FBF1E5 canvas, ivory card, coral primary, Cabinet Grotesk display.
 struct AuthGateView: View {
     @ObservedObject var auth: AuthGateModel
-    var pendingTitle: String?
+    /// The link waiting behind this screen, if any: a plan (with the title hint) or a friend (with the name hint).
+    var pending: Pending?
+
+    enum Pending: Equatable {
+        case plan(String)
+        case friend(String?)
+
+        /// The pill: "Sam wants to connect" from the hint, or "A friend wants to connect" without one.
+        var pillText: String {
+            switch self {
+            case .plan(let title): return "You were invited to \(title)"
+            case .friend(let name): return "\(name ?? "A friend") wants to connect"
+            }
+        }
+        var buttonTitle: String {
+            switch self {
+            case .plan: return "Continue to invite"
+            case .friend: return "Continue"
+            }
+        }
+    }
+
+    /// Plan-invite wording ("You're in. Just add your name.") stays for plan links only.
+    private var pendingTitle: String? { pending.map(\.pillText) }
+    private var isPlanPending: Bool { if case .plan = pending { return true }; return false }
     @State private var name: String = ""
     @FocusState private var isNameFocused: Bool
 
@@ -39,7 +63,13 @@ struct AuthGateView: View {
 
                     // Headline block — E's hero
                     VStack(spacing: 10) {
-                        if let pendingTitle {
+                        if pending != nil && !isPlanPending {
+                            Text("Connect with your friend.")
+                                .textStyle(.display)
+                                .foregroundStyle(DesignTokens.Colors.text)
+                                .multilineTextAlignment(.center)
+                                .accessibilityAddTraits(.isHeader)
+                        } else if let pendingTitle {
                             Text("You're in.")
                                 .textStyle(.display)
                                 .foregroundStyle(DesignTokens.Colors.text)
@@ -58,9 +88,9 @@ struct AuthGateView: View {
                                 .accessibilityAddTraits(.isHeader)
                         }
 
-                        Text(pendingTitle == nil
+                        Text(pending == nil
                              ? "The shared calendar for friend groups. No back-and-forth."
-                             : "Your friends are waiting to find a time.")
+                             : (isPlanPending ? "Your friends are waiting to find a time." : "Sign in to see each other's names and when you're busy."))
                             .textStyle(.body)
                             .foregroundStyle(DesignTokens.Colors.textMuted)
                             .multilineTextAlignment(.center)
@@ -100,7 +130,7 @@ struct AuthGateView: View {
                         }
 
                         Button(action: attemptContinue) {
-                            PrimaryPill(title: pendingTitle == nil ? "Continue" : "Continue to invite", isBusy: auth.state == .signingIn)
+                            PrimaryPill(title: pending?.buttonTitle ?? "Continue", isBusy: auth.state == .signingIn)
                         }
                         .buttonStyle(.plain)
                         .disabled(!canContinue)
@@ -166,7 +196,7 @@ struct AuthGateView: View {
     }
 
     private func invitedPill(title: String) -> some View {
-        Text("You were invited to \(title)")
+        Text(title)
             .textStyle(.caption)
             .foregroundStyle(DesignTokens.Colors.accentHover)
             .padding(.horizontal, 14)
@@ -325,9 +355,9 @@ final class AuthGateModel: ObservableObject {
 }
 
 #Preview("Cold") {
-    AuthGateView(auth: AuthGateModel(store: InMemoryProposalStore()), pendingTitle: nil)
+    AuthGateView(auth: AuthGateModel(store: InMemoryProposalStore()), pending: nil)
 }
 
 #Preview("Invited") {
-    AuthGateView(auth: AuthGateModel(store: InMemoryProposalStore()), pendingTitle: "Sunday Brunch")
+    AuthGateView(auth: AuthGateModel(store: InMemoryProposalStore()), pending: .plan("Sunday Brunch"))
 }

@@ -74,7 +74,7 @@ final class InMemorySocialStoreTests: XCTestCase {
         let hidden = await hint { _ = try await store.sendPoke(to: jalen.id, about: nil) }
         XCTAssertEqual(hidden, "FC_NOT_FRIEND")
         _ = try await store.sendPoke(to: sam.id, about: nil)
-        store.friendIDs = [jalen.id]
+        store.befriend([jalen.id], with: arlo.id)
         let seeded = try await store.sendPoke(to: jalen.id, about: nil)
         XCTAssertTrue(seeded.isNew)
     }

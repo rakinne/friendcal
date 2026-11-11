@@ -2,6 +2,15 @@
 
 All notable changes to FriendCal are listed here, newest first. The version lives in `VERSION`.
 
+## [0.5.0.0] - 2026-11-10
+
+### Added
+- Add a friend with a link. Send your friend link and the person who opens it sees who invited them and can accept in one tap. Links open the app directly when it's installed, and a web page with the same link opens for everyone else.
+- Entry points to Add a friend from Home and Groups, so you don't need the debug menu to find it.
+
+### Fixed
+- A failed first load on Groups is no longer hidden by the refresh that runs at launch.
+
 ## [0.4.1.0] - 2026-11-10
 
 ### Fixed

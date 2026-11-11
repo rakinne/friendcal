@@ -69,8 +69,7 @@ struct AccountDeletionView: View {
             }
             // the remembered city is per device: the next account must not inherit it
             LastUsedCity().clear()
-            // suppress pending deep link per 2B
-            UserDefaults.standard.set(true, forKey: "FriendCalSuppressPendingLink")
+            // The pending link is cleared by the root gate when the identity goes away.
             receipt = r
         } catch {
             self.error = UserFacingError.map(error, action: .deleteAccount)

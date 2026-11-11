@@ -13,6 +13,7 @@ public final class InMemoryProposalStore: ProposalStore {
         case proposals, load, create, update, join, tapFree, release, lock, myCommitments, signIn, deleteAccount
         case suggestPlace, votePlace, vetoPlace, removePlace
         case sendPoke, acknowledgePoke, tagAlong, inbox, registerDevice
+        case friendLink, resetFriendLink, previewFriendLink, acceptFriendLink, friends, removeFriend
     }
 
     public private(set) var users: [User]
@@ -28,9 +29,15 @@ public final class InMemoryProposalStore: ProposalStore {
     public private(set) var deviceTokens: [String: UUID] = [:]
     /// push_outbox: what the server would hand to APNs. Tests read it to assert who was told what.
     public private(set) var outbox: [QueuedPush] = []
-    /// Friends beyond the people the caller shares a plan with. The server has no friends table yet,
-    /// so there this set is empty; demo data fills it so Groups' roster can be poked before a plan exists.
-    public var friendIDs: Set<UUID> = []
+    /// friendships, link for link: one entry per pair, with when it began (supabase/friends.sql).
+    public private(set) var friendships: [FriendPair: Date] = [:]
+    /// friend_links: one per person.
+    public private(set) var friendLinks: [UUID: FriendLinkRecord] = [:]
+    /// friend_removals: written only when a friendship was actually removed.
+    public private(set) var friendRemovals: Set<FriendRemoval> = []
+    /// `-FriendCalFriendLink valid|dead|own|already`: what the store answers for ANY opened token, so
+    /// a UI test needs no real link. nil answers by the real rules.
+    public var friendLinkScenario: FriendLinkScenario?
     public private(set) var currentUserID: UUID?
     public private(set) var authState: AuthState = .signedOut
     public private(set) var identityGeneration: Int = 0
@@ -49,14 +56,45 @@ public final class InMemoryProposalStore: ProposalStore {
     /// and the screen can only learn the truth by reconciling after that error.
     public enum StaleChange: String { case vetoed, locked, removed }
 
+    /// Two people, smaller id first, like `friendships (user_a, user_b)`.
+    public struct FriendPair: Hashable, Sendable {
+        public let a: UUID
+        public let b: UUID
+        public init(_ x: UUID, _ y: UUID) {
+            if x.uuidString <= y.uuidString { a = x; b = y } else { a = y; b = x }
+        }
+        public func other(than me: UUID) -> UUID? { me == a ? b : (me == b ? a : nil) }
+    }
+
+    /// One friend_links row.
+    public struct FriendLinkRecord: Equatable, Sendable {
+        public var token: String
+        public var tokenAccepts = 0
+        public var acceptCount = 0
+        public var mintCount = 1
+    }
+
+    public struct FriendRemoval: Hashable, Sendable {
+        public var remover: UUID
+        public var removed: UUID
+    }
+
+    public enum FriendLinkScenario: String, Sendable { case valid, dead, own, already }
+
+    /// The 50th accept works and the 51st is dead (friends.sql).
+    public static let friendLinkCap = 50
+    /// The inviter `-FriendCalFriendLink valid|already` answers with.
+    public static let scenarioInviterID = UUID(uuidString: "00000000-0000-0000-0000-000000006001")!
+
     /// One push_outbox row.
     public struct QueuedPush: Equatable, Sendable {
-        public enum Kind: String, Sendable { case poke, tagAlong = "tag_along" }
+        public enum Kind: String, Sendable { case poke, tagAlong = "tag_along", friendJoined = "friend_joined" }
         public var recipientID: UUID
         public var kind: Kind
         public var title: String
         public var body: String
-        public var route: PushRoute
+        /// nil for `friend_joined`: the app does not route that kind yet (the push forwarder work).
+        public var route: PushRoute?
         public var expiresAt: Date?
     }
     public var staleBeforeNextVote: StaleChange?
@@ -97,6 +135,13 @@ public final class InMemoryProposalStore: ProposalStore {
         currentUserID = user.id
         setAuth(.signedIn(user.id), bumpGeneration: true)
         return user.id
+    }
+
+    /// Demo and UI tests (`-FriendCalSignedOut 1`): the fixture's data with nobody signed in, so the
+    /// sign-in gate shows and a pending link can be seen waiting behind it.
+    public func forgetIdentity() {
+        currentUserID = nil
+        authState = .signedOut
     }
 
     public func signOut() async {
@@ -143,6 +188,12 @@ public final class InMemoryProposalStore: ProposalStore {
         let collecting = Set(proposals.filter { $0.status == .requesting }.map(\.id))
         let votedOn = Set(votes.filter { $0.voterID == me && collecting.contains($0.proposalID) }.map(\.proposalID))
         votes.removeAll { $0.voterID == me && collecting.contains($0.proposalID) }
+
+        // Friendships, the link and removal records in both directions go with the account: a deleted
+        // person is nobody's friend, holds no link, and nobody keeps a record against them.
+        friendships = friendships.filter { $0.key.other(than: me) == nil }
+        friendLinks[me] = nil
+        friendRemovals = friendRemovals.filter { $0.remover != me && $0.removed != me }
 
         // The tombstone. The row stays; the identifying content goes.
         if let index = users.firstIndex(where: { $0.id == me }) {
@@ -423,8 +474,8 @@ public final class InMemoryProposalStore: ProposalStore {
             throw Self.refusal("42501", "this account has been deleted", "FC_ACCOUNT_DELETED")
         }
         guard userID != me else { throw Self.refusal("22023", "you cannot poke yourself", "FC_SELF_POKE") }
-        guard isActive(userID), friendIDs.contains(userID) || sharePlan(me, userID) else {
-            throw Self.refusal("P0002", "you can only poke friends you share a plan with", "FC_NOT_FRIEND")
+        guard isActive(userID), areFriends(me, userID) || sharePlan(me, userID) else {
+            throw Self.refusal("P0002", "you can only poke friends", "FC_NOT_FRIEND")
         }
         let at = now()
         if let live = pokes.last(where: { $0.fromID == me && $0.toID == userID && $0.isLive(at: at) }) {
@@ -525,6 +576,149 @@ public final class InMemoryProposalStore: ProposalStore {
     public func seed(pokes: [Poke], tagAlongs: [TagAlong] = []) {
         self.pokes = pokes
         self.tagAlongs = tagAlongs
+    }
+
+    // MARK: Add a friend (friends.sql's contract, check for check)
+
+    private func areFriends(_ a: UUID, _ b: UUID) -> Bool { friendships[FriendPair(a, b)] != nil }
+
+    /// Fixtures and tests: makes these people the caller's friends, as the demo roster is.
+    public func befriend(_ ids: some Sequence<UUID>, with me: UUID, at date: Date? = nil) {
+        for id in ids where id != me { friendships[FriendPair(me, id)] = friendships[FriendPair(me, id)] ?? (date ?? now()) }
+    }
+
+    /// Tests: sets a person's link record, to reach the cap without fifty accepts.
+    public func setFriendLinkRecord(_ record: FriendLinkRecord, for user: UUID) { friendLinks[user] = record }
+
+    /// Makes the current person's friends exactly `ids` (demo data aligned to a Groups scenario).
+    public func setFriends(_ ids: some Sequence<UUID>, of me: UUID) {
+        friendships = friendships.filter { $0.key.other(than: me) == nil }
+        befriend(ids, with: me)
+    }
+
+    private func requireActive(_ me: UUID) throws {
+        guard isActive(me) || !users.contains(where: { $0.id == me }) else {
+            throw Self.refusal("42501", "this account has been deleted", "FC_ACCOUNT_DELETED")
+        }
+    }
+
+    private static func newToken() -> String {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+        return String((0..<FriendToken.length).map { _ in alphabet.randomElement()! })
+    }
+
+    public func friendLink() async throws -> String {
+        let me = try await authorize(.friendLink)
+        try requireActive(me)
+        if let record = friendLinks[me] { return record.token }
+        ensureUser(me)
+        let record = FriendLinkRecord(token: Self.newToken())
+        friendLinks[me] = record
+        return record.token
+    }
+
+    public func resetFriendLink() async throws -> String {
+        let me = try await authorize(.resetFriendLink)
+        try requireActive(me)
+        ensureUser(me)
+        var record = friendLinks[me] ?? FriendLinkRecord(token: "", mintCount: 0)
+        record.token = Self.newToken()
+        record.tokenAccepts = 0
+        record.mintCount += 1
+        friendLinks[me] = record
+        return record.token
+    }
+
+    /// friendcal_friend_link_answer(): the order of the tests is the spec's.
+    private func linkAnswer(_ token: String, caller me: UUID) -> (FriendLinkAnswer.Status, UUID?) {
+        if let scenario = friendLinkScenario {
+            let inviter = Self.scenarioInviterID
+            if !users.contains(where: { $0.id == inviter }) { users.append(User(id: inviter, displayName: "Sam")) }
+            switch scenario {
+            case .dead: return (.dead, nil)
+            case .own: return (.own, me)
+            case .already: return (.already, inviter)
+            case .valid: return areFriends(me, inviter) ? (.already, inviter) : (.valid, inviter)
+            }
+        }
+        guard FriendToken.isValid(token), let (owner, record) = friendLinks.first(where: { $0.value.token == token }), isActive(owner) else {
+            return (.dead, nil)
+        }
+        if owner == me { return (.own, owner) }
+        if friendRemovals.contains(FriendRemoval(remover: owner, removed: me)) { return (.dead, nil) }
+        if areFriends(me, owner) { return (.already, owner) }
+        if record.tokenAccepts >= Self.friendLinkCap { return (.dead, nil) }
+        return (.valid, owner)
+    }
+
+    private func answer(_ status: FriendLinkAnswer.Status, _ person: UUID?) -> FriendLinkAnswer {
+        switch status {
+        case .valid, .already:
+            guard let person else { return .dead }
+            let user = users.first { $0.id == person }
+            return FriendLinkAnswer(status: status, person: Friend(id: person, name: user?.displayName ?? "", avatarURL: user?.avatarURL))
+        case .own: return .own
+        case .dead: return .dead
+        }
+    }
+
+    public func previewFriendLink(token: String) async throws -> FriendLinkAnswer {
+        let me = try await authorize(.previewFriendLink)
+        try requireActive(me)
+        let (status, person) = linkAnswer(token, caller: me)
+        return answer(status, person)
+    }
+
+    public func acceptFriendLink(token: String) async throws -> FriendLinkAnswer {
+        let me = try await authorize(.acceptFriendLink)
+        try requireActive(me)
+        let (status, person) = linkAnswer(token, caller: me)
+        guard status == .valid, let inviter = person else { return answer(status, person) }
+        ensureUser(me)
+        friendships[FriendPair(me, inviter)] = now()
+        if var record = friendLinks[inviter], friendLinkScenario == nil {
+            record.tokenAccepts += 1
+            record.acceptCount += 1
+            friendLinks[inviter] = record
+        }
+        friendRemovals.remove(FriendRemoval(remover: me, removed: inviter))
+        if isActive(inviter) {
+            outbox.append(QueuedPush(recipientID: inviter, kind: .friendJoined, title: "\(displayName(me)) connected with you",
+                                     body: "You two are connected.", route: nil, expiresAt: now().addingTimeInterval(24 * 3600)))
+        }
+        return answer(.valid, inviter)
+    }
+
+    public func friends() async throws -> [Friend] {
+        let me = try await authorize(.friends)
+        try requireActive(me)
+        return friendships.compactMap { pair, since -> Friend? in
+            guard let other = pair.other(than: me), isActive(other) else { return nil }
+            let user = users.first { $0.id == other }
+            return Friend(id: other, name: user?.displayName ?? "", avatarURL: user?.avatarURL, connectedAt: since)
+        }
+        .sorted { ($0.connectedAt ?? .distantPast, $1.id.uuidString) > ($1.connectedAt ?? .distantPast, $0.id.uuidString) }
+    }
+
+    public func removeFriend(_ userID: UUID) async throws {
+        let me = try await authorize(.removeFriend)
+        try requireActive(me)
+        guard userID != me, friendships.removeValue(forKey: FriendPair(me, userID)) != nil else { return }
+        friendRemovals.insert(FriendRemoval(remover: me, removed: userID))
+    }
+
+    /// Demo and UI tests: `name` opens the current person's link and connects, as if on another phone.
+    /// Returns the new friend's id.
+    @discardableResult
+    public func simulateFriendAccepting(named name: String) -> UUID? {
+        guard let me = currentUserID else { return nil }
+        let guest = User(id: UUID(), displayName: name)
+        users.append(guest)
+        friendships[FriendPair(me, guest.id)] = now()
+        if var record = friendLinks[me] { record.tokenAccepts += 1; record.acceptCount += 1; friendLinks[me] = record }
+        outbox.append(QueuedPush(recipientID: me, kind: .friendJoined, title: "\(name) connected with you",
+                                 body: "You two are connected.", route: nil, expiresAt: now().addingTimeInterval(24 * 3600)))
+        return guest.id
     }
 
     public func tapFree(proposalID: UUID, range: DateRange, expiresAt: Date?) async throws -> AvailabilitySlot {

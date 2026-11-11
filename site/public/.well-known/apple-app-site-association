@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["6589A6M74D.com.friendcal.app"],
+        "components": [
+          { "/": "/f/*", "comment": "Friend links" },
+          { "/": "/p/*", "comment": "Plan links" }
+        ]
+      }
+    ]
+  }
+}
