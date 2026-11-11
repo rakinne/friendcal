@@ -196,6 +196,45 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 3c. App/server contract: every RPC the app calls must exist in the schema this wave builds, be
+#     executable by `authenticated`, and not by `anon`. The names are read from the Swift source, so
+#     there is no list to keep in sync. This is the check that was missing when the app shipped
+#     calling friend_link()/my_friends() while friends.sql had not reached main: the in-memory store
+#     answers every Swift test, so only the server schema can say a function is absent.
+#     WAVE_SQL skips a file that is not on disk, so a missing SQL file shows up HERE, by name.
+#     Scope is app/FriendCal only: app/.build holds vendored packages with their own .rpc( samples.
+# ---------------------------------------------------------------------------
+echo "# app/server contract: every RPC the app calls exists and is granted"
+APP_RPCS="$(grep -rhoE '\.rpc\("[A-Za-z0-9_]+"' "$ROOT/app/FriendCal" --include='*.swift' | sed -E 's/.*\("//; s/"$//' | sort -u)"
+if [[ -z "$APP_RPCS" ]]; then
+  fail "contract: found no .rpc(\"...\") calls under app/FriendCal; the extraction pattern or path has rotted"
+else
+  check_app_rpcs() {
+    local db="$1" label="$2" fn missing=0
+    for fn in $APP_RPCS; do
+      # A name can be overloaded; require at least one definition the caller can execute.
+      row="$(psql_db "$db" -tAc "select coalesce(bool_or(has_function_privilege('authenticated', p.oid, 'EXECUTE')), false)::text
+                                       || ',' || coalesce(bool_or(has_function_privilege('anon', p.oid, 'EXECUTE')), false)::text
+                                   from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = '$fn'
+                                  having count(*) > 0" | tr -d ' ')"
+      if [[ -z "$row" ]]; then
+        fail "contract ($label): the app calls $fn() but no supabase/*.sql file in the wave defines it"; missing=1
+      elif [[ "$row" != "true,false" ]]; then
+        fail "contract ($label): $fn() grants authenticated/anon execute as '$row' (want true,false)"; missing=1
+      fi
+    done
+    [[ "$missing" == 0 ]] && echo "  ok - $label: all $(wc -w <<<"$APP_RPCS" | tr -d ' ') RPCs the app calls are defined and granted to authenticated only"
+    return 0
+  }
+  newdb contract_fresh
+  psql_db contract_fresh -f "$ROOT/supabase/tests/supabase-stubs.sql" >/dev/null
+  psql_db contract_fresh -f "$ROOT/supabase/schema.sql" 2>&1 | quiet
+  load_wave contract_fresh loose
+  check_app_rpcs contract_fresh "fresh schema"
+  [[ -n "$UPGRADED" ]] && check_app_rpcs "$UPGRADED" "upgraded schema"
+fi
+
+# ---------------------------------------------------------------------------
 # 3b. The social schema from origin/main, WITH a queued push, takes this wave. push_outbox_kind is
 #     replaced in place (friends.sql adds friend_joined); the queued row must survive that, a
 #     friend_joined row must then be accepted, and the wave must be safe to apply a second time.
