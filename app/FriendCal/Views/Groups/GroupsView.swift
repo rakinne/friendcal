@@ -54,6 +54,9 @@ struct GroupsView: View {
             .accessibilityIdentifier("groups")
             .safeAreaInset(edge: .bottom, spacing: 0) { if draft != nil { builderBar } }
         }
+        .onChange(of: session.statusFailures) {
+            if let error = session.statusError { onToast(error.message) }
+        }
         .sheet(item: $studio) { request in
             StatusStudioSheet(session: session, initialKind: request.kind,
                               onShared: { _ in onToast("Status shared") }, onCleared: { onToast("Status cleared") })

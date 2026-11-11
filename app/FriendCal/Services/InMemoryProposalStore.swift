@@ -14,6 +14,7 @@ public final class InMemoryProposalStore: ProposalStore {
         case suggestPlace, votePlace, vetoPlace, removePlace
         case sendPoke, acknowledgePoke, tagAlong, inbox, registerDevice
         case friendLink, resetFriendLink, previewFriendLink, acceptFriendLink, friends, removeFriend
+        case setStatus, clearStatus, friendStatuses
     }
 
     public private(set) var users: [User]
@@ -31,6 +32,8 @@ public final class InMemoryProposalStore: ProposalStore {
     public private(set) var outbox: [QueuedPush] = []
     /// friendships, link for link: one entry per pair, with when it began (supabase/friends.sql).
     public private(set) var friendships: [FriendPair: Date] = [:]
+    /// One status per person (statuses.sql). Expired ones stay until replaced; reads filter them.
+    public private(set) var statuses: [UUID: FriendStatus] = [:]
     /// friend_links: one per person.
     public private(set) var friendLinks: [UUID: FriendLinkRecord] = [:]
     /// friend_removals: written only when a friendship was actually removed.
@@ -716,6 +719,28 @@ public final class InMemoryProposalStore: ProposalStore {
         try requireActive(me)
         guard userID != me, friendships.removeValue(forKey: FriendPair(me, userID)) != nil else { return }
         friendRemovals.insert(FriendRemoval(remover: me, removed: userID))
+    }
+
+    public func setMyStatus(_ status: FriendStatus) async throws {
+        let me = try await authorize(.setStatus)
+        try requireActive(me)
+        if let until = status.until, until <= now() {
+            throw Self.refusal("22023", "a status must end in the future", "FC_BAD_STATUS")
+        }
+        statuses[me] = FriendStatus(kind: status.kind, message: status.message, since: now(), until: status.until)
+    }
+
+    public func clearMyStatus() async throws {
+        let me = try await authorize(.clearStatus)
+        statuses[me] = nil
+    }
+
+    public func friendStatuses() async throws -> [UUID: FriendStatus] {
+        let me = try await authorize(.friendStatuses)
+        try requireActive(me)
+        return statuses.filter { id, status in
+            status.isActive(at: now()) && isActive(id) && (id == me || areFriends(me, id))
+        }
     }
 
     /// Demo and UI tests: `name` opens the current person's link and connects, as if on another phone.

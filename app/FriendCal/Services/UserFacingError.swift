@@ -12,12 +12,14 @@ public struct UserFacingError: Error, Equatable {
         case poke, ackPoke, tagAlong, notifications
         /// Add a friend (supabase/friends.sql): your link, opening one, connecting, the roster, removing.
         case friendLink, resetFriendLink, previewFriend, acceptFriend, loadFriends, removeFriend
+        /// Your status (supabase/statuses.sql): sharing it or clearing it.
+        case setStatus
 
         /// Like the place actions: the SQLSTATE-level fallbacks below speak about locking, and none
         /// of these ever mean that.
         var isSocialAction: Bool {
             switch self {
-            case .poke, .ackPoke, .tagAlong, .notifications, .friendLink, .resetFriendLink, .previewFriend, .acceptFriend, .loadFriends, .removeFriend: return true
+            case .poke, .ackPoke, .tagAlong, .notifications, .friendLink, .resetFriendLink, .previewFriend, .acceptFriend, .loadFriends, .removeFriend, .setStatus: return true
             default: return false
             }
         }
@@ -66,6 +68,7 @@ public struct UserFacingError: Error, Equatable {
             // below, and `testEveryServerHintIsMapped` pins the set.
             case "FC_NOT_SIGNED_IN": return UserFacingError(message: "Sign in to continue.", details: details)
             case "FC_ACCOUNT_DELETED": return UserFacingError(message: "This account has been deleted.", details: details)
+            case "FC_BAD_STATUS": return UserFacingError(message: "That status has already ended. Pick a later time.", details: details)
             case "FC_NOT_FOUND": return UserFacingError(message: "This plan is gone.", details: details)
             // Poke and Tag along (social.sql).
             case "FC_SELF_POKE": return UserFacingError(message: "You can't poke yourself.", details: details)
@@ -150,7 +153,7 @@ public struct UserFacingError: Error, Equatable {
         case .vetoPlace, .bringBack: return "Only \(host) can pass on a place."
         case .removePlace: return "Only the person who suggested a place can withdraw it."
         case .suggestPlace, .votePlace: return "Join this plan to suggest or vote."
-        case .poke, .ackPoke, .tagAlong, .notifications, .friendLink, .resetFriendLink, .previewFriend, .acceptFriend, .loadFriends, .removeFriend: return generic(action)
+        case .poke, .ackPoke, .tagAlong, .notifications, .friendLink, .resetFriendLink, .previewFriend, .acceptFriend, .loadFriends, .removeFriend, .setStatus: return generic(action)
         case .lock, .mark, .join, .create, .load: return "Only \(host) can lock this plan."
         }
     }
@@ -183,6 +186,7 @@ public struct UserFacingError: Error, Equatable {
         case .acceptFriend: return "Couldn't connect. Try again."
         case .loadFriends: return "Couldn't load your friends. Try again."
         case .removeFriend: return "Couldn't remove that friend. Try again."
+        case .setStatus: return "Couldn't share your status. Try again."
         }
     }
 }
