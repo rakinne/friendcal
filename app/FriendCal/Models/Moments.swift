@@ -21,6 +21,12 @@ public struct Moment: Equatable, Sendable {
     /// A friend's own words, shown italic under the line ("down for tacos, anyone").
     public var detail: String?
     public var action: Action?
+
+    public init(text: String, detail: String? = nil, action: Action? = nil) {
+        self.text = text
+        self.detail = detail
+        self.action = action
+    }
 }
 
 public enum MomentsEngine {

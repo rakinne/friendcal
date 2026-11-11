@@ -208,6 +208,22 @@ public protocol ProposalStore: AnyObject {
     /// Stores this device's APNs token for the caller, so pokes and tag alongs reach it.
     func registerDevice(token: String, sandbox: Bool) async throws
 
+    // MARK: Add a friend (supabase/friends.sql). Server-first like the rest. A friendship grants a name
+    // and a poke and nothing else; every refusal carries the SQLSTATE and FC_* hint the file names.
+
+    /// The caller's personal link token, minted on first use. Only ever returned to its owner.
+    func friendLink() async throws -> String
+    /// Replaces the token: the old link is dead from then on. Friends already connected stay connected.
+    func resetFriendLink() async throws -> String
+    /// What opening this link would do for the caller. Changes nothing.
+    func previewFriendLink(token: String) async throws -> FriendLinkAnswer
+    /// Connects the caller with the link's owner. Idempotent: a repeat answers `already`.
+    func acceptFriendLink(token: String) async throws -> FriendLinkAnswer
+    /// The caller's friends, newest first. Never a deleted account.
+    func friends() async throws -> [Friend]
+    /// Ends a friendship. Idempotent; the other person is told nothing.
+    func removeFriend(_ userID: UUID) async throws
+
     func tapFree(proposalID: UUID, range: DateRange, expiresAt: Date?) async throws -> AvailabilitySlot
     /// Removes one of the current user's own holds (C3).
     func release(slotID: UUID) async throws

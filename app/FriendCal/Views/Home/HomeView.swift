@@ -14,6 +14,8 @@ struct HomeView: View {
     var onOpenInvite: (UUID) -> Void = { _ in }
     /// A plan was created from Request times: the shell shows it on the Invites tab (design 3.2A).
     var onCreated: (Proposal) -> Void = { _ in }
+    /// Opens Add a friend (the shell owns the sheet). Reachable from the debug sheet only until PR 3.
+    var onAddFriend: () -> Void = {}
     @Environment(\.scenePhase) private var scenePhase
     @State private var toast = ToastCenter()
     @State private var showDrawer = false
@@ -69,7 +71,7 @@ struct HomeView: View {
                 .presentationDetents([.large])
         }
         #if DEBUG
-        .sheet(isPresented: $showDebug) { DebugSheet(session: session) }
+        .sheet(isPresented: $showDebug) { DebugSheet(session: session, onAddFriend: onAddFriend) }
         #endif
     }
 

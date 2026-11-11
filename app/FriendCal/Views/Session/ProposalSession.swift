@@ -252,7 +252,14 @@ final class ProposalSession {
     var markFocusCell: HeatmapCell? { visibleWeek?.cells.first { $0.id == markFocusCellID } }
     /// The quorum base, matching HeatmapBuilder's cell totals (D5, D13).
     var total: Int { proposal?.headcount ?? 0 }
-    var onlineCount: Int { members.filter(\.isOnline).count }
+    /// People drawn on the wheel: the plan's members, or -- with no plan members -- your friends
+    /// (`FriendRoster.wheelSource`), so the empty state goes away after the first friend.
+    private var wheelPeople: [HomeMember] {
+        FriendRoster.wheelSource(planMemberCount: members.count) == .planMembers ? members : friendFaces
+    }
+    /// Your friends as faces, set by the shell from the roster.
+    var friendFaces: [HomeMember] = []
+    var onlineCount: Int { wheelPeople.filter(\.isOnline).count }
 
     /// Home's Share: the selected slot while requesting (X9); the locked plan once locked (design 2.2A).
     var shareText: String? {
@@ -278,10 +285,8 @@ final class ProposalSession {
     /// Wheel faces (D36): up to 10 members; past 10, 9 faces (the active friend always among them)
     /// and a "+N" face for the rest.
     var wheel: (faces: [HomeMember], overflow: Int) {
-        guard members.count > 10 else { return (members, 0) }
-        var faces = Array(members.prefix(9))
-        if let active = members.first(where: \.isActive), !faces.contains(active) { faces[8] = active }
-        return (faces, members.count - 9)
+        let people = wheelPeople
+        return FriendRoster.wheelFaces(people, pinned: people.first(where: \.isActive)?.id)
     }
 
     /// The selected cell's statuses, in member order; nil hides the chips (D19) and strips status

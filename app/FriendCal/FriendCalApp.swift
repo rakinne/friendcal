@@ -41,6 +41,20 @@ struct FriendCalApp: App {
             FixtureData.seedPokes(into: store, fixture: fixture, now: FixtureClock.now())
         }
         #endif
+        // The demo roster IS the demo friend graph, aligned to the Groups scenario that is on screen:
+        // Groups reads friends from the store now, so the store and the screen must agree.
+        if let me = store.currentUserID {
+            let seed = GroupsSession.Seed.make(fixture: fixture, youID: me, scenario: .fromLaunchArguments, now: FixtureClock.now())
+            store.setFriends(seed.friends.map(\.id), of: me)
+        }
+        // `-FriendCalSignedOut 1`: the fixture's data, nobody signed in (the gate shows).
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "FriendCalSignedOut") { store.forgetIdentity() }
+        #endif
+        // `-FriendCalFriendLink valid|dead|own|already`: what the store answers for the opened token.
+        #if DEBUG
+        store.friendLinkScenario = UserDefaults.standard.string(forKey: "FriendCalFriendLink").flatMap(InMemoryProposalStore.FriendLinkScenario.init(rawValue:))
+        #endif
         let latency = UserDefaults.standard.double(forKey: "FriendCalStoreLatency")
         if latency > 0 { store.latency = .seconds(latency) }
         // `-FriendCalFailNext create|tapFree|lock|...`: that operation fails once with a network error.
@@ -72,57 +86,64 @@ struct FriendCalApp: App {
     private static let placeSearch = PlaceSearchProvider.fromLaunchArguments()
 
     @StateObject private var authGate = AuthGateModel(store: Self.store)
+    /// The one owner of every opened link, above sign-in (spec 5).
+    @State private var router = LinkRouter()
 
     var body: some Scene {
         WindowGroup {
-            RootGateView(store: Self.store, fixture: Self.fixture, pendingTitle: pendingTitle)
+            RootGateView(store: Self.store, fixture: Self.fixture, router: router)
                 .environment(\.placeSearch, Self.placeSearch)
+                .environment(router)
         }
-    }
-
-    private var pendingTitle: String? {
-        // pending deep link title hint for 1E
-        if let url = UserDefaults.standard.string(forKey: "FriendCalPendingLink").flatMap(URL.init(string:)), let link = DeepLink.parse(url) {
-            if case .proposal(_, let t) = link { return t }
-        }
-        return nil
     }
 }
 
-/// Identity-keyed root gate (G7): signedOut shows AuthGate, signedIn shows AppTabView keyed by userID
+/// Identity-keyed root gate (G7): signedOut shows AuthGate, signedIn shows AppTabView keyed by userID.
+/// It also owns the link router's lifetime: every opened URL goes to the router HERE, signed in or
+/// not, and the pending link is cleared when the identity goes away (sign-out, account deletion).
 struct RootGateView: View {
     let store: ProposalStore
     let fixture: HomeFixture
-    let pendingTitle: String?
+    let router: LinkRouter
     @StateObject private var model: AuthGateModel
+    /// The account that was signed in, so its cached friend link can be cleared on the way out.
+    @State private var lastAccount: UUID?
 
-    init(store: ProposalStore, fixture: HomeFixture, pendingTitle: String?) {
+    init(store: ProposalStore, fixture: HomeFixture, router: LinkRouter) {
         self.store = store
         self.fixture = fixture
-        self.pendingTitle = pendingTitle
+        self.router = router
         _model = StateObject(wrappedValue: AuthGateModel(store: store))
     }
 
     var body: some View {
         Group {
             switch model.state {
-            case .signedOut, .failed:
-                AuthGateView(auth: model, pendingTitle: pendingTitle)
-            case .signingIn:
-                AuthGateView(auth: model, pendingTitle: pendingTitle)
+            case .signedOut, .failed, .signingIn:
+                AuthGateView(auth: model, pending: pendingPill)
             case .signedIn(let id):
                 AppTabView(fixture: fixture, store: store)
                     .id(id)
-                    .task {
-                        // replay pending link once on transition to authenticated-with-usable-name
-                        if let urlStr = UserDefaults.standard.string(forKey: "FriendCalPendingLink"), !UserDefaults.standard.bool(forKey: "FriendCalSuppressPendingLink") {
-                            if let url = URL(string: urlStr), let link = DeepLink.parse(url) {
-                                try? await store.join(link.proposalID)
-                                UserDefaults.standard.removeObject(forKey: "FriendCalPendingLink")
-                            }
-                        }
-                    }
             }
+        }
+        .onOpenURL { router.open($0) }
+        .onChange(of: model.state) { old, new in
+            if case .signedIn(let id) = new { lastAccount = id }
+            if case .signedIn = old, !new.isSignedIn {
+                // Signed out or deleted: nothing pending, and the account's cached link goes too.
+                router.clear()
+                if let lastAccount { FriendLinkCache(persistent: true).clear(account: lastAccount) }
+            }
+        }
+        .onAppear { if case .signedIn(let id) = model.state { lastAccount = id } }
+    }
+
+    /// What the sign-in gate says about the link waiting behind it.
+    private var pendingPill: AuthGateView.Pending? {
+        switch router.pending {
+        case .proposal(_, let title): return title.map(AuthGateView.Pending.plan)
+        case .friend(_, let name): return .friend(name)
+        case nil: return nil
         }
     }
 }

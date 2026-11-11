@@ -200,7 +200,7 @@ enum FixtureData {
                                           places: fixture.places, votes: fixture.votes, currentUserID: current, now: clock)
         // The demo roster is the demo friend graph: Groups lists these people whether or not a plan
         // exists yet, so they must be pokeable either way. The server has no such set (social.sql).
-        store.friendIDs = Set(fixture.members.map(\.id))
+        if let current { store.befriend(fixture.members.map(\.id), with: current) }
         return store
     }
 

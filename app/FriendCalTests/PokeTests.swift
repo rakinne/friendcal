@@ -239,7 +239,7 @@ final class PokeTests: XCTestCase {
             UserFacingError.map(ProposalStoreError.server(code: code, message: "raw", hint: hint), action: action).message
         }
         XCTAssertEqual(say("22023", "FC_SELF_POKE", .poke), "You can't poke yourself.")
-        XCTAssertEqual(say("P0002", "FC_NOT_FRIEND", .poke), "You can only poke friends you share a plan with.")
+        XCTAssertEqual(say("P0002", "FC_NOT_FRIEND", .poke), "You can only poke friends.")
         XCTAssertEqual(say("P0002", "FC_POKE_NOT_FOUND", .ackPoke), "That poke is gone.")
         XCTAssertEqual(say("55000", "FC_NOT_LOCKED", .tagAlong), "This plan isn't locked yet. Mark your times instead.")
         XCTAssertEqual(say("55000", "FC_PLAN_OVER", .tagAlong), "This plan already happened.")

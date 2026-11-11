@@ -383,6 +383,49 @@ public final class SupabaseProposalStore: ProposalStore, AppleSignInCapable {
         }
     }
 
+    // MARK: Add a friend (supabase/friends.sql)
+
+    public func friendLink() async throws -> String {
+        try await perform { _ in
+            let row: TokenRow = try await self.client.rpc("friend_link").execute().value
+            return row.token
+        }
+    }
+
+    public func resetFriendLink() async throws -> String {
+        try await perform { _ in
+            let row: TokenRow = try await self.client.rpc("reset_friend_link").execute().value
+            return row.token
+        }
+    }
+
+    public func previewFriendLink(token: String) async throws -> FriendLinkAnswer {
+        try await perform { _ in
+            let row: LinkAnswerRow = try await self.client.rpc("preview_friend_link", params: ["p_token": token]).execute().value
+            return row.model
+        }
+    }
+
+    public func acceptFriendLink(token: String) async throws -> FriendLinkAnswer {
+        try await perform { _ in
+            let row: LinkAnswerRow = try await self.client.rpc("accept_friend_link", params: ["p_token": token]).execute().value
+            return row.model
+        }
+    }
+
+    public func friends() async throws -> [Friend] {
+        try await perform { _ in
+            let rows: [FriendRow] = try await self.client.rpc("my_friends").execute().value
+            return rows.map(\.model)
+        }
+    }
+
+    public func removeFriend(_ userID: UUID) async throws {
+        try await perform { _ in
+            try await self.client.rpc("remove_friend", params: ["p_user": userID]).execute()
+        }
+    }
+
     /// Four small reads under RLS rather than one definer RPC: every name and title here is one the
     /// caller could already read, so there is no new server surface to get wrong.
     public func inbox() async throws -> SocialInbox {
@@ -765,6 +808,37 @@ private struct PokeRow: Decodable {
         Poke(id: id, fromID: fromID, toID: toID, proposalID: proposalID, createdAt: createdAt, expiresAt: expiresAt,
              acknowledgedAt: acknowledgedAt, ackVia: acknowledgedAt == nil ? nil : (ackVia.flatMap(Poke.AckVia.init(rawValue:)) ?? .app))
     }
+}
+
+private struct TokenRow: Decodable { var token: String }
+
+/// friends.sql's answer: `{status}` for own and dead, plus who the inviter is for valid and already.
+private struct LinkAnswerRow: Decodable {
+    var status: String
+    var userID: UUID?
+    var displayName: String?
+    var avatarURL: String?
+    enum CodingKeys: String, CodingKey { case status, userID = "user_id", displayName = "display_name", avatarURL = "avatar_url" }
+    /// An unknown status is read as dead: the safest answer to something this build does not understand.
+    var model: FriendLinkAnswer {
+        guard let state = FriendLinkAnswer.Status(rawValue: status) else { return .dead }
+        switch state {
+        case .valid, .already:
+            guard let userID else { return .dead }
+            return FriendLinkAnswer(status: state, person: Friend(id: userID, name: displayName ?? "", avatarURL: avatarURL.flatMap(URL.init(string:))))
+        case .own: return .own
+        case .dead: return .dead
+        }
+    }
+}
+
+private struct FriendRow: Decodable {
+    var id: UUID
+    var displayName: String?
+    var avatarURL: String?
+    var connectedAt: Date?
+    enum CodingKeys: String, CodingKey { case id, displayName = "display_name", avatarURL = "avatar_url", connectedAt = "connected_at" }
+    var model: Friend { Friend(id: id, name: displayName ?? "", avatarURL: avatarURL.flatMap(URL.init(string:)), connectedAt: connectedAt) }
 }
 
 private struct TagAlongRow: Decodable {

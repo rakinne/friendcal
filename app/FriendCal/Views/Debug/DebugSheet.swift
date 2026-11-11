@@ -8,6 +8,9 @@ import FriendCalCore
 /// Compiled out of Release.
 struct DebugSheet: View {
     var session: ProposalSession
+    /// Opens the Add a friend sheet. Until the entry points ship (PR 3) this is the only way in.
+    var onAddFriend: () -> Void = {}
+    @Environment(\.dismiss) private var dismiss
     @State private var lastError: String?
 
     var body: some View {
@@ -41,6 +44,17 @@ struct DebugSheet: View {
                         Text("No proposal. Use Request times on Home.").textStyle(.body)
                     }
                     Divider()
+                    Text("Add a friend").textStyle(.label)
+                    Button("Add a friend") { dismiss(); onAddFriend() }
+                        .buttonStyle(.bordered).tint(DesignTokens.Colors.accent)
+                        .accessibilityIdentifier("debug.addFriend")
+                    // Demo store only: someone opens your link on another phone and connects.
+                    if let memory = session.store as? InMemoryProposalStore {
+                        Button("A friend joins through my link") { memory.simulateFriendAccepting(named: "Jess") }
+                            .buttonStyle(.bordered).tint(DesignTokens.Colors.accent)
+                            .accessibilityIdentifier("debug.friendJoins")
+                    }
+                    Divider()
                     Text("BusyBlockView sample").textStyle(.label)
                     BusyBlockView(sanitized: StealthService.SanitizedBusy(id: UUID(), userID: UUID(), range: DateRange(lower: Date.now, upper: Date.now.addingTimeInterval(3600))))
                 }
@@ -48,6 +62,7 @@ struct DebugSheet: View {
             }
             .background(DesignTokens.Colors.background.ignoresSafeArea())
             .navigationTitle("Debug").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.accessibilityIdentifier("debug.done") } }
         }
     }
 }
