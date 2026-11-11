@@ -228,6 +228,15 @@ public protocol ProposalStore: AnyObject {
     /// Ends a friendship. Idempotent; the other person is told nothing.
     func removeFriend(_ userID: UUID) async throws
 
+    // MARK: Statuses (supabase/statuses.sql). What a person says they are doing; friends see it.
+
+    /// Replaces the caller's status. The server stamps `since`; an `until` in the past is refused.
+    func setMyStatus(_ status: FriendStatus) async throws
+    /// Removes the caller's status. Idempotent.
+    func clearMyStatus() async throws
+    /// The ACTIVE statuses of the caller and the caller's friends, by person. Expired ones are absent.
+    func friendStatuses() async throws -> [UUID: FriendStatus]
+
     func tapFree(proposalID: UUID, range: DateRange, expiresAt: Date?) async throws -> AvailabilitySlot
     /// Removes one of the current user's own holds (C3).
     func release(slotID: UUID) async throws

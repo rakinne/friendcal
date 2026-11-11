@@ -74,6 +74,23 @@ final class GroupsUITests: XCTestCase {
         XCTAssertTrue(row(app, "You, no status yet. Double tap to set one").waitForExistence(timeout: 5))
     }
 
+    /// protects=a status the server refuses does not stay on screen as if friends could see it: the row
+    /// goes back to "no status" and the failure is said in a toast; fails_when=the rollback or the toast
+    /// is dropped, so you believe you shared a status that never left the phone;
+    /// no_claim=the wording of each network error (UserFacingErrorTests).
+    func testRefusedStatusRollsBack() {
+        let app = Self.launch(extra: ["-FriendCalFailNext", "setStatus"])
+        app.buttons["groups.setStatus"].tap()
+        XCTAssertTrue(any(app, "studio").waitForExistence(timeout: 5))
+        app.buttons["studio.kind.movies"].tap()
+        app.buttons["studio.share"].tap()
+        XCTAssertTrue(row(app, "You, no status yet. Double tap to set one").waitForExistence(timeout: 8), "the refused status was not rolled back")
+        XCTAssertFalse(row(app, "You, movies, till 10:10 PM").exists)
+        let failure = NSPredicate(format: "label != %@ AND label != ''", "Status shared")
+        expectation(for: failure, evaluatedWith: toast(app))
+        waitForExpectations(timeout: 8)
+    }
+
     /// protects=a sticker in the tray opens the studio already on that scene; fails_when=the chip
     /// opens a blank studio or the wrong scene; no_claim=the gallery's scroll.
     func testTrayChipOpensStudioOnThatScene() {

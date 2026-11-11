@@ -28,10 +28,10 @@ final class KnownFriendsStore {
     }
 }
 
-/// Everything Groups shows, as one observable value (variant D). Statuses, crews and busy time live
-/// here in memory: nothing on this screen reaches the network store yet, so a status you set stays on
-/// this device until the backend (a statuses table with its own RLS) lands. The ROSTER is different:
-/// who your friends are comes from the store (`friends()`), through `FriendRoster`, which owns the rules
+/// Everything Groups shows, as one observable value (variant D). Crews and busy time live here in
+/// memory. STATUSES go to the store (supabase/statuses.sql): your own is applied at once and written in
+/// the background, rolled back with a toast if the server refuses, and your friends' are read with the
+/// roster. The ROSTER: who your friends are comes from the store (`friends()`), through `FriendRoster`, which owns the rules
 /// (stale reads, what counts as new); this class holds the state and animates around it. All copy and rules come
 /// from FriendCalCore (`Presence`, `MomentsEngine`, `GroupsLayout`, `CrewDraft`), which is what the
 /// unit tests cover; this class only holds state and hands the views what they need.
@@ -69,6 +69,15 @@ final class GroupsSession {
     private var highlightTask: Task<Void, Never>?
     private(set) var crews: [Crew]
     private(set) var statuses: [UUID: FriendStatus]
+    /// People whose status came from the store, so one the server no longer returns (expired, cleared,
+    /// unfriended) is dropped, while a seeded demo status is left alone.
+    private var fetchedStatusIDs: Set<UUID> = []
+    /// Your own writes run one after another, so a quick set-then-clear lands in that order.
+    private var statusWrites: Task<Void, Never>?
+    private var statusWritesInFlight = 0
+    /// Bumps when a write was refused; the screen toasts `statusError` and your status is already back.
+    private(set) var statusFailures = 0
+    private(set) var statusError: UserFacingError?
     private let busyNow: Set<UUID>
     private let busyBlocks: [UUID: [DateInterval]]
     /// Folder ids the user collapsed.
@@ -133,6 +142,7 @@ final class GroupsSession {
         let generation = roster.beginRefresh()
         do {
             let loaded = try await store.friends()
+            await readStatuses(store)
             guard roster.apply(loaded, startedAt: generation) else { return true }
             loadError = nil
             syncFriends()
@@ -145,6 +155,16 @@ final class GroupsSession {
             if !roster.hasLoaded { loadError = UserFacingError.map(error, action: .loadFriends) }
             return false
         }
+    }
+
+    /// Friends' statuses (and your own, after a relaunch). A failure keeps what is on screen: statuses
+    /// are never worth an error banner. While one of your own writes is out, your own entry is left alone.
+    private func readStatuses(_ store: ProposalStore) async {
+        guard let fetched = try? await store.friendStatuses() else { return }
+        let writing = statusWritesInFlight > 0
+        for id in fetchedStatusIDs where fetched[id] == nil && !(writing && id == you.id) { statuses[id] = nil }
+        for (id, status) in fetched where !(writing && id == you.id) { statuses[id] = status }
+        fetchedStatusIDs = Set(fetched.keys)
     }
 
     /// Groups is on screen (or not). Arrivals are announced only while it is.
@@ -255,17 +275,50 @@ final class GroupsSession {
         if collapsed.contains(folder.id) { collapsed.remove(folder.id) } else { collapsed.insert(folder.id) }
     }
 
-    // MARK: Writing (in memory)
+    // MARK: Writing
 
-    /// Sets your own status from the sheet. Returns what was stored.
+    /// Sets your own status from the sheet. Returns what was stored locally; the server write follows,
+    /// and a refusal puts the previous status back and raises `statusFailures`.
     @discardableResult
     func setMyStatus(kind: StatusKind, message: String, duration: StatusDuration) -> FriendStatus {
         let status = FriendStatus(kind: kind, message: message, since: now, until: duration.end(from: now, calendar: calendar))
+        let previous = statuses[you.id]
         statuses[you.id] = status
+        write(previous: previous, rolledBackTo: status) { try await $0.setMyStatus(status) }
         return status
     }
 
-    func clearMyStatus() { statuses[you.id] = nil }
+    func clearMyStatus() {
+        let previous = statuses[you.id]
+        statuses[you.id] = nil
+        write(previous: previous, rolledBackTo: nil) { try await $0.clearMyStatus() }
+    }
+
+    /// `applied` is what this call put on screen: the rollback only happens if it is still there, so a
+    /// later change of yours is never undone by an earlier failure.
+    private func write(previous: FriendStatus?, rolledBackTo applied: FriendStatus?,
+                       _ operation: @escaping (ProposalStore) async throws -> Void) {
+        guard let store else { return }
+        let before = statusWrites
+        statusWritesInFlight += 1
+        statusWrites = Task { [weak self] in
+            await before?.value
+            do {
+                try await operation(store)
+                self?.finishWrite(failed: nil, previous: previous, applied: applied)
+            } catch {
+                self?.finishWrite(failed: UserFacingError.map(error, action: .setStatus), previous: previous, applied: applied)
+            }
+        }
+    }
+
+    private func finishWrite(failed: UserFacingError?, previous: FriendStatus?, applied: FriendStatus?) {
+        statusWritesInFlight -= 1
+        guard let failed else { return }
+        if statuses[you.id] == applied { statuses[you.id] = previous }
+        statusError = failed
+        statusFailures += 1
+    }
 
     /// Makes a crew from the ticked friends and returns it.
     @discardableResult

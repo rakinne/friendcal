@@ -436,6 +436,26 @@ public final class SupabaseProposalStore: ProposalStore, AppleSignInCapable {
         }
     }
 
+    public func setMyStatus(_ status: FriendStatus) async throws {
+        try await perform { _ in
+            try await self.client.rpc("set_my_status", params: SetStatusParams(
+                p_kind: status.kind.rawValue, p_message: status.message, p_until: status.until)).execute()
+        }
+    }
+
+    public func clearMyStatus() async throws {
+        try await perform { _ in
+            try await self.client.rpc("clear_my_status").execute()
+        }
+    }
+
+    public func friendStatuses() async throws -> [UUID: FriendStatus] {
+        try await perform { _ in
+            let rows: [StatusRow] = try await self.client.rpc("friend_statuses").execute().value
+            return Dictionary(rows.compactMap { row in row.model.map { (row.userID, $0) } }, uniquingKeysWith: { first, _ in first })
+        }
+    }
+
     public func removeFriend(_ userID: UUID) async throws {
         try await perform { _ in
             try await self.client.rpc("remove_friend", params: ["p_user": userID]).execute()
@@ -855,6 +875,33 @@ private struct FriendRow: Decodable {
     var connectedAt: Date?
     enum CodingKeys: String, CodingKey { case id, displayName = "display_name", avatarURL = "avatar_url", connectedAt = "connected_at" }
     var model: Friend { Friend(id: id, name: displayName ?? "", avatarURL: avatarURL.flatMap(URL.init(string:)), connectedAt: connectedAt) }
+}
+
+/// `p_until` is sent as an explicit null: Postgres resolves a function by its argument names.
+private struct SetStatusParams: Encodable {
+    var p_kind: String
+    var p_message: String
+    var p_until: Date?
+    enum CodingKeys: String, CodingKey { case p_kind, p_message, p_until }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(p_kind, forKey: .p_kind)
+        try c.encode(p_message, forKey: .p_message)
+        try c.encode(p_until, forKey: .p_until)
+    }
+}
+
+private struct StatusRow: Decodable {
+    var userID: UUID
+    var kind: String
+    var message: String
+    var since: Date
+    var until: Date?
+    enum CodingKeys: String, CodingKey { case userID = "user_id", kind, message, since, until }
+    /// nil for a kind this build does not know (a newer app wrote it): shown as no status, not a crash.
+    var model: FriendStatus? {
+        StatusKind(rawValue: kind).map { FriendStatus(kind: $0, message: message, since: since, until: until) }
+    }
 }
 
 private struct TagAlongRow: Decodable {
