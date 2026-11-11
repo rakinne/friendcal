@@ -487,7 +487,7 @@ begin
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public' and c.relkind = 'r'
      and c.relname in ('busy_blocks', 'events', 'availability_slots', 'proposals', 'circles', 'circle_members',
-                       'proposal_places', 'place_votes')
+                       'proposal_places', 'place_votes', 'friendships', 'friend_links', 'friend_removals')
      and not c.relrowsecurity;
   if v_tables is not null then
     raise exception 'rls.sql: row level security is off on %', v_tables;

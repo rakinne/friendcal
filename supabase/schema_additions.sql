@@ -126,3 +126,72 @@ as $$
 $$;
 revoke all on function friendcal_has_recipient(jsonb, uuid) from public, anon;
 grant execute on function friendcal_has_recipient(jsonb, uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Add a friend (docs/designs/friendcal-add-friend-spec.md, section 6). Server rules live in
+-- friends.sql, users_auth.sql and social.sql; these are the three tables and the one predicate the
+-- users read policy needs, so they exist before any policy that mentions them.
+--
+-- No client reads or writes any of the three tables: RLS on, every privilege revoked, no policy.
+-- Every access goes through a definer function that reads auth.uid() itself.
+-- ---------------------------------------------------------------------------
+
+-- One row per pair. The smaller id goes first, which is what makes the pair a primary key whichever
+-- of the two people accepted. uuid compares bytewise, the same in least()/greatest() and in `<`.
+create table if not exists friendships (
+  user_a uuid not null references users(id),
+  user_b uuid not null references users(id),
+  created_at timestamptz not null default now(),
+  primary key (user_a, user_b),
+  constraint friendships_ordered check (user_a < user_b)
+);
+create index if not exists friendships_by_b on friendships (user_b);
+
+-- One reusable personal link per user. The token is 22 base64url characters (friends.sql), never
+-- returned to anyone but its owner. No expiry column: a link lives until its owner resets it.
+-- token_accepts is what the 50-accept cap counts and resets with the token; accept_count and
+-- mint_count are lifetime counters for the README query.
+create table if not exists friend_links (
+  user_id uuid primary key references users(id),
+  token text not null unique check (token ~ '^[A-Za-z0-9_-]{22}$'),
+  created_at timestamptz not null default now(),
+  token_accepts int not null default 0,
+  accept_count int not null default 0,
+  mint_count int not null default 1,
+  last_accepted_at timestamptz
+);
+
+-- Written only when a friendship was actually deleted, so two people can never hold records against
+-- each other. The removed person reads the remover's links as dead; see friends.sql.
+create table if not exists friend_removals (
+  remover uuid not null references users(id),
+  removed uuid not null references users(id),
+  created_at timestamptz not null default now(),
+  primary key (remover, removed)
+);
+create index if not exists friend_removals_by_removed on friend_removals (removed);
+
+alter table friendships enable row level security;
+alter table friend_links enable row level security;
+alter table friend_removals enable row level security;
+revoke all on friendships, friend_links, friend_removals from authenticated, anon;
+
+-- Is the caller friends with p_other? Takes only the other person's id and reads auth.uid() itself,
+-- so it cannot be asked about two third parties. Definer, because the caller has no privilege on
+-- friendships; always true or false, never NULL (a NULL in a policy arm or an `if not` fails open).
+-- It reads no `users` column, so it can be created before users_auth.sql and is_active().
+create or replace function friendcal_is_friend(p_other uuid) returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    auth.uid() is not null and p_other is not null
+    and exists (select 1 from friendships f
+                 where f.user_a = least(auth.uid(), p_other)
+                   and f.user_b = greatest(auth.uid(), p_other)),
+    false)
+$$;
+revoke all on function friendcal_is_friend(uuid) from public, anon;
+grant execute on function friendcal_is_friend(uuid) to authenticated;

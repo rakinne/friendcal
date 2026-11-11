@@ -60,7 +60,7 @@ newdb() { psql_db postgres -c "create database $1" >/dev/null; }
 # Every .sql file this wave adds, in application order, after schema.sql. Each must be idempotent.
 # schema_additions.sql comes first: every policy, view and function after it may assume its columns.
 WAVE_SQL=(schema_additions.sql lock_proposal.sql rls.sql)
-for f in users_auth.sql join_proposal.sql commitments.sql places.sql social.sql; do
+for f in users_auth.sql join_proposal.sql commitments.sql places.sql social.sql friends.sql; do
   [[ -f "$ROOT/supabase/$f" ]] && WAVE_SQL+=("$f")
 done
 
@@ -194,6 +194,83 @@ if git -C "$ROOT" cat-file -e origin/main:supabase/schema.sql 2>/dev/null; then
 else
   echo "  skip - upgrade check (origin/main:supabase/schema.sql not available)"
 fi
+
+# ---------------------------------------------------------------------------
+# 3c. App/server contract: every RPC the app calls must exist in the schema this wave builds, be
+#     executable by `authenticated`, and not by `anon`. The names are read from the Swift source, so
+#     there is no list to keep in sync. This is the check that was missing when the app shipped
+#     calling friend_link()/my_friends() while friends.sql had not reached main: the in-memory store
+#     answers every Swift test, so only the server schema can say a function is absent.
+#     WAVE_SQL skips a file that is not on disk, so a missing SQL file shows up HERE, by name.
+#     Scope is app/FriendCal only: app/.build holds vendored packages with their own .rpc( samples.
+# ---------------------------------------------------------------------------
+echo "# app/server contract: every RPC the app calls exists and is granted"
+APP_RPCS="$(grep -rhoE '\.rpc\("[A-Za-z0-9_]+"' "$ROOT/app/FriendCal" --include='*.swift' | sed -E 's/.*\("//; s/"$//' | sort -u)"
+if [[ -z "$APP_RPCS" ]]; then
+  fail "contract: found no .rpc(\"...\") calls under app/FriendCal; the extraction pattern or path has rotted"
+else
+  check_app_rpcs() {
+    local db="$1" label="$2" fn missing=0
+    for fn in $APP_RPCS; do
+      # A name can be overloaded; require at least one definition the caller can execute.
+      row="$(psql_db "$db" -tAc "select coalesce(bool_or(has_function_privilege('authenticated', p.oid, 'EXECUTE')), false)::text
+                                       || ',' || coalesce(bool_or(has_function_privilege('anon', p.oid, 'EXECUTE')), false)::text
+                                   from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = '$fn'
+                                  having count(*) > 0" | tr -d ' ')"
+      if [[ -z "$row" ]]; then
+        fail "contract ($label): the app calls $fn() but no supabase/*.sql file in the wave defines it"; missing=1
+      elif [[ "$row" != "true,false" ]]; then
+        fail "contract ($label): $fn() grants authenticated/anon execute as '$row' (want true,false)"; missing=1
+      fi
+    done
+    [[ "$missing" == 0 ]] && echo "  ok - $label: all $(wc -w <<<"$APP_RPCS" | tr -d ' ') RPCs the app calls are defined and granted to authenticated only"
+    return 0
+  }
+  newdb contract_fresh
+  psql_db contract_fresh -f "$ROOT/supabase/tests/supabase-stubs.sql" >/dev/null
+  psql_db contract_fresh -f "$ROOT/supabase/schema.sql" 2>&1 | quiet
+  load_wave contract_fresh loose
+  check_app_rpcs contract_fresh "fresh schema"
+  [[ -n "$UPGRADED" ]] && check_app_rpcs "$UPGRADED" "upgraded schema"
+fi
+
+# ---------------------------------------------------------------------------
+# 3b. The social schema from origin/main, WITH a queued push, takes this wave. push_outbox_kind is
+#     replaced in place (friends.sql adds friend_joined); the queued row must survive that, a
+#     friend_joined row must then be accepted, and the wave must be safe to apply a second time.
+# ---------------------------------------------------------------------------
+echo "# upgrade: a queued push survives the friend_joined kind change"
+PREV_WAVE=(schema_additions.sql lock_proposal.sql rls.sql users_auth.sql join_proposal.sql commitments.sql places.sql social.sql)
+if git -C "$ROOT" cat-file -e origin/main:supabase/social.sql 2>/dev/null; then
+  newdb upgrade_push
+  psql_db upgrade_push -f "$ROOT/supabase/tests/supabase-stubs.sql" >/dev/null
+  git -C "$ROOT" show origin/main:supabase/schema.sql | psql_db upgrade_push 2>&1 | quiet
+  psql_db upgrade_push -f "$ROOT/supabase/tests/upgrade_fixture.sql" 2>&1 | quiet
+  for f in "${PREV_WAVE[@]}"; do
+    if git -C "$ROOT" cat-file -e "origin/main:supabase/$f" 2>/dev/null; then
+      git -C "$ROOT" show "origin/main:supabase/$f" | psql_loose upgrade_push 2>&1 | quiet
+    fi
+  done
+  PA1=00000000-0000-0000-0000-0000000000a1; PA2=00000000-0000-0000-0000-0000000000a2
+  psql_db upgrade_push -c "insert into push_outbox(recipient_id, kind, title, body) values ('$PA1', 'poke', 'Sam poked you', 'queued before the upgrade')"
+  load_wave upgrade_push loose
+  [[ "$(psql_db upgrade_push -tAc "select count(*) from push_outbox where kind = 'poke' and body = 'queued before the upgrade'")" == 1 ]] \
+    || fail "the queued poke push did not survive the upgrade"
+  PTOK="$(psql_db upgrade_push -tAc "select t.scalar('select friend_link() ->> ''token''', '$PA1'::uuid)")"
+  PST="$(psql_db upgrade_push -tAc "select t.scalar(format('select accept_friend_link(%L) ->> ''status''', '$PTOK'), '$PA2'::uuid)")"
+  PJ="$(psql_db upgrade_push -tAc "select count(*) from push_outbox where kind = 'friend_joined' and recipient_id = '$PA1'")"
+  # Applying the wave again must keep both rows and stay green.
+  load_wave upgrade_push strict
+  PKEPT="$(psql_db upgrade_push -tAc "select count(*) from push_outbox where recipient_id = '$PA1'")"
+  if [[ "$PST" == valid && "$PJ" == 1 && "$PKEPT" == 2 ]]; then
+    echo "  ok - the queued poke push is kept, a friend_joined push is then accepted, and a second apply keeps both"
+  else
+    fail "push upgrade: accept=$PST friend_joined=$PJ rows after reapply=$PKEPT (want valid, 1, 2)"
+  fi
+else
+  echo "  skip - push upgrade (origin/main:supabase/social.sql not available)"
+fi
+
 
 # ---------------------------------------------------------------------------
 # 4. Test files. Each gets its own database so one file's fixtures cannot be another file's
@@ -415,4 +492,109 @@ fi
 grep -q 'proposal_is_readable' "$ROOT/supabase/places.sql" && ! grep -q 'recipientIDs' "$ROOT/supabase/places.sql" \
   && echo "  ok - places.sql reuses proposal_is_readable and has no second copy of the membership test" \
   || { echo "  not ok - places.sql re-derives plan membership instead of calling proposal_is_readable"; exit 1; }
+# ---------------------------------------------------------------------------
+# 7. Friend links (friends.sql): accept against reset, deletion and removal, and poke against removal,
+#    each in BOTH commit orders. accept, remove, reset, delete_account and send_poke all serialize on
+#    friendcal_lock_users and re-read what they depend on after taking it, so the second to arrive
+#    always sees the first. race A B: A runs in one transaction and holds it open 1.5s before it
+#    commits; B starts 0.4s later and has to wait for A's per-user lock.
+# ---------------------------------------------------------------------------
+echo "# friend link ordering"
+fu() { printf '00000000-0000-0000-0000-0000000f%04x' "$1"; }
+as() { echo "select t.become('authenticated', '$1');"; }
+race() {
+  psql_db "$CDB" -tA -c "begin; $1 select pg_sleep(1.5); commit;" >"$TMP/ra.out" 2>&1 &
+  local a=$!
+  # gstack-timing-ok: B only needs to start while A holds its transaction open (A sleeps 1.5s); a slower B still finds A committed and answers the same.
+  sleep 0.4
+  psql_db "$CDB" -tA -c "begin; $2 commit;" >"$TMP/rb.out" 2>&1 || true
+  wait $a || true
+}
+expect() { # expect <name> <actual> <wanted>
+  if [[ "$2" == "$3" ]]; then echo "  ok - $1"; else
+    echo "  not ok - $1: got '$2', want '$3'"; echo "    A: $(cat "$TMP/ra.out")"; echo "    B: $(cat "$TMP/rb.out")"; exit 1
+  fi
+}
+q() { psql_db "$CDB" -tAc "$1"; }
+# newpair <n>: owner fu(2n) with a link and joiner fu(2n+1); sets O, J and TOK.
+newpair() {
+  O="$(fu $((2 * $1)))"; J="$(fu $((2 * $1 + 1)))"
+  psql_db "$CDB" -o /dev/null -c "
+    insert into users(id, display_name) values ('$O', 'Owner $1'), ('$J', 'Joiner $1');
+    insert into auth.users(id, email) values ('$O', '$O@example.com'), ('$J', '$J@example.com');
+    insert into friend_links(user_id, token) values ('$O', friendcal_new_friend_token());"
+  TOK="$(q "select token from friend_links where user_id = '$O'")"
+}
+befriend() { psql_db "$CDB" -o /dev/null -c "insert into friendships(user_a, user_b) values (least('$O'::uuid, '$J'), greatest('$O'::uuid, '$J'))"; }
+pairs() { q "select count(*) from friendships where '$O' in (user_a, user_b) and '$J' in (user_a, user_b)"; }
+
+# 7a. accept commits first, then the owner resets: the accept stays; the old token is dead after.
+newpair 1
+race "$(as "$J") select accept_friend_link('$TOK');" "$(as "$O") select reset_friend_link();"
+expect "accept then reset: the friendship stays" "$(pairs)" 1
+expect "accept then reset: the owner has a new token" \
+  "$(q "select token <> '$TOK' from friend_links where user_id = '$O'")" t
+
+# 7b. reset commits first, then the accept arrives with the old token: dead, nobody connected.
+newpair 2
+race "$(as "$O") select reset_friend_link();" "$(as "$J") select accept_friend_link('$TOK');"
+expect "reset then accept: the old token answers dead" "$(grep -c '"status": "dead"' "$TMP/rb.out")" 1
+expect "reset then accept: nobody connected" "$(pairs)" 0
+
+# 7c. accept commits first, then the owner deletes the account: no friendship survives the deletion.
+newpair 3
+race "$(as "$J") select accept_friend_link('$TOK');" "$(as "$O") select delete_account();"
+expect "accept then deletion: the friendship does not survive" "$(pairs)" 0
+expect "accept then deletion: the link is gone" "$(q "select count(*) from friend_links where user_id = '$O'")" 0
+expect "accept then deletion: no deadlock" "$(cat "$TMP/ra.out" "$TMP/rb.out" | grep -c deadlock || true)" 0
+
+# 7d. deletion commits first, then the accept arrives: dead, and no friendship is born beside a deleted account.
+newpair 4
+race "$(as "$O") select delete_account();" "$(as "$J") select accept_friend_link('$TOK');"
+expect "deletion then accept: dead" "$(grep -c '"status": "dead"' "$TMP/rb.out")" 1
+expect "deletion then accept: nobody connected" "$(pairs)" 0
+
+# 7e. accept (already friends) commits first, then the owner removes the joiner: removed, recorded.
+newpair 5; befriend
+race "$(as "$J") select accept_friend_link('$TOK');" "$(as "$O") select remove_friend('$J');"
+expect "accept then removal: the friendship is gone" "$(pairs)" 0
+expect "accept then removal: the removal is on record" "$(q "select count(*) from friend_removals where remover = '$O' and removed = '$J'")" 1
+
+# 7f. removal commits first, then the accept arrives: dead, and the removed person stays removed.
+newpair 6; befriend
+race "$(as "$O") select remove_friend('$J');" "$(as "$J") select accept_friend_link('$TOK');"
+expect "removal then accept: dead" "$(grep -c '"status": "dead"' "$TMP/rb.out")" 1
+expect "removal then accept: still not friends" "$(pairs)" 0
+
+# 7g. poke commits first, then the removal: the poke was sent while they were friends and stays.
+newpair 7; befriend
+race "$(as "$O") select send_poke('$J');" "$(as "$O") select remove_friend('$J');"
+expect "poke then removal: the poke was sent" "$(q "select count(*) from pokes where from_user = '$O' and to_user = '$J'")" 1
+expect "poke then removal: they are no longer friends" "$(pairs)" 0
+
+# 7h. removal commits first, then a poke arrives: refused as a non-friend, and no poke row exists.
+newpair 8; befriend
+race "$(as "$O") select remove_friend('$J');" "$(as "$J") select send_poke('$O');"
+expect "removal then poke: refused" "$(grep -c 'FC_NOT_FRIEND' "$TMP/rb.out")" 1
+expect "removal then poke: no poke follows a removal" \
+  "$(q "select count(*) from pokes where '$O' in (from_user, to_user) and '$J' in (from_user, to_user)")" 0
+expect "removal then poke: no push either" "$(q "select count(*) from push_outbox where recipient_id in ('$O', '$J') and kind = 'poke'")" 0
+
+# 7i. Two accepts of one link by the same person at once: one friendship, one push, one count.
+newpair 9
+race "$(as "$J") select accept_friend_link('$TOK');" "$(as "$J") select accept_friend_link('$TOK');"
+expect "double accept: one friendship" "$(pairs)" 1
+expect "double accept: counted once" "$(q "select token_accepts from friend_links where user_id = '$O'")" 1
+expect "double accept: one push" "$(q "select count(*) from push_outbox where recipient_id = '$O' and kind = 'friend_joined'")" 1
+
+# 7j. Two people accepting each other's links at once: one friendship, one push.
+newpair 10
+O1="$O"; J1="$J"; OTOK="$TOK"
+psql_db "$CDB" -o /dev/null -c "insert into friend_links(user_id, token) values ('$J1', friendcal_new_friend_token())"
+JTOK="$(q "select token from friend_links where user_id = '$J1'")"
+race "$(as "$J1") select accept_friend_link('$OTOK');" "$(as "$O1") select accept_friend_link('$JTOK');"
+expect "mutual accept: one friendship" "$(pairs)" 1
+expect "mutual accept: one push in all" "$(q "select count(*) from push_outbox where recipient_id in ('$O1', '$J1') and kind = 'friend_joined'")" 1
+
+
 echo "sql tests: all passed"
