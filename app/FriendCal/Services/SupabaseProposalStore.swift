@@ -420,6 +420,22 @@ public final class SupabaseProposalStore: ProposalStore, AppleSignInCapable {
         }
     }
 
+    public func myDisplayName() async throws -> String? {
+        try await perform { me in
+            let rows: [UserRow] = try await self.client.from("users").select(Self.userColumns)
+                .eq("id", value: me.uuidString).limit(1).execute().value
+            guard let name = PlaceText.trimmedOrNil(rows.first?.displayName), name != Self.placeholderName else { return nil }
+            return name
+        }
+    }
+
+    public func setDisplayName(_ name: String) async throws {
+        guard let name = PlaceText.trimmedOrNil(name) else { return }
+        try await perform { me in
+            try await self.client.from("users").update(["display_name": name]).eq("id", value: me.uuidString).execute()
+        }
+    }
+
     public func removeFriend(_ userID: UUID) async throws {
         try await perform { _ in
             try await self.client.rpc("remove_friend", params: ["p_user": userID]).execute()

@@ -100,6 +100,10 @@ struct MeView: View {
             UserDefaults.standard.set(t, forKey: "FriendCalDisplayName.\(id.uuidString)")
         }
         isEditingName = false
+        Task {
+            do { try await store.setDisplayName(t) }
+            catch { toast = "Couldn't save your name. Try again." }
+        }
     }
     private func load() async {
         if let id = store.currentUserID, let cached = UserDefaults.standard.string(forKey: "FriendCalDisplayName.\(id.uuidString)") {
@@ -107,6 +111,7 @@ struct MeView: View {
         } else if let user = (store as? InMemoryProposalStore)?.users.first(where: { $0.id == store.currentUserID }) {
             displayName = user.displayName
         }
+        if let saved = try? await store.myDisplayName() { displayName = saved }
         do {
             let c = try await store.myCommitments(from: .now)
             commitments = c

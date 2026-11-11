@@ -463,6 +463,17 @@ public final class InMemoryProposalStore: ProposalStore {
         proposals.contains { $0.status != .cancelled && $0.isReadable(by: a) && $0.isReadable(by: b) }
     }
 
+    public func myDisplayName() async throws -> String? {
+        guard let me = currentUserID else { return nil }
+        return users.first { $0.id == me }.flatMap { PlaceText.trimmedOrNil($0.displayName) }
+    }
+
+    public func setDisplayName(_ name: String) async throws {
+        guard let me = currentUserID, let name = PlaceText.trimmedOrNil(name),
+              let i = users.firstIndex(where: { $0.id == me }) else { return }
+        users[i].displayName = name
+    }
+
     private func displayName(_ id: UUID) -> String {
         let name = users.first { $0.id == id }?.displayName.trimmingCharacters(in: .whitespaces) ?? ""
         return name.isEmpty ? SocialInbox.unknownName : name

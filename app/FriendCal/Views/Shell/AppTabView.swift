@@ -137,7 +137,10 @@ struct AppTabView: View {
     private func openAddFriend() {
         Task {
             guard await PresentationGate.waitUntilClear(), let me = store.currentUserID else { return }
-            friendSheet = FriendLinkSession(store: store, account: me, senderName: groups.you.name, cache: linkCache)
+            // groups.you.name is the fixture's "You" for a real account; the saved profile name is the sender.
+            let saved = (try? await store.myDisplayName())
+                ?? UserDefaults.standard.string(forKey: "FriendCalDisplayName.\(me.uuidString)")
+            friendSheet = FriendLinkSession(store: store, account: me, senderName: saved ?? "", cache: linkCache)
         }
     }
 
