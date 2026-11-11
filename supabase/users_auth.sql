@@ -38,6 +38,9 @@ create policy "users_read_self_and_co_participants"
          where p.created_by = users.id
             or friendcal_has_recipient(p.distribution, users.id)
       )
+      -- A friend reads the name and avatar beside the Busy blocks they could already see. This arm
+      -- widens the users row and nothing else: no policy on a plan, place, vote or Busy block moves.
+      or friendcal_is_friend(users.id)
     )
   );
 
@@ -165,7 +168,9 @@ begin
   -- One locking protocol (F1): every person whose holds this call is about to touch, locked in the
   -- one shared order. Without this, delete_account and lock_proposal can take the same per-user
   -- locks in opposite orders and deadlock -- and only ever under concurrency.
-  select coalesce(array_agg(distinct s.user_id), '{}') into v_affected
+  -- The caller always joins the set, even with no holds: accept_friend_link, remove_friend and
+  -- reset_friend_link serialize on the same per-user lock, so a deletion cannot interleave with them.
+  select coalesce(array_agg(distinct s.user_id), '{}') || v_uid into v_affected
     from availability_slots s
    where s.source_proposal_id = any (v_cancelled) or s.user_id = v_uid;
   perform friendcal_lock_users(v_affected);
@@ -199,6 +204,13 @@ begin
   -- Locked plans are left alone on purpose: their Busy blocks are time other people have already
   -- committed to, and the attendee list is what lets those people still see who they are meeting.
   select count(*) into v_locked from proposals p where p.created_by = v_uid and p.status = 'locked';
+
+  -- Friendships, the link and removal records in both directions go with the account: a deleted
+  -- person is nobody's friend, holds no link, and nobody keeps a record against them. Same
+  -- transaction as the tombstone, under the caller's user lock, so an accept never lands beside it.
+  delete from friendships where user_a = v_uid or user_b = v_uid;
+  delete from friend_links where user_id = v_uid;
+  delete from friend_removals where remover = v_uid or removed = v_uid;
 
   -- The tombstone. The row stays; the identifying content goes.
   update users
