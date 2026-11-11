@@ -96,7 +96,7 @@ struct GroupsView: View {
             StartCrewCard { startBuilding() }.groupsRow(top: 6, bottom: 6)
         }
         if let error = session.loadError {
-            InlineError(error: error, onRetry: { Task { await session.refresh() } })
+            InlineError(error: error, onRetry: { Task { await session.refresh(force: true) } })
                 .groupsRow()
         } else if session.isLoadingRoster {
             Capsule().fill(Color.skeleton).frame(height: 56)

@@ -122,7 +122,7 @@ struct AppTabView: View {
             if phase == .active {
                 Task { await social.refresh() }
                 // The roster is read at launch; later it is read when the app returns from the background.
-                if wasInBackground { wasInBackground = false; Task { await groups.refresh() } }
+                if wasInBackground { wasInBackground = false; Task { await groups.refresh(force: true) } }
             }
         }
     }

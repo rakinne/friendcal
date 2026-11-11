@@ -64,6 +64,7 @@ final class GroupsSession {
     private(set) var celebrations = 0
     private var isOnScreen = false
     private var isRefreshing = false
+    private var lastAttempt: ContinuousClock.Instant?
     private var refreshAgain = false
     private var highlightTask: Task<Void, Never>?
     private(set) var crews: [Crew]
@@ -106,8 +107,13 @@ final class GroupsSession {
     /// Reads the roster. A failure leaves the last roster on screen and retries on the next foreground;
     /// only a failed FIRST load shows an error. A read that began before a local accept or remove is
     /// discarded by the roster.
-    func refresh() async {
+    ///
+    /// `force` is for Retry, a foreground and a local change. Without it, a read attempted within the
+    /// last 1.5 seconds is not repeated: the shell and the screen both ask when the app opens, and the
+    /// second must not paper over the first's failure.
+    func refresh(force: Bool = false) async {
         guard store != nil else { return }
+        if !force, let last = lastAttempt, ContinuousClock.now - last < .seconds(1.5) { return }
         // Concurrent callers (the shell, the screen, a foreground) coalesce into one read, and one
         // more read follows if somebody asked while it was out.
         if isRefreshing { refreshAgain = true; return }
@@ -123,6 +129,7 @@ final class GroupsSession {
 
     private func readRoster() async -> Bool {
         guard let store else { return true }
+        lastAttempt = ContinuousClock.now
         let generation = roster.beginRefresh()
         do {
             let loaded = try await store.friends()
@@ -158,7 +165,7 @@ final class GroupsSession {
         syncFriends()
         knownStore.save(roster.knownIDs, for: you.id)
         celebrate([friend], note: "You and \(friend.name) are connected")
-        Task { await refresh() }
+        Task { await refresh(force: true) }
     }
 
     /// Removes a friend. nil on success; the mapped sentence on failure, with the row back as it was.
