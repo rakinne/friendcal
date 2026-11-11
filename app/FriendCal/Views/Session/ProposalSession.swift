@@ -273,7 +273,7 @@ final class ProposalSession {
 
     /// The invite message with the deep link (design 3.5A).
     var inviteText: String? {
-        proposal.map { ShareText.invite(title: $0.title, url: DeepLink.proposal($0.id, title: $0.title).url) }
+        proposal.map { ShareText.invite(title: $0.title, url: DeepLink.proposal($0.id, title: $0.title).shareURL) }
     }
 
     /// VoiceOver hint when Share is disabled (X6, X10).

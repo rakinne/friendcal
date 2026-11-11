@@ -12,7 +12,7 @@ public struct Moment: Equatable, Sendable {
             switch self {
             case .poke(_, let name): "Poke \(name)"
             case .setStatus: "Set status"
-            case .invite: "Invite"
+            case .invite: "Add a friend"
             }
         }
     }

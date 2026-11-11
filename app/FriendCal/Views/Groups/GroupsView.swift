@@ -22,6 +22,8 @@ struct GroupsView: View {
     var onToast: (String) -> Void = { _ in }
     /// A plan was joined from the Tag along sheet.
     var onOpenPlan: (UUID) -> Void = { _ in }
+    /// Opens the Add a friend sheet (the shell owns it).
+    var onAddFriend: () -> Void = {}
 
     private struct StudioRequest: Identifiable {
         let id = UUID()
@@ -133,6 +135,13 @@ struct GroupsView: View {
                     .accessibilityAddTraits(.isHeader)
             }
             Spacer()
+            Button(action: onAddFriend) {
+                Image(systemName: "person.badge.plus").font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(DesignTokens.Colors.accentHover)
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel("Add a friend")
+            .accessibilityIdentifier("groups.addFriend")
             Button { studio = StudioRequest(kind: nil) } label: {
                 Text(session.myPresence.status == nil ? "Set status" : "Edit status")
                     .textStyle(.label).foregroundStyle(DesignTokens.Colors.onPrimary)
@@ -309,7 +318,7 @@ struct GroupsView: View {
         switch action {
         case .poke(let id, let name): Task { await social.poke(id, name: name) }
         case .setStatus: studio = StudioRequest(kind: nil)
-        case .invite: onToast("Invites by link are coming soon")
+        case .invite: onAddFriend()
         }
     }
 

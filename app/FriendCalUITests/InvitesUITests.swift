@@ -77,7 +77,7 @@ final class InvitesUITests: XCTestCase {
         submit.tap()
         XCTAssertTrue(any(app, "create.success").waitForExistence(timeout: 5))
         XCTAssertEqual(any(app, "create.success").label, "Brunch is live")
-        XCTAssertTrue(any(app, "create.link").label.hasPrefix("friendcal://proposal/"))
+        XCTAssertTrue(any(app, "create.link").label.hasPrefix("https://friendcal.app/p/"))
         XCTAssertTrue(app.buttons["create.share"].exists)
         attach(app, "create-success")
         app.buttons["create.done"].tap()

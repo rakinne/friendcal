@@ -348,7 +348,7 @@ final class ProposalSessionTests: XCTestCase {
     func testInviteTextCarriesDeepLinkAndDemoFlag() throws {
         let s = session(.lockedInviteCreator)
         let id = try XCTUnwrap(s.proposal?.id)
-        XCTAssertTrue(try XCTUnwrap(s.inviteText).contains(DeepLink.proposal(id).url.absoluteString))
+        XCTAssertTrue(try XCTUnwrap(s.inviteText).contains(DeepLink.proposal(id).shareURL.absoluteString))
         XCTAssertTrue(s.isDemo)
         XCTAssertNil(session(.noProposal).inviteText)
     }

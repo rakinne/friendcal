@@ -33,7 +33,7 @@ struct AppTabView: View {
     @Environment(LinkRouter.self) private var router: LinkRouter?
     /// The Accept cover, for the friend link being answered.
     @State private var accept: AcceptRequest?
-    /// The Add a friend sheet (reachable from the debug sheet only until the entry points ship).
+    /// The Add a friend sheet: the Groups header, the wheel's empty state, the Moments line, and the debug sheet.
     @State private var friendSheet: FriendLinkSession?
     @State private var linkCache: FriendLinkCache
     @State private var wasInBackground = false
@@ -77,7 +77,7 @@ struct AppTabView: View {
                 }
             }
             Tab("Groups", systemImage: "person.2", value: .groups) {
-                GroupsView(session: groups, social: social, onToast: { toast.show($0) }, onOpenPlan: openInvite)
+                GroupsView(session: groups, social: social, onToast: { toast.show($0) }, onOpenPlan: openInvite, onAddFriend: openAddFriend)
             }
             // The same count badge the Pokes tab wears: friends who arrived while another tab was up.
             .badge(groups.arrivalCount)

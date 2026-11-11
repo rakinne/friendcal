@@ -45,7 +45,7 @@ final class HomeStatesUITests: XCTestCase {
     func testNoFriends() {
         let app = launch("noFriends")
         XCTAssertTrue(app.staticTexts["Add your first fave"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["wheel.invite"].exists)
+        XCTAssertEqual(app.buttons["wheel.invite"].label, "Add a friend")
         XCTAssertTrue(app.staticTexts["No plans brewing"].exists)
         XCTAssertFalse(app.buttons["home.share"].isEnabled)
         attach(app, "state-no-friends")

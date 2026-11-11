@@ -121,7 +121,7 @@ struct HomeView: View {
                 return session.selectedCell?.roster[member.id]?.word(calendar: session.calendar) ?? (member.isOnline ? "online" : "away")
             },
             onMore: { showDrawer = true },
-            onInvite: { toast.show("Inviting friends is coming soon") }
+            onInvite: onAddFriend
         )
     }
 

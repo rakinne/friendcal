@@ -63,7 +63,7 @@ struct FriendsWheel: View {
                     .textStyle(.title).foregroundStyle(DesignTokens.Colors.text)
                     .multilineTextAlignment(.center)
                 Button(action: onInvite) {
-                    Text("Invite").textStyle(.label).foregroundStyle(DesignTokens.Colors.onPrimary)
+                    Text("Add a friend").textStyle(.label).foregroundStyle(DesignTokens.Colors.onPrimary)
                         .padding(.horizontal, DesignTokens.Spacing.md).frame(minHeight: 44)
                         .background(Capsule().fill(DesignTokens.Colors.accentHover))
                 }

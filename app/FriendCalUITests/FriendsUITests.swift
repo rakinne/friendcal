@@ -149,6 +149,32 @@ final class FriendsUITests: XCTestCase {
         }
     }
 
+    // MARK: Entry points
+
+    /// protects=the Groups header's person.badge.plus button is labeled "Add a friend", is at least 44pt,
+    /// and opens the sheet; fails_when=the button is missing, small, or opens nothing.
+    func testGroupsHeaderButtonOpensTheSheet() {
+        let app = Self.launch(tab: "groups", extra: ["-FriendCalGroups", "crew", "-FriendCalPendingLink", "none"])
+        let button = app.buttons["groups.addFriend"]
+        XCTAssertTrue(button.waitForExistence(timeout: 10))
+        XCTAssertEqual(button.label, "Add a friend")
+        XCTAssertGreaterThanOrEqual(button.frame.height, 43.9)   // 44pt, within float error
+        XCTAssertGreaterThanOrEqual(button.frame.width, 43.9)
+        button.tap()
+        XCTAssertTrue(any(app, "addFriend.link").waitForExistence(timeout: 8))
+    }
+
+    /// protects=the wheel's empty state reads "Add a friend" and opens the sheet; fails_when=it still
+    /// says Invite or toasts "coming soon".
+    func testWheelEmptyStateOpensTheSheet() {
+        let app = Self.launch("noFriends", extra: ["-FriendCalPendingLink", "none"])
+        let pill = app.buttons["wheel.invite"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 10))
+        XCTAssertEqual(pill.label, "Add a friend")
+        pill.tap()
+        XCTAssertTrue(any(app, "addFriend.link").waitForExistence(timeout: 8))
+    }
+
     // MARK: Accept
 
     /// protects=opening a friend link shows Accept with the SERVER's name, calls nothing until Connect, and

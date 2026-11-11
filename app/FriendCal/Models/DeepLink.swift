@@ -35,7 +35,7 @@ public enum DeepLink: Equatable, Sendable {
     public static let proposalWebPath = "p"
     /// Flips to true in the pull request that ships the static site, so every shared link moves
     /// from the custom scheme to https at once.
-    public static let useWebLinks = false
+    public static let useWebLinks = true
     /// Query item carrying a friend's name hint.
     public static let nameKey = "n"
     /// The longest name hint accepted. A first name, not a payload.
