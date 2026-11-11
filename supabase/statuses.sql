@@ -57,18 +57,12 @@ grant execute on function set_my_status(text, text, timestamptz) to authenticate
 -- clear_my_status(): idempotent.
 create or replace function clear_my_status()
 returns void
-language plpgsql
+language sql
 security definer
 set search_path = public
 as $$
-declare
-  v_uid uuid := auth.uid();
-begin
-  if v_uid is null then
-    raise exception 'not signed in' using errcode = '42501', hint = 'FC_NOT_SIGNED_IN';
-  end if;
-  delete from user_statuses where user_id = v_uid;
-end $$;
+  delete from user_statuses where user_id = auth.uid()
+$$;
 revoke all on function clear_my_status() from public, anon;
 grant execute on function clear_my_status() to authenticated;
 
