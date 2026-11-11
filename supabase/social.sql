@@ -19,10 +19,10 @@
 -- an ignored poke costs the recipient one push an hour per friend, and a recipient who answers has
 -- chosen to keep playing. (It replaces "1 per (from, to, proposal) per 24h", docs/DECISIONS.md.)
 --
--- WHO CAN POKE WHOM. There is no friends table yet, so the graph is the one users_auth.sql already
--- uses for reading a name: two people who share a plan neither is hidden from. Everything else --
--- a stranger, a made-up id, a deleted account -- gets the same FC_NOT_FRIEND, so the RPC cannot be
--- used to test whether an id exists.
+-- WHO CAN POKE WHOM. Two people who are friends (friends.sql), or who share a plan neither is hidden
+-- from. Everything else -- a stranger, a made-up id, a deleted account -- gets the same FC_NOT_FRIEND,
+-- so the RPC cannot be used to test whether an id exists. The test runs AFTER the user locks are
+-- taken: remove_friend takes the same locks, so a poke never follows a removal.
 --
 -- TAG ALONG. Joining a plan after it locked. The caller becomes a recipient and an attendee, gets
 -- the same window-sized Busy block lock_proposal() gives everyone else, and the host is told.
@@ -95,9 +95,14 @@ create table if not exists push_outbox (
   sent_at timestamptz,
   attempts int not null default 0,
   last_error text,
-  constraint push_outbox_kind check (kind in ('poke', 'tag_along'))
+  constraint push_outbox_kind check (kind in ('poke', 'tag_along', 'friend_joined'))
 );
 create index if not exists push_outbox_unsent on push_outbox (created_at) where sent_at is null;
+-- friend_joined (friends.sql) joined the kind list after the table first shipped, and `create table
+-- if not exists` leaves an older table's constraint alone, so it is replaced in place. Drop-and-add
+-- is safe to re-run, and a queued row of an older kind still satisfies the new list.
+alter table push_outbox drop constraint if exists push_outbox_kind;
+alter table push_outbox add constraint push_outbox_kind check (kind in ('poke', 'tag_along', 'friend_joined'));
 
 -- ---------------------------------------------------------------------------
 -- 2) Row security and privileges. One `revoke all`, then exactly what a client may do (rls.sql
@@ -181,16 +186,18 @@ begin
   if p_to is null or p_to = v_uid then
     raise exception 'you cannot poke yourself' using errcode = '22023', hint = 'FC_SELF_POKE';
   end if;
-  -- One refusal for "no such person", "deleted" and "not someone you share a plan with".
-  if not is_active(p_to) or not friendcal_share_plan(v_uid, p_to) then
-    raise exception 'you can only poke friends you share a plan with'
-      using errcode = 'P0002', hint = 'FC_NOT_FRIEND';
-  end if;
-
   -- Serialize both people through the one shared protocol (lock_proposal.sql): the helper sorts the
   -- ids, so two people poking each other at once take the same locks in the same order, run one
-  -- after the other, and the second sees the first's poke and answers it.
+  -- after the other, and the second sees the first's poke and answers it. The same lock is what
+  -- remove_friend, accept_friend_link and delete_account take, so the gate below is read after any
+  -- of them that was in flight has committed.
   perform friendcal_lock_users(array[v_uid, p_to]);
+
+  -- One refusal for "no such person", "deleted" and "neither a friend nor on a plan together".
+  if not is_active(p_to) or not (friendcal_is_friend(p_to) or friendcal_share_plan(v_uid, p_to)) then
+    raise exception 'you can only poke friends'
+      using errcode = 'P0002', hint = 'FC_NOT_FRIEND';
+  end if;
 
   select * into v_poke from pokes
    where from_user = v_uid and to_user = p_to
